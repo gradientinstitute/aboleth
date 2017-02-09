@@ -1,0 +1,12 @@
+numpy
+scipy
+matplotlib
+scikit-learn>=0.18.0
+
+# For Edward and tensorflow NN 
+tensorflow>=1.0.0rc0
+Edward
+
+# For Keras NN
+#tensorflow
+#Keras
