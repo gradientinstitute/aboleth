@@ -2,20 +2,25 @@
 import numpy as np
 import matplotlib.pyplot as pl
 import tensorflow as tf
+import edward as ed
 from sklearn.gaussian_process.kernels import RBF, Matern
+from edward.models import Normal
 
 # Settings
 N = 200
 Ns = 400
-kernel = Matern(length_scale=0.5)
+kernel = RBF(length_scale=1)
 noise = 0.1
 
 # Setup the network
-no_features = 2000
-layer_sizes = [10]
+no_features = 100
+layer_sizes = [10, 10]
 
 # Optimization
-NITER = 20000
+NITER = 5000
+NPREDSAMP = 20
+NSAMP = 5
+WPRIOR = 1
 
 
 class RandomFF():
@@ -34,9 +39,17 @@ class RandomFF():
 
 def neural_network(x, W, b, Phi):
     F = x
+    if len(W) == 0:
+        return F
     for W_l, b_l, phi in zip(W, b, Phi):
         P = phi.transform(F)
         F = tf.matmul(P, W_l) + b_l
+    return F
+
+
+def standardlinearmodel(X, W, b, basis):
+    P = basis.transform(X)
+    F = tf.matmul(P, W) + b
     return tf.reshape(F, [-1])
 
 
@@ -82,8 +95,8 @@ def main():
         np.float32(ys)
 
     # Adjust input layer sizes depending on activation
-    dims_in = [1] + layer_sizes
-    dims_out = layer_sizes + [1]
+    dims_in = [1] + layer_sizes[:-1]
+    dims_out = layer_sizes
 
     # Configure Network
     W, b, Phi = [], [], []
@@ -92,39 +105,79 @@ def main():
         W.append(tf.Variable(tf.random_normal((2 * no_features, d_out))))
         b.append(tf.Variable(tf.random_normal((d_out,))))
 
+    if len(layer_sizes) == 0:
+        layer_sizes.append(1)
+
+    # Final Layer
+    Phi_out = RandomFF(layer_sizes[-1], no_features)
+
+    # Prior
+    W_out = Normal(
+        mu=tf.zeros((2 * no_features, 1)),
+        sigma=tf.ones((2 * no_features, 1)) * WPRIOR
+    )
+    b_out = Normal(mu=tf.zeros(1), sigma=tf.ones(1) * WPRIOR)
+
+    # Posterior
+    qW_out = Normal(
+        mu=tf.Variable(tf.random_normal((2 * no_features, 1))),
+        sigma=tf.nn.softplus(
+            tf.Variable(tf.random_normal((2 * no_features, 1)))
+        )
+    )
+    qb_out = Normal(
+        mu=tf.Variable(tf.random_normal((1,))),
+        sigma=tf.nn.softplus(tf.Variable(tf.random_normal((1,))))
+    )
+
     # Model and training
-    y = neural_network(Xr, W, b, Phi)
-    loss = tf.nn.l2_loss(y - yr) + regularizer(W, b)
-    optimizer = tf.train.AdamOptimizer()
-    train = optimizer.minimize(loss)
+    y = Normal(
+        mu=standardlinearmodel(
+            neural_network(Xr, W, b, Phi),
+            W_out,
+            b_out,
+            Phi_out
+        ),
+        sigma=noise * tf.ones(N)
+    )
+
+    # Setup Variational Inference
+    inference = ed.KLqp(
+        {W_out: qW_out, b_out: qb_out},
+        data={y: yr})
 
     # Model prediction
     Xq = np.linspace(-20, 20, Ns, dtype=np.float32)[:, np.newaxis]
     # Xq = tf.constant(Xs)
-    yq = neural_network(Xq, W, b, Phi)
+    mus = []
+    for s in range(NPREDSAMP):
+        mus.append(standardlinearmodel(
+            neural_network(Xq, W, b, Phi),
+            qW_out.sample(),
+            qb_out.sample(),
+            Phi_out
+        ))
 
-    # Before starting, initialize the variables.  We will 'run' this first.
+    mus = tf.transpose(tf.stack(mus))
+
+    # Start session
+    sess = ed.get_session()
     init = tf.global_variables_initializer()
+    init.run()
 
-    # Launch the graph.
-    sess = tf.Session()
-    sess.run(init)
-
-    # Fit the network.
-    for step in range(NITER):
-        sess.run(train)
-        loss_val = sess.run(loss)
-        if step % 100 == 0:
-            print("Iteration {}, loss = {}".format(step, loss_val))
+    # Run inference
+    inference.run(n_iter=NITER)#, n_samples=NSAMP)
 
     # Predict
-    Ey = sess.run(yq)
+    Eys = mus.eval()
+    Ey = Eys.mean(axis=1)
 
     # Plot
     pl.figure()
     pl.plot(Xr.flatten(), yr, 'bx')
     pl.plot(Xs.flatten(), ys, 'k')
-    pl.plot(Xq.flatten(), Ey.flatten(), 'r')
+    pl.plot(Xq.flatten(), Eys, 'r', alpha=0.1)
+    pl.plot(Xq.flatten(), Ey, 'r--')
     pl.show()
 
     # Close the Session when we're done.
