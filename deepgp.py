@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.distributions import Normal
 
 
 class DeepGP():
@@ -10,25 +9,25 @@ class DeepGP():
             n_features=100,
             layer_sizes=[],
             var=1.0,
+            reg=0.1,
             n_samples=5
     ):
         self.n_features = n_features
         self.layer_sizes = layer_sizes
         self.var = var
+        self.reg = reg
         self.n_samples = n_samples
 
-    def fit(self, X, y):
-
+    def fit(self, X, y, N=None):
         self._make_NN(X, y)
-        loss = - self._ELL(X, y) + self._KL()
+        # Mini-batch discount factor
+        B = 1 if N is None else N / len(X)
+        loss = - B * self._ELL(X, y) + self._KL()
         return loss
 
     def predict(self, X, n_samples=20):
-        Eys = []
-        for _ in range(n_samples):
-            W_samp = [q.sample() for q in self.qW]
-            b_samp = [q.sample() for q in self.qb]
-            Eys.append(self._evaluate_NN(X, W_samp, b_samp))
+        Eys = [self._evaluate_NN(X, *self._sample_q())
+               for _ in range(n_samples)]
         return tf.transpose(tf.stack(Eys))
 
     def _make_NN(self, X, y):
@@ -36,34 +35,36 @@ class DeepGP():
         self.Xd = X.shape[1]
         self.yd = y.shape[1] if np.ndim(y) > 1 else 1
 
-        # Adjust input layer sizes depending on activation
+        # Adjust input layer sizes dependig on activation
         dims_in = [self.Xd] + self.layer_sizes
         dims_out = self.layer_sizes + [self.yd]
         fout = 2 * self.n_features
 
         # Initialize weight priors and approximate posteriors
         self.pW, self.qW, self.pb, self.qb, self.Phi = [], [], [], [], []
-        for din, dout in zip(dims_in, dims_out):
-            self.Phi.append(RandomFF(din, self.n_features))
+        for di, do in zip(dims_in, dims_out):
+            self.Phi.append(RandomFF(di, self.n_features))
 
             # Priors
-            self.pW.append(Gaussian(
-                mu=tf.zeros((fout, dout)),
-                var=tf.ones((fout, dout))
+            self.pW.append(Normal(
+                mu=tf.zeros((fout, do)),
+                var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((fout, do))
+                # var=tf.ones((fout, do))
             ))
-            self.pb.append(Gaussian(
-                mu=tf.zeros((dout,)),
-                var=tf.ones((dout,))
+            self.pb.append(Normal(
+                mu=tf.zeros((do,)),
+                var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((do,))
+                # var=tf.ones((do,))
             ))
 
             # Posteriors
-            self.qW.append(Gaussian(
-                mu=tf.Variable(tf.random_normal((fout, dout))),
-                var=tf.nn.softplus(tf.Variable(tf.random_normal((fout, dout))))
+            self.qW.append(Normal(
+                mu=tf.Variable(tf.random_normal((fout, do))),
+                var=tf.nn.softplus(tf.Variable(tf.random_normal((fout, do))))
             ))
-            self.qb.append(Gaussian(
-                mu=tf.Variable(tf.random_normal((dout,))),
-                var=tf.nn.softplus(tf.Variable(tf.random_normal((dout,))))
+            self.qb.append(Normal(
+                mu=tf.Variable(tf.random_normal((do,))),
+                var=tf.nn.softplus(tf.Variable(tf.random_normal((do,))))
             ))
 
         # TODO: Initialize this properly! Or better yet, make this class not
@@ -75,50 +76,53 @@ class DeepGP():
         for W_l, b_l, phi in zip(W, b, self.Phi):
             P = phi.transform(F)
             F = tf.matmul(P, W_l) + b_l
-        return tf.reshape(F, [-1])
+        Ey = tf.squeeze(F) if self.yd == 1 else F
+        return Ey
 
     def _likelihood(self, X, y, W, b):
         f = self._evaluate_NN(X, W, b)
-        ll = normal_logpdf(y, f, self.var)
+        ll = Normal(f, self.var).log_pdf(y)
         return tf.reduce_sum(ll)
 
     def _KL(self):
         KL = 0
         for qW, pW, qb, pb in zip(self.qW, self.pW, self.qb, self.pb):
-            KL += normal_KLqp(qW.mu, pW.mu, qW.var, pW.var)
-            KL += normal_KLqp(qb.mu, pb.mu, qb.var, pb.var)
+            KL += (normal_KLqp(qW, pW) + normal_KLqp(qb, pb))
         return KL
 
     def _ELL(self, X, y):
-
         ELL = 0
         for _ in range(self.n_samples):
-            W, b = [], []
-            for qW, qb in zip(self.qW, self.qb):
-                E = np.random.randn(*qW.shape())
-                e = np.random.randn(*qb.shape())
-                W.append(qW.mu + E * qW.std)
-                b.append(qb.mu + e * qb.std)
-
-            ELL += self._likelihood(X, y, W, b)
-
+            ELL += self._likelihood(X, y, *self._sample_q())
         return ELL / self.n_samples
 
+    def _sample_q(self):
+        W_samp = [q.sample() for q in self.qW]
+        b_samp = [q.sample() for q in self.qb]
+        return W_samp, b_samp
 
-# TODO can we just use Normal? Or even sub-class normal to provide var?
-class Gaussian():
+
+# TensorFlow contribs stats (tf.contrib.distribution.norm) seem to be effed,
+# also we can control the reparameterisation trick in here
+class Normal():
 
     def __init__(self, mu, var):
         self.mu = mu
         self.var = var
-        self.std = tf.sqrt(var)
+        self.sigma = tf.sqrt(var)
 
     def sample(self):
-        norm = Normal(self.mu, self.std)
-        return norm.sample()
+        # Reparameterisation trick
+        e = tf.random_normal(self.shape())
+        x = self.mu + e * self.sigma
+        return x
 
     def shape(self):
         return self.mu.get_shape()
+
+    def log_pdf(self, x):
+        l = -0.5 * (tf.log(2 * self.var * np.pi) + (x - self.mu)**2 / self.var)
+        return l
 
 
 class RandomFF():
@@ -126,7 +130,6 @@ class RandomFF():
     def __init__(self, input_dim, n_features):
         self.D = np.float32(n_features)
         self.d = input_dim
-        # TODO use tensorflow constants here?
         self.P = np.random.randn(input_dim, n_features).astype(np.float32)
 
     def transform(self, F):
@@ -136,12 +139,7 @@ class RandomFF():
         return tf.concat([real, imag], axis=1) / tf.sqrt(self.D)
 
 
-def normal_KLqp(mu_p, mu_q, var_p, var_q):
-    var_qp = var_q / var_p
-    KL = (mu_q - mu_p)**2 / (2 * var_p) + 0.5 * (var_qp - 1 - tf.log(var_qp))
+def normal_KLqp(q, p):
+    KL = 0.5 * (tf.log(p.var) - tf.log(q.var) + q.var / p.var - 1 +
+                (q.mu - p.mu)**2 / p.var)
     return tf.reduce_sum(KL)
-
-
-def normal_logpdf(x, mu, var):
-    norm = Normal(mu, tf.sqrt(var))
-    return norm.log_pdf(x)

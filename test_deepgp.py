@@ -9,15 +9,15 @@ from deepgp import DeepGP
 # Settings
 N = 200
 Ns = 400
-kernel = Matern(length_scale=0.5)
+kernel = RBF(length_scale=1.)
 noise = 0.1
 
 # Setup the network
-no_features = 200
-layer_sizes = [10]
+no_features = 100
+layer_sizes = [20]
 
 # Optimization
-NITER = 20000
+NITER = 200000
 
 
 def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
