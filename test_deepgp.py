@@ -17,7 +17,7 @@ no_features = 200
 layer_sizes = [10]
 
 # Optimization
-NITER = 1000
+NITER = 20000
 
 
 def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
@@ -53,8 +53,10 @@ def main():
     Xr, yr, Xs, ys = np.float32(Xr), np.float32(yr), np.float32(Xs), \
         np.float32(ys)
 
-    dgp = DeepGP(no_features, layer_sizes)
+    dgp = DeepGP(no_features, layer_sizes, var=noise**2)
     loss = dgp.fit(Xr, yr)
+    optimizer = tf.train.AdamOptimizer()
+    train = optimizer.minimize(loss)
 
     # Launch the graph.
     init = tf.global_variables_initializer()
@@ -70,12 +72,14 @@ def main():
 
     # Predict
     Ey = sess.run(dgp.predict(Xs))
+    Eymean = Ey.mean(axis=1)
 
     # Plot
     pl.figure()
     pl.plot(Xr.flatten(), yr, 'bx')
     pl.plot(Xs.flatten(), ys, 'k')
-    pl.plot(Xq.flatten(), Ey.flatten(), 'r')
+    pl.plot(Xs.flatten(), Ey, 'r', alpha=0.2)
+    pl.plot(Xs.flatten(), Eymean, 'r--')
     pl.show()
 
     # Close the Session when we're done.

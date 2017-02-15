@@ -20,7 +20,7 @@ class DeepGP():
     def fit(self, X, y):
 
         self._make_NN(X, y)
-        loss = - self._ELL(X, y) - self._KL()
+        loss = - self._ELL(X, y) + self._KL()
         return loss
 
     def predict(self, X, n_samples=20):
@@ -28,7 +28,7 @@ class DeepGP():
         for _ in range(n_samples):
             W_samp = [q.sample() for q in self.qW]
             b_samp = [q.sample() for q in self.qb]
-            Eys.append(self._evaluate_NN(X, W_samp, b_samp, self.Phi))
+            Eys.append(self._evaluate_NN(X, W_samp, b_samp))
         return tf.transpose(tf.stack(Eys))
 
     def _make_NN(self, X, y):
@@ -68,7 +68,7 @@ class DeepGP():
 
         # TODO: Initialize this properly! Or better yet, make this class not
         # just a regressor, but likelihood agnostic!
-        self.var = tf.nn.softplus(tf.Variable(self.var))
+        # self.var = tf.nn.softplus(tf.Variable(self.var))
 
     def _evaluate_NN(self, X, W, b):
         F = X
@@ -78,9 +78,9 @@ class DeepGP():
         return tf.reshape(F, [-1])
 
     def _likelihood(self, X, y, W, b):
-        F = self._evaluate_NN(X, W, b)
-        ll = normal_logpdf(y, F, self.var)
-        return ll
+        f = self._evaluate_NN(X, W, b)
+        ll = normal_logpdf(y, f, self.var)
+        return tf.reduce_sum(ll)
 
     def _KL(self):
         KL = 0
@@ -136,10 +136,10 @@ class RandomFF():
         return tf.concat([real, imag], axis=1) / tf.sqrt(self.D)
 
 
-def normal_KLqp(mu_p, var_p, mu_q, var_q):
+def normal_KLqp(mu_p, mu_q, var_p, var_q):
     var_qp = var_q / var_p
     KL = (mu_q - mu_p)**2 / (2 * var_p) + 0.5 * (var_qp - 1 - tf.log(var_qp))
-    return KL
+    return tf.reduce_sum(KL)
 
 
 def normal_logpdf(x, mu, var):
