@@ -7,6 +7,7 @@ from sklearn.gaussian_process.kernels import RBF, Matern
 from deepgp import DeepGP, gen_batch
 
 # Settings
+pl.style.use("ggplot")
 N = 200
 Ns = 400
 kernel = Matern(length_scale=1.)
@@ -18,6 +19,7 @@ layer_sizes = [5]
 
 # Optimization
 NITER = 100000
+config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 
 def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
@@ -66,16 +68,17 @@ def main():
 
     # Launch the graph.
     init = tf.global_variables_initializer()
-    sess = tf.Session()
+    sess = tf.Session(config=config)
     sess.run(init)
 
     # Fit the network.
     batches = gen_batch({X_: Xr, y_: yr}, batch_size=10, n_iter=NITER)
+    loss_val = []
     for i, data in enumerate(batches):
         sess.run(train, feed_dict=data)
-        loss_val = sess.run(loss, feed_dict=data)
+        loss_val.append(sess.run(loss, feed_dict=data))
         if i % 100 == 0:
-            print("Iteration {}, loss = {}".format(i, loss_val))
+            print("Iteration {}, loss = {}".format(i, loss_val[-1]))
 
     # Predict
     Ey = sess.run(dgp.predict(Xs))
@@ -87,6 +90,11 @@ def main():
     pl.plot(Xs.flatten(), ys, 'k')
     pl.plot(Xs.flatten(), Ey, 'r', alpha=0.2)
     pl.plot(Xs.flatten(), Eymean, 'r--')
+
+    pl.figure()
+    pl.plot(range(len(loss_val)), loss_val, 'r')
+    pl.xlabel("Iteration")
+    pl.ylabel("-ve ELBO")
     pl.show()
 
     # Close the Session when we're done.
