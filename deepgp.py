@@ -6,22 +6,24 @@ class DeepGP():
 
     def __init__(
             self,
+            N,
             n_features=100,
             layer_sizes=[],
             var=1.0,
             reg=0.1,
             n_samples=5
     ):
+        self.N = tf.to_float(N)
         self.n_features = n_features
         self.layer_sizes = layer_sizes
         self.var = var
         self.reg = reg
         self.n_samples = n_samples
+        self._make_NN()
 
-    def fit(self, X, y, N=None):
-        self._make_NN(X, y)
+    def loss(self, X, y):
         # Mini-batch discount factor
-        B = 1 if N is None else N / len(X)
+        B = self.N / tf.to_float(tf.shape(X)[0])
         loss = - B * self._ELL(X, y) + self._KL()
         return loss
 
@@ -30,14 +32,11 @@ class DeepGP():
                for _ in range(n_samples)]
         return tf.transpose(tf.stack(Eys))
 
-    def _make_NN(self, X, y):
-
-        self.Xd = X.shape[1]
-        self.yd = y.shape[1] if np.ndim(y) > 1 else 1
+    def _make_NN(self):
 
         # Adjust input layer sizes dependig on activation
-        dims_in = [self.Xd] + self.layer_sizes
-        dims_out = self.layer_sizes + [self.yd]
+        dims_in = self.layer_sizes[:-1]
+        dims_out = self.layer_sizes[1:]
         fout = 2 * self.n_features
 
         # Initialize weight priors and approximate posteriors
@@ -48,13 +47,13 @@ class DeepGP():
             # Priors
             self.pW.append(Normal(
                 mu=tf.zeros((fout, do)),
-                var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((fout, do))
-                # var=tf.ones((fout, do))
+                # var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((fout, do))
+                var=tf.ones((fout, do))
             ))
             self.pb.append(Normal(
                 mu=tf.zeros((do,)),
-                var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((do,))
-                # var=tf.ones((do,))
+                # var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((do,))
+                var=tf.ones((do,))
             ))
 
             # Posteriors
@@ -76,7 +75,7 @@ class DeepGP():
         for W_l, b_l, phi in zip(W, b, self.Phi):
             P = phi.transform(F)
             F = tf.matmul(P, W_l) + b_l
-        Ey = tf.squeeze(F) if self.yd == 1 else F
+        Ey = tf.squeeze(F) if self.layer_sizes[-1] == 1 else F
         return Ey
 
     def _likelihood(self, X, y, W, b):
@@ -143,3 +142,44 @@ def normal_KLqp(q, p):
     KL = 0.5 * (tf.log(p.var) - tf.log(q.var) + q.var / p.var - 1 +
                 (q.mu - p.mu)**2 / p.var)
     return tf.reduce_sum(KL)
+
+
+def endless_permutations(N, random_state=None):
+    """
+    Generate an endless sequence of random integers from permutations of the
+    set [0, ..., N).
+    If we call this N times, we will sweep through the entire set without
+    replacement, on the (N+1)th call a new permutation will be created, etc.
+    Parameters
+    ----------
+    N: int
+        the length of the set
+    random_state: int or RandomState, optional
+        random seed
+    Yields
+    ------
+    int:
+        a random int from the set [0, ..., N)
+    """
+    if isinstance(random_state, np.random.RandomState):
+        generator = random_state
+    else:
+        generator = np.random.RandomState(random_state)
+
+    while True:
+        batch_inds = generator.permutation(N)
+        for b in batch_inds:
+            yield b
+
+
+def gen_batch(data_dict, batch_size, n_iter=10000, random_state=None):
+
+    N = len(data_dict[list(data_dict.keys())[0]])
+    perms = endless_permutations(N, random_state)
+
+    i = 0
+    while i < n_iter:
+        i += 1
+        ind = np.array([next(perms) for _ in range(batch_size)])
+        batch_dict = {k: v[ind] for k, v in data_dict.items()}
+        yield batch_dict

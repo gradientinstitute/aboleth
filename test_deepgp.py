@@ -4,20 +4,20 @@ import matplotlib.pyplot as pl
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF, Matern
 
-from deepgp import DeepGP
+from deepgp import DeepGP, gen_batch
 
 # Settings
 N = 200
 Ns = 400
-kernel = RBF(length_scale=1.)
+kernel = Matern(length_scale=1.)
 noise = 0.1
 
 # Setup the network
-no_features = 100
-layer_sizes = [20]
+no_features = 50
+layer_sizes = [5]
 
 # Optimization
-NITER = 200000
+NITER = 100000
 
 
 def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
@@ -48,13 +48,19 @@ def main():
 
     # Get data
     Xr, yr, Xs, ys = gen_gausprocess(N, Ns, kern=kernel, noise=noise)
-    # yr = np.abs(yr)
-    # ys = np.abs(ys)
     Xr, yr, Xs, ys = np.float32(Xr), np.float32(yr), np.float32(Xs), \
         np.float32(ys)
 
-    dgp = DeepGP(no_features, layer_sizes, var=noise**2)
-    loss = dgp.fit(Xr, yr)
+    _, D = Xr.shape
+
+    # Create NN
+    layers = [D] + layer_sizes + [1]
+    dgp = DeepGP(N, no_features, layers, var=noise**2)
+
+    X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
+    y_ = tf.placeholder(dtype=tf.float32, shape=(None,))
+
+    loss = dgp.loss(X_, y_)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
 
@@ -64,11 +70,12 @@ def main():
     sess.run(init)
 
     # Fit the network.
-    for step in range(NITER):
-        sess.run(train)
-        loss_val = sess.run(loss)
-        if step % 100 == 0:
-            print("Iteration {}, loss = {}".format(step, loss_val))
+    batches = gen_batch({X_: Xr, y_: yr}, batch_size=10, n_iter=NITER)
+    for i, data in enumerate(batches):
+        sess.run(train, feed_dict=data)
+        loss_val = sess.run(loss, feed_dict=data)
+        if i % 100 == 0:
+            print("Iteration {}, loss = {}".format(i, loss_val))
 
     # Predict
     Ey = sess.run(dgp.predict(Xs))
