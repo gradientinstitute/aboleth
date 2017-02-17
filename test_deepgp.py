@@ -18,7 +18,7 @@ no_features = 50
 layer_sizes = [5]
 
 # Optimization
-NITER = 100000
+NITER = 20000
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 
@@ -57,7 +57,7 @@ def main():
 
     # Create NN
     layers = [D] + layer_sizes + [1]
-    dgp = DeepGP(N, no_features, layers, var=noise**2)
+    dgp = DeepGP(N, no_features, layers, var=0.01)
 
     X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
     y_ = tf.placeholder(dtype=tf.float32, shape=(None,))
@@ -77,7 +77,7 @@ def main():
     for i, data in enumerate(batches):
         sess.run(train, feed_dict=data)
         loss_val.append(sess.run(loss, feed_dict=data))
-        if i % 100 == 0:
+        if i % 1000 == 0:
             print("Iteration {}, loss = {}".format(i, loss_val[-1]))
 
     # Predict

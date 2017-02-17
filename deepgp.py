@@ -2,6 +2,17 @@ import numpy as np
 import tensorflow as tf
 
 
+# NOTE: This has a baked in Gaussian likelihood on the output
+# TODO: decouple the likelihood and it's parameters from this DeepGP (i.e.
+#   pass in a likelihood objects in an initialiser argument)
+# TODO: Use Keras to build up the NN, then we can use other layers apart from
+#   just random features? We could also pass in the NN instead of layer_sizes
+#   into the initialiser? Then we just have to loop through the layers and
+#   place the appropriate priors and posteriors the weights.
+# TODO: This sucks for learning the variance parameters of the Gaussian
+#   likelihood (i.e. the var input to the init). Maybe if we lock this off
+#   initially while learning weights, then "unlock" it later? once we have
+#   reasonble weights?
 class DeepGP():
 
     def __init__(
@@ -11,7 +22,7 @@ class DeepGP():
             layer_sizes=[],
             var=1.0,
             reg=0.1,
-            n_samples=5
+            n_samples=10
     ):
         self.N = tf.to_float(N)
         self.n_features = n_features
@@ -47,28 +58,27 @@ class DeepGP():
             # Priors
             self.pW.append(Normal(
                 mu=tf.zeros((fout, do)),
-                # var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((fout, do))
-                var=tf.ones((fout, do))
+                # var=_stay_pos(tf.Variable(self.reg)) * tf.ones((fout, do))
+                var=self.reg * tf.ones((fout, do))
             ))
             self.pb.append(Normal(
                 mu=tf.zeros((do,)),
-                # var=tf.nn.softplus(tf.Variable(self.reg)) * tf.ones((do,))
-                var=tf.ones((do,))
+                # var=_stay_pos(tf.Variable(self.reg)) * tf.ones((do,))
+                var=self.reg * tf.ones((do,))
             ))
 
             # Posteriors
             self.qW.append(Normal(
                 mu=tf.Variable(tf.random_normal((fout, do))),
-                var=tf.nn.softplus(tf.Variable(tf.random_normal((fout, do))))
+                var=_stay_pos(tf.Variable(tf.random_normal((fout, do))))
             ))
             self.qb.append(Normal(
                 mu=tf.Variable(tf.random_normal((do,))),
-                var=tf.nn.softplus(tf.Variable(tf.random_normal((do,))))
+                var=_stay_pos(tf.Variable(tf.random_normal((do,))))
             ))
 
-        # TODO: Initialize this properly! Or better yet, make this class not
-        # just a regressor, but likelihood agnostic!
-        # self.var = tf.nn.softplus(tf.Variable(self.var))
+        # Noise NOTE: likelihood dependent
+        # self.var = _stay_pos(tf.Variable(self.var))
 
     def _evaluate_NN(self, X, W, b):
         F = X
@@ -142,6 +152,10 @@ def normal_KLqp(q, p):
     KL = 0.5 * (tf.log(p.var) - tf.log(q.var) + q.var / p.var - 1 +
                 (q.mu - p.mu)**2 / p.var)
     return tf.reduce_sum(KL)
+
+
+def _stay_pos(X, minval=1e-10):
+    return tf.maximum(X, minval)
 
 
 def endless_permutations(N, random_state=None):
