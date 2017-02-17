@@ -155,7 +155,9 @@ def normal_KLqp(q, p):
 
 
 def _stay_pos(X, minval=1e-10):
-    return tf.maximum(X, minval)
+    # return tf.exp(X)
+    # return tf.nn.softplus(X)
+    return tf.maximum(tf.abs(X), minval)
 
 
 def endless_permutations(N, random_state=None):

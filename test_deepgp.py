@@ -15,10 +15,10 @@ noise = 0.1
 
 # Setup the network
 no_features = 50
-layer_sizes = [5]
+layer_sizes = [10]
 
 # Optimization
-NITER = 20000
+NITER = 40000
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 
@@ -76,13 +76,17 @@ def main():
     loss_val = []
     for i, data in enumerate(batches):
         sess.run(train, feed_dict=data)
-        loss_val.append(sess.run(loss, feed_dict=data))
-        if i % 1000 == 0:
+        if i % 100 == 0:
+            loss_val.append(sess.run(loss, feed_dict=data))
             print("Iteration {}, loss = {}".format(i, loss_val[-1]))
 
     # Predict
     Ey = sess.run(dgp.predict(Xs))
     Eymean = Ey.mean(axis=1)
+
+    for W, b in zip(dgp.qW, dgp.qb):
+        print(sess.run(1. * W.sigma))
+        print(sess.run(1. * b.sigma))
 
     # Plot
     pl.figure()
