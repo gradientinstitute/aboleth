@@ -2,9 +2,6 @@ import numpy as np
 import tensorflow as tf
 
 
-# NOTE: This has a baked in Gaussian likelihood on the output
-# TODO: decouple the likelihood and it's parameters from this DeepGP (i.e.
-#   pass in a likelihood objects in an initialiser argument)
 # TODO: Use Keras to build up the NN, then we can use other layers apart from
 #   just random features? We could also pass in the NN instead of layer_sizes
 #   into the initialiser? Then we just have to loop through the layers and
@@ -18,16 +15,16 @@ class DeepGP():
     def __init__(
             self,
             N,
+            loglikelihood,
             n_features=100,
             layer_sizes=[],
-            var=1.0,
-            reg=0.1,
+            reg=1.,
             n_samples=10
     ):
         self.N = tf.to_float(N)
+        self.likelihood = loglikelihood
         self.n_features = n_features
         self.layer_sizes = layer_sizes
-        self.var = var
         self.reg = reg
         self.n_samples = n_samples
         self._make_NN()
@@ -58,13 +55,13 @@ class DeepGP():
             # Priors
             self.pW.append(Normal(
                 mu=tf.zeros((fout, do)),
-                # var=_stay_pos(tf.Variable(self.reg)) * tf.ones((fout, do))
-                var=self.reg * tf.ones((fout, do))
+                var=_stay_pos(tf.Variable(self.reg)) * tf.ones((fout, do))
+                # var=self.reg * tf.ones((fout, do))
             ))
             self.pb.append(Normal(
                 mu=tf.zeros((do,)),
-                # var=_stay_pos(tf.Variable(self.reg)) * tf.ones((do,))
-                var=self.reg * tf.ones((do,))
+                var=_stay_pos(tf.Variable(self.reg)) * tf.ones((do,))
+                # var=self.reg * tf.ones((do,))
             ))
 
             # Posteriors
@@ -77,9 +74,6 @@ class DeepGP():
                 var=_stay_pos(tf.Variable(tf.random_normal((do,))))
             ))
 
-        # Noise NOTE: likelihood dependent
-        # self.var = _stay_pos(tf.Variable(self.var))
-
     def _evaluate_NN(self, X, W, b):
         F = X
         for W_l, b_l, phi in zip(W, b, self.Phi):
@@ -87,11 +81,6 @@ class DeepGP():
             F = tf.matmul(P, W_l) + b_l
         Ey = tf.squeeze(F) if self.layer_sizes[-1] == 1 else F
         return Ey
-
-    def _likelihood(self, X, y, W, b):
-        f = self._evaluate_NN(X, W, b)
-        ll = Normal(f, self.var).log_pdf(y)
-        return tf.reduce_sum(ll)
 
     def _KL(self):
         KL = 0
@@ -102,7 +91,8 @@ class DeepGP():
     def _ELL(self, X, y):
         ELL = 0
         for _ in range(self.n_samples):
-            ELL += self._likelihood(X, y, *self._sample_q())
+            f = self._evaluate_NN(X, *self._sample_q())
+            ELL += tf.reduce_sum(self.likelihood(y, f))
         return ELL / self.n_samples
 
     def _sample_q(self):
@@ -115,7 +105,7 @@ class DeepGP():
 # also we can control the reparameterisation trick in here
 class Normal():
 
-    def __init__(self, mu, var):
+    def __init__(self, mu=0., var=1.):
         self.mu = mu
         self.var = var
         self.sigma = tf.sqrt(var)
@@ -129,8 +119,11 @@ class Normal():
     def shape(self):
         return self.mu.get_shape()
 
-    def log_pdf(self, x):
-        l = -0.5 * (tf.log(2 * self.var * np.pi) + (x - self.mu)**2 / self.var)
+    @classmethod
+    def log_pdf(cls, x, mu=None, var=None):
+        mu = cls.mu if mu is None else mu
+        var = cls.var if var is None else var
+        l = -0.5 * (tf.log(2 * var * np.pi) + (x - mu)**2 / var)
         return l
 
 
@@ -172,6 +165,7 @@ def endless_permutations(N, random_state=None):
         the length of the set
     random_state: int or RandomState, optional
         random seed
+
     Yields
     ------
     int:
