@@ -19,7 +19,8 @@ class DeepGP():
             n_features=100,
             layer_sizes=[],
             reg=1.,
-            n_samples=10
+            n_samples=10,
+            learn_prior=False,
     ):
         self.N = tf.to_float(N)
         self.likelihood = loglikelihood
@@ -27,6 +28,7 @@ class DeepGP():
         self.layer_sizes = layer_sizes
         self.reg = reg
         self.n_samples = n_samples
+        self.learn_prior = learn_prior
         self._make_NN()
 
     def loss(self, X, y):
@@ -55,23 +57,23 @@ class DeepGP():
             # Priors
             self.pW.append(Normal(
                 mu=tf.zeros((fout, do)),
-                var=_stay_pos(tf.Variable(self.reg)) * tf.ones((fout, do))
-                # var=self.reg * tf.ones((fout, do))
+                var=stay_pos(tf.Variable(self.reg)) * tf.ones((fout, do))
+                if self.learn_prior else self.reg * tf.ones((fout, do))
             ))
             self.pb.append(Normal(
                 mu=tf.zeros((do,)),
-                var=_stay_pos(tf.Variable(self.reg)) * tf.ones((do,))
-                # var=self.reg * tf.ones((do,))
+                var=stay_pos(tf.Variable(self.reg)) * tf.ones((do,))
+                if self.learn_prior else self.reg * tf.ones((do,))
             ))
 
             # Posteriors
             self.qW.append(Normal(
                 mu=tf.Variable(tf.random_normal((fout, do))),
-                var=_stay_pos(tf.Variable(tf.random_normal((fout, do))))
+                var=stay_pos(tf.Variable(tf.random_normal((fout, do))))
             ))
             self.qb.append(Normal(
                 mu=tf.Variable(tf.random_normal((do,))),
-                var=_stay_pos(tf.Variable(tf.random_normal((do,))))
+                var=stay_pos(tf.Variable(tf.random_normal((do,))))
             ))
 
     def _evaluate_NN(self, X, W, b):
@@ -83,13 +85,13 @@ class DeepGP():
         return Ey
 
     def _KL(self):
-        KL = 0
+        KL = 0.
         for qW, pW, qb, pb in zip(self.qW, self.pW, self.qb, self.pb):
-            KL += (normal_KLqp(qW, pW) + normal_KLqp(qb, pb))
+            KL += tf.reduce_sum(qW.KLqp(pW)) + tf.reduce_sum(qb.KLqp(pb))
         return KL
 
     def _ELL(self, X, y):
-        ELL = 0
+        ELL = 0.
         for _ in range(self.n_samples):
             f = self._evaluate_NN(X, *self._sample_q())
             ELL += tf.reduce_sum(self.likelihood(y, f))
@@ -119,12 +121,16 @@ class Normal():
     def shape(self):
         return self.mu.get_shape()
 
-    @classmethod
-    def log_pdf(cls, x, mu=None, var=None):
-        mu = cls.mu if mu is None else mu
-        var = cls.var if var is None else var
-        l = -0.5 * (tf.log(2 * var * np.pi) + (x - mu)**2 / var)
-        return l
+    def log_pdf(self, x, mu=None, var=None):
+        mu = self.mu if mu is None else mu
+        var = self.var if var is None else var
+        lp = -0.5 * (tf.log(2 * var * np.pi) + (x - mu)**2 / var)
+        return lp
+
+    def KLqp(self, p):
+        KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1 +
+                    (self.mu - p.mu)**2 / p.var)
+        return KL
 
 
 class RandomFF():
@@ -141,13 +147,7 @@ class RandomFF():
         return tf.concat([real, imag], axis=1) / tf.sqrt(self.D)
 
 
-def normal_KLqp(q, p):
-    KL = 0.5 * (tf.log(p.var) - tf.log(q.var) + q.var / p.var - 1 +
-                (q.mu - p.mu)**2 / p.var)
-    return tf.reduce_sum(KL)
-
-
-def _stay_pos(X, minval=1e-10):
+def stay_pos(X, minval=1e-10):
     # return tf.exp(X)
     # return tf.nn.softplus(X)
     return tf.maximum(tf.abs(X), minval)

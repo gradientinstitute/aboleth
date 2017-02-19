@@ -5,19 +5,19 @@ import matplotlib.pyplot as pl
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF, Matern
 
-from deepgp import DeepGP, Normal, gen_batch
+from deepgp import DeepGP, Normal, gen_batch, stay_pos
 
 # Settings
 pl.style.use("ggplot")
 N = 200
 Ns = 400
-kernel = Matern(length_scale=1.)
+kernel = RBF(length_scale=1.)
 noise = 0.1
-var = noise**2
+var = 1.0
 
 # Setup the network
 no_features = 50
-layer_sizes = [10]
+layer_sizes = [5]
 
 # Optimization
 NITER = 40000
@@ -59,8 +59,11 @@ def main():
 
     # Create NN
     layers = [D] + layer_sizes + [1]
-    like = partial(Normal.log_pdf, var=var)
-    dgp = DeepGP(N, like, no_features, layers)
+    like = Normal()
+    lvar = tf.Variable(stay_pos(var))
+    llhood = partial(like.log_pdf, var=lvar)
+    # llhood = partial(like.log_pdf, var=var)
+    dgp = DeepGP(N, llhood, no_features, layers)
 
     X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
     y_ = tf.placeholder(dtype=tf.float32, shape=(None,))
@@ -86,6 +89,10 @@ def main():
     # Predict
     Ey = sess.run(dgp.predict(Xs))
     Eymean = Ey.mean(axis=1)
+
+    for W, b in zip(dgp.qW, dgp.qb):
+        print(sess.run(1. * W.sigma))
+        print(sess.run(1. * b.sigma))
 
     # Plot
     pl.figure()
