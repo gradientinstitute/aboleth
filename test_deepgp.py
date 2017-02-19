@@ -1,33 +1,31 @@
-from functools import partial
-
 import numpy as np
 import matplotlib.pyplot as pl
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF, Matern
 
-from deepgp import DeepGP, Normal, gen_batch, stay_pos
+from deepgp import DeepGP, Normal, gen_batch, pos
 
 # Settings
 pl.style.use("ggplot")
-N = 200
+N = 2000
 Ns = 400
-kernel = RBF(length_scale=1.)
+kernel = Matern(length_scale=0.5)
 noise = 0.1
-var = 1.0
+var = 1.
 
 # Setup the network
 no_features = 50
 layer_sizes = [5]
 
 # Optimization
-NITER = 40000
+NITER = 20000
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 
 def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
                     scale=1., xmin=-10, xmax=10):
     """
-    Generate a random (noisy) draw from a Gaussian Process with a RBF kernel.
+    Generate a random (noisy) draw from a Gaussian Process.
     """
 
     # Xtrain = np.linspace(xmin, xmax, ntrain)[:, np.newaxis]
@@ -59,11 +57,14 @@ def main():
 
     # Create NN
     layers = [D] + layer_sizes + [1]
-    like = Normal()
-    lvar = tf.Variable(stay_pos(var))
-    llhood = partial(like.log_pdf, var=lvar)
-    # llhood = partial(like.log_pdf, var=var)
-    dgp = DeepGP(N, llhood, no_features, layers)
+    like = Normal(var=tf.Variable(pos(var)))
+    dgp = DeepGP(
+        N=N,
+        loglikelihood=like.log_pdf,
+        n_features=no_features,
+        layer_sizes=layers,
+        learn_prior=True
+    )
 
     X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
     y_ = tf.placeholder(dtype=tf.float32, shape=(None,))
@@ -87,23 +88,28 @@ def main():
             print("Iteration {}, loss = {}".format(i, loss_val[-1]))
 
     # Predict
-    Ey = sess.run(dgp.predict(Xs))
+    Xq = np.linspace(-20, 20, Ns).astype(np.float32)[:, np.newaxis]
+    Ey = sess.run(dgp.predict(Xq))
+    # Ey = sess.run(dgp.predict(Xs))
     Eymean = Ey.mean(axis=1)
 
-    for W, b in zip(dgp.qW, dgp.qb):
-        print(sess.run(1. * W.sigma))
-        print(sess.run(1. * b.sigma))
+    print("noise = {}".format(np.sqrt(sess.run(like.var * 1))))
+    # for W, b in zip(dgp.qW, dgp.qb):
+    #     print(sess.run(1. * W.sigma))
+    #     print(sess.run(1. * b.sigma))
 
     # Plot
     pl.figure()
-    pl.plot(Xr.flatten(), yr, 'bx')
+    pl.plot(Xr.flatten(), yr, 'b.', alpha=0.2)
     pl.plot(Xs.flatten(), ys, 'k')
-    pl.plot(Xs.flatten(), Ey, 'r', alpha=0.2)
-    pl.plot(Xs.flatten(), Eymean, 'r--')
+    # pl.plot(Xs.flatten(), Ey, 'r', alpha=0.2)
+    # pl.plot(Xs.flatten(), Eymean, 'r--')
+    pl.plot(Xq.flatten(), Ey, 'r', alpha=0.2)
+    pl.plot(Xq.flatten(), Eymean, 'r--')
 
     pl.figure()
     pl.plot(range(len(loss_val)), loss_val, 'r')
-    pl.xlabel("Iteration")
+    pl.xlabel("Iteration ($\\times 100$)")
     pl.ylabel("-ve ELBO")
     pl.show()
 

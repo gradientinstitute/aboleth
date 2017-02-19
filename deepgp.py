@@ -2,21 +2,63 @@ import numpy as np
 import tensorflow as tf
 
 
-# TODO: Use Keras to build up the NN, then we can use other layers apart from
-#   just random features? We could also pass in the NN instead of layer_sizes
-#   into the initialiser? Then we just have to loop through the layers and
-#   place the appropriate priors and posteriors the weights.
-# TODO: This sucks for learning the variance parameters of the Gaussian
-#   likelihood (i.e. the var input to the init). Maybe if we lock this off
-#   initially while learning weights, then "unlock" it later? once we have
-#   reasonble weights?
+class RandomRBF():
+
+    def __init__(self, input_dim, n_features):
+        self.D = n_features
+        self.d = input_dim
+        self.P = self._weights().astype(np.float32)
+        # self.P = tf.Variable(self._weights().astype(np.float32))
+        # self.lenscale = pos(tf.Variable(tf.ones(self.d,)))
+        self._D = tf.to_float(self.D)
+
+    def transform(self, F):
+        # FP = tf.matmul(F / self.lenscale, self.P)  # better to add layers
+        FP = tf.matmul(F, self.P)
+        real = tf.cos(FP)
+        imag = tf.sin(FP)
+        return tf.concat([real, imag], axis=1) / tf.sqrt(self._D)
+
+    def _weights(self):
+        P = np.random.randn(self.d, self.D)
+        return P
+
+
+class RandomMatern32(RandomRBF):
+    p = 1.
+
+    def _weights(self):
+
+        # p is the matern number (v = p + .5) and the two is a transformation
+        # of variables between Rasmussen 2006 p84 and the CF of a Multivariate
+        # Student t (see wikipedia). Also see "A Note on the Characteristic
+        # Function of Multivariate t Distribution":
+        #   http://ocean.kisti.re.kr/downfile/volume/kss/GCGHC8/2014/v21n1/
+        #   GCGHC8_2014_v21n1_81.pdf
+        # To sample from a m.v. t we use the formula
+        # from wikipedia, x = y * np.sqrt(df / u) where y ~ norm(0, I),
+        # u ~ chi2(df), then x ~ mvt(0, I, df)
+        df = 2 * (self.p + 0.5)
+        y = np.random.randn(self.d, self.D)
+        u = np.random.chisquare(df, size=(self.D,))
+        return y * np.sqrt(df / u)
+
+
+class RandomMatern52(RandomMatern32):
+    p = 2.
+
+
+# TODO: Allow for activations other than RFF!
 class DeepGP():
+    # NOTE: More layer/parameters will mean you WILL need more data! The KL
+    # penalties stack up pretty fast!
 
     def __init__(
             self,
             N,
             loglikelihood,
             n_features=100,
+            features=RandomRBF,
             layer_sizes=[],
             reg=1.,
             n_samples=10,
@@ -25,6 +67,7 @@ class DeepGP():
         self.N = tf.to_float(N)
         self.likelihood = loglikelihood
         self.n_features = n_features
+        self.features = features
         self.layer_sizes = layer_sizes
         self.reg = reg
         self.n_samples = n_samples
@@ -52,28 +95,28 @@ class DeepGP():
         # Initialize weight priors and approximate posteriors
         self.pW, self.qW, self.pb, self.qb, self.Phi = [], [], [], [], []
         for di, do in zip(dims_in, dims_out):
-            self.Phi.append(RandomFF(di, self.n_features))
+            self.Phi.append(self.features(di, self.n_features))
 
             # Priors
             self.pW.append(Normal(
                 mu=tf.zeros((fout, do)),
-                var=stay_pos(tf.Variable(self.reg)) * tf.ones((fout, do))
+                var=pos(tf.Variable(self.reg)) * tf.ones((fout, do))
                 if self.learn_prior else self.reg * tf.ones((fout, do))
             ))
             self.pb.append(Normal(
                 mu=tf.zeros((do,)),
-                var=stay_pos(tf.Variable(self.reg)) * tf.ones((do,))
+                var=pos(tf.Variable(self.reg)) * tf.ones((do,))
                 if self.learn_prior else self.reg * tf.ones((do,))
             ))
 
             # Posteriors
             self.qW.append(Normal(
-                mu=tf.Variable(tf.random_normal((fout, do))),
-                var=stay_pos(tf.Variable(tf.random_normal((fout, do))))
+                mu=tf.Variable(self.reg * tf.random_normal((fout, do))),
+                var=pos(tf.Variable(self.reg * tf.random_normal((fout, do))))
             ))
             self.qb.append(Normal(
-                mu=tf.Variable(tf.random_normal((do,))),
-                var=stay_pos(tf.Variable(tf.random_normal((do,))))
+                mu=tf.Variable(self.reg * tf.random_normal((do,))),
+                var=pos(tf.Variable(self.reg * tf.random_normal((do,))))
             ))
 
     def _evaluate_NN(self, X, W, b):
@@ -87,7 +130,7 @@ class DeepGP():
     def _KL(self):
         KL = 0.
         for qW, pW, qb, pb in zip(self.qW, self.pW, self.qb, self.pb):
-            KL += tf.reduce_sum(qW.KLqp(pW)) + tf.reduce_sum(qb.KLqp(pb))
+            KL += tf.reduce_sum(qW.KL(pW)) + tf.reduce_sum(qb.KL(pb))
         return KL
 
     def _ELL(self, X, y):
@@ -124,33 +167,19 @@ class Normal():
     def log_pdf(self, x, mu=None, var=None):
         mu = self.mu if mu is None else mu
         var = self.var if var is None else var
-        lp = -0.5 * (tf.log(2 * var * np.pi) + (x - mu)**2 / var)
+        lp = -0.5 * (tf.log(2. * var * np.pi) + (x - mu)**2 / var)
         return lp
 
-    def KLqp(self, p):
-        KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1 +
+    def KL(self, p):
+        KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1. +
                     (self.mu - p.mu)**2 / p.var)
         return KL
 
 
-class RandomFF():
-
-    def __init__(self, input_dim, n_features):
-        self.D = np.float32(n_features)
-        self.d = input_dim
-        self.P = np.random.randn(input_dim, n_features).astype(np.float32)
-
-    def transform(self, F):
-        FP = tf.matmul(F, self.P)
-        real = tf.cos(FP)
-        imag = tf.sin(FP)
-        return tf.concat([real, imag], axis=1) / tf.sqrt(self.D)
-
-
-def stay_pos(X, minval=1e-10):
-    # return tf.exp(X)
-    # return tf.nn.softplus(X)
-    return tf.maximum(tf.abs(X), minval)
+def pos(X, minval=1e-10):
+    # return tf.exp(X)  # Medium speed, but gradients tend to explode
+    # return tf.nn.softplus(X)  # Slow but well behaved!
+    return tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
 
 
 def endless_permutations(N, random_state=None):
