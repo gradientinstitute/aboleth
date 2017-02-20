@@ -56,7 +56,7 @@ class DeepGP():
     def __init__(
             self,
             N,
-            loglikelihood,
+            likelihood,
             n_features=100,
             features=RandomRBF,
             layer_sizes=[],
@@ -65,7 +65,7 @@ class DeepGP():
             learn_prior=False,
     ):
         self.N = tf.to_float(N)
-        self.likelihood = loglikelihood
+        self.likelihood = likelihood
         self.n_features = n_features
         self.features = features
         self.layer_sizes = layer_sizes
@@ -81,7 +81,7 @@ class DeepGP():
         return loss
 
     def predict(self, X, n_samples=20):
-        Eys = [self.active(self._evaluate_NN(X, *self._sample_q()))
+        Eys = [self.likelihood.active(self._evaluate_NN(X, *self._sample_q()))
                for _ in range(n_samples)]
         return tf.transpose(tf.stack(Eys))
 
@@ -137,7 +137,8 @@ class DeepGP():
         ELL = 0.
         for _ in range(self.n_samples):
             f = self._evaluate_NN(X, *self._sample_q())
-            ELL += tf.reduce_sum(self.likelihood(y, self.likelihood.active(f)))
+            ll = self.likelihood.log_pdf(y, self.likelihood.active(f))
+            ELL += tf.reduce_sum(ll)
         return ELL / self.n_samples
 
     def _sample_q(self):
