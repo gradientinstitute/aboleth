@@ -81,7 +81,7 @@ class DeepGP():
         return loss
 
     def predict(self, X, n_samples=20):
-        Eys = [self._evaluate_NN(X, *self._sample_q())
+        Eys = [self.active(self._evaluate_NN(X, *self._sample_q()))
                for _ in range(n_samples)]
         return tf.transpose(tf.stack(Eys))
 
@@ -137,7 +137,7 @@ class DeepGP():
         ELL = 0.
         for _ in range(self.n_samples):
             f = self._evaluate_NN(X, *self._sample_q())
-            ELL += tf.reduce_sum(self.likelihood(y, f))
+            ELL += tf.reduce_sum(self.likelihood(y, self.likelihood.active(f)))
         return ELL / self.n_samples
 
     def _sample_q(self):
@@ -167,13 +167,31 @@ class Normal():
     def log_pdf(self, x, mu=None, var=None):
         mu = self.mu if mu is None else mu
         var = self.var if var is None else var
-        lp = -0.5 * (tf.log(2. * var * np.pi) + (x - mu)**2 / var)
-        return lp
+        ll = -0.5 * (tf.log(2. * var * np.pi) + (x - mu)**2 / var)
+        return ll
 
     def KL(self, p):
         KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1. +
                     (self.mu - p.mu)**2 / p.var)
         return KL
+
+    def active(self, f):
+        return f
+
+
+class Bernoulli():
+
+    def __init__(self, p=.5, active=tf.nn.sigmoid):
+        self.p = p
+        self.ilink = active
+
+    def log_pdf(self, x, p=None):
+        p = self.p if p is None else p
+        ll = x * tf.log(pos(p)) + (1 - x) * tf.log(pos(1 - p))
+        return ll
+
+    def active(self, f):
+        return self.ilink(f)
 
 
 def pos(X, minval=1e-10):
