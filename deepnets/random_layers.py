@@ -9,7 +9,7 @@ class RandomRBF(Activation):
     def __init__(self, input_dim, output_dim, name=None):
         super().__init__(input_dim=input_dim, output_dim=output_dim, name=name)
         self.P = self._weights().astype(np.float32)
-        self._D = tf.to_float(self.D)
+        self._D = tf.to_float(self.output_dim)
 
     def __call__(self, X):
         XP = tf.matmul(X, self.P)

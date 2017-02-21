@@ -10,7 +10,7 @@ from deepnets import BayesNN, Normal, gen_batch, pos, Dense, RandomRBF
 pl.style.use("ggplot")
 N = 2000
 Ns = 400
-kernel = Matern(length_scale=0.5)
+kernel = RBF(length_scale=.5)
 noise = 0.1
 var = 1.
 
@@ -36,12 +36,12 @@ def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
     K = kern(Xcat, Xcat)
     U, S, V = np.linalg.svd(K)
     L = U.dot(np.diag(np.sqrt(S))).dot(V)
-    f = np.random.randn(ntrain + ntest).dot(L)[:, np.newaxis]
+    f = np.random.randn(ntrain + ntest).dot(L)
 
     ytrain = f[0:ntrain] + np.random.randn(ntrain) * noise
     ftest = f[ntrain:]
 
-    return Xtrain, ytrain, Xtest, ftest
+    return Xtrain, ytrain[:, np.newaxis], Xtest, ftest[:, np.newaxis]
 
 
 def main():
@@ -57,11 +57,10 @@ def main():
 
     # Create NN
     like = Normal(var=tf.Variable(pos(var)))
-    dgp = BayesNN(
-        N=N,
-        loglikelihood=like,
-    )
+    dgp = BayesNN(N=N, likelihood=like)
     dgp.add(RandomRBF(1, 50))
+    dgp.add(Dense(100, 5))
+    dgp.add(RandomRBF(5, 50))
     dgp.add(Dense(100, 1))
 
     X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
@@ -87,7 +86,7 @@ def main():
 
     # Predict
     Xq = np.linspace(-20, 20, Ns).astype(np.float32)[:, np.newaxis]
-    Ey = sess.run(dgp.predict(Xq))
+    Ey = np.hstack(sess.run(dgp.predict(Xq)))
     # Ey = sess.run(dgp.predict(Xs))
     Eymean = Ey.mean(axis=1)
 

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from numpy import np
+import numpy as np
 
 
 def pos(X, minval=1e-10):

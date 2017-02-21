@@ -1,5 +1,7 @@
 import tensorflow as tf
+
 from utils import pos
+from likelihoods import Normal
 
 
 class Layer():
@@ -101,21 +103,13 @@ class Activation(Layer):
 # Private Module Classes
 #
 
-class _Weights():
-
-    def __init__(self, mu=0., var=1.):
-        self.mu = mu
-        self.var = var
-        self.sigma = tf.sqrt(var)
+class _Weights(Normal):
 
     def sample(self):
         # Reparameterisation trick
-        e = tf.random_normal(self.shape())
+        e = tf.random_normal(self.mu.get_shape())
         x = self.mu + e * self.sigma
         return x
-
-    def shape(self):
-        return self.mu.get_shape()
 
     def KL(self, p):
         KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1. +

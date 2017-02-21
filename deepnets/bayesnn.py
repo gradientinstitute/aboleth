@@ -38,7 +38,7 @@ class BayesNN():
 
     def predict(self, X, n_samples=20):
         Eys = [self._evaluate_NN(X) for _ in range(n_samples)]
-        return tf.transpose(tf.stack(Eys))
+        return Eys
 
     def _evaluate_NN(self, X):
         if self.nlayers == 0:
