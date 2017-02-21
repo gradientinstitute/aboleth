@@ -3,7 +3,7 @@ import bokeh.plotting as bk
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF, Matern
 
-from deepnets import BayesNN, Normal, gen_batch, pos, Dense, RandomRBF
+from deepnets import BayesNN, normal, gen_batch, pos, Dense, RandomRBF
 
 
 # Settings
@@ -37,10 +37,10 @@ def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
     L = U.dot(np.diag(np.sqrt(S))).dot(V)
     f = np.random.randn(ntrain + ntest).dot(L)
 
-    ytrain = f[0:ntrain] + np.random.randn(ntrain) * noise
+    Ytrain = f[0:ntrain] + np.random.randn(ntrain) * noise
     ftest = f[ntrain:]
 
-    return Xtrain, ytrain[:, np.newaxis], Xtest, ftest[:, np.newaxis]
+    return Xtrain, Ytrain[:, np.newaxis], Xtest, ftest[:, np.newaxis]
 
 
 def main():
@@ -48,25 +48,26 @@ def main():
     np.random.seed(10)
 
     # Get data
-    Xr, yr, Xs, ys = gen_gausprocess(N, Ns, kern=kernel, noise=noise)
-    Xr, yr, Xs, ys = np.float32(Xr), np.float32(yr), np.float32(Xs), \
-        np.float32(ys)
+    Xr, Yr, Xs, Ys = gen_gausprocess(N, Ns, kern=kernel, noise=noise)
+    Xr, Yr, Xs, Ys = np.float32(Xr), np.float32(Yr), np.float32(Xs), \
+        np.float32(Ys)
 
     _, D = Xr.shape
 
-    # Create NN
-    like = Normal(var=pos(tf.Variable(var)))
+    # Data
+    with tf.name_scope("Input"):
+        X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
+        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
 
+    # Create NN
+    like = normal(variance=pos(tf.Variable(var)))
     dgp = BayesNN(N=N, likelihood=like)
     dgp.add(RandomRBF(input_dim=1, n_features=50))
     dgp.add(Dense(output_dim=5))
     dgp.add(RandomRBF(n_features=50))
     dgp.add(Dense(output_dim=1))
 
-    X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-    y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
-
-    loss = dgp.loss(X_, y_)
+    loss = dgp.loss(X_, Y_)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
 
@@ -76,7 +77,7 @@ def main():
     sess.run(init)
 
     # Fit the network.
-    batches = gen_batch({X_: Xr, y_: yr}, batch_size=10, n_iter=NITER)
+    batches = gen_batch({X_: Xr, Y_: Yr}, batch_size=10, n_iter=NITER)
     loss_val = []
     for i, data in enumerate(batches):
         sess.run(train, feed_dict=data)
@@ -90,16 +91,11 @@ def main():
     # Ey = sess.run(dgp.predict(Xs))
     Eymean = Ey.mean(axis=1)
 
-    print("noise = {}".format(np.sqrt(sess.run(like.var * 1))))
-    # for W, b in zip(dgp.qW, dgp.qb):
-    #     print(sess.run(1. * W.sigma))
-    #     print(sess.run(1. * b.sigma))
-
     # Plot
     f = bk.figure(tools='pan,box_zoom,reset', sizing_mode='stretch_both')
-    f.circle(Xr.flatten(), yr.flatten(), fill_color='blue', alpha=0.2,
+    f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue', alpha=0.2,
             legend='Training')
-    f.line(Xs.flatten(), ys.flatten(), line_color='black', legend='Truth')
+    f.line(Xs.flatten(), Ys.flatten(), line_color='black', legend='Truth')
     for y in Ey.T:
         f.line(Xq.flatten(), y, line_color='red', alpha=0.2, legend='Samples')
     f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')

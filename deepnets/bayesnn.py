@@ -66,6 +66,6 @@ class BayesNN():
         ELL = 0.
         for _ in range(self.n_samples):
             #TODO: make these key value, i.e. log_prob(Y=, H=...)
-            ll = self.likelihood.log_prob(y, self._evaluate_NN(X))
+            ll = self.likelihood(y, self._evaluate_NN(X))
             ELL += tf.reduce_sum(ll)
         return ELL / self.n_samples

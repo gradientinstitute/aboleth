@@ -1,7 +1,6 @@
 import tensorflow as tf
 
 from deepnets.utils import pos
-from deepnets.likelihoods import Normal
 
 
 class Layer():
@@ -98,12 +97,12 @@ class Activation(Layer):
 # Private Module Classes
 #
 
-class _Weights(Normal):
+class _Weights():
 
-    # def __init__(self, mu=0., var=1.):
-    #     self.mu = mu
-    #     self.var = var
-    #     self.sigma = tf.sqrt(var)
+    def __init__(self, mu=0., var=1.):
+        self.mu = mu
+        self.var = var
+        self.sigma = tf.sqrt(var)
 
     def sample(self):
         # Reparameterisation trick
