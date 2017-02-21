@@ -17,7 +17,7 @@ variance = 1.
 n_loss_samples = 10
 n_predict_samples = 10
 n_iterations = 20000
-batch_size = 100
+batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 # Network structure
