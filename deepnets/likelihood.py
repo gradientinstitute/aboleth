@@ -1,10 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from deepnets.utils import pos
-
-# TODO: Make these functions, then kwargs them into the loss function
-
+from deepnets.util import pos
 
 def normal(variance):
     def l(x, f):
