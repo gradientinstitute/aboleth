@@ -6,10 +6,17 @@ from layers import Activation
 
 class RandomRBF(Activation):
 
-    def __init__(self, input_dim, output_dim, name=None):
-        super().__init__(input_dim=input_dim, output_dim=output_dim, name=name)
+    def __init__(self, n_features, input_dim=None, name=None):
+        super().__init__(input_dim=input_dim, output_dim=n_features * 2,
+                         name=name)
+        self.n_features = n_features
+        self._D = tf.to_float(self.n_features)
+
+    def build(self, input_dim=None):
+        if input_dim is not None:
+            self.input_dim = input_dim
         self.P = self._weights().astype(np.float32)
-        self._D = tf.to_float(self.output_dim)
+        return self
 
     def __call__(self, X):
         XP = tf.matmul(X, self.P)
@@ -18,7 +25,7 @@ class RandomRBF(Activation):
         return tf.concat([real, imag], axis=1) / tf.sqrt(self._D)
 
     def _weights(self):
-        P = np.random.randn(self.input_dim, self.output_dim)
+        P = np.random.randn(self.input_dim, self.n_features)
         return P
 
 
@@ -37,8 +44,8 @@ class RandomMatern32(RandomRBF):
         # from wikipedia, x = y * np.sqrt(df / u) where y ~ norm(0, I),
         # u ~ chi2(df), then x ~ mvt(0, I, df)
         df = 2 * (self.p + 0.5)
-        y = np.random.randn(self.input_dim, self.output_dim)
-        u = np.random.chisquare(df, size=(self.output_dim,))
+        y = np.random.randn(self.input_dim, self.n_features)
+        u = np.random.chisquare(df, size=(self.n_features,))
         return y * np.sqrt(df / u)
 
 

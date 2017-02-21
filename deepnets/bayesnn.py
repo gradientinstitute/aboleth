@@ -27,7 +27,14 @@ class BayesNN():
 
         # TODO: parse input and output dimensions to make sure they match, OR,
         # Fill in appropriate dimensions (input) if not!
-        self.layers["{}_{}".format(layer, self.nlayers)] = layer.build()
+        # TODO: make the following better
+        if self.nlayers > 0:
+            prevl = next(reversed(self.layers.values()))
+            l = layer.build(input_dim=prevl.output_dim)
+        else:
+            l = layer.build()
+
+        self.layers["{}_{}".format(layer, self.nlayers)] = l
         self.nlayers += 1
 
     def loss(self, X, y):

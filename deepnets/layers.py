@@ -6,7 +6,7 @@ from likelihoods import Normal
 
 class Layer():
 
-    def __init__(self, input_dim, output_dim, name=None):
+    def __init__(self, output_dim, input_dim=None, name=None):
 
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -15,7 +15,9 @@ class Layer():
     def __call__(self, X):
         raise NotImplementedError("This is just an abstract base class")
 
-    def build(self):
+    def build(self, input_dim=None):
+        if input_dim is not None:
+            self.input_dim = input_dim
         return self
 
     def KL(self):
@@ -33,14 +35,16 @@ class Layer():
 
 class Dense(Layer):
 
-    def __init__(self, input_dim, output_dim, reg=1., learn_prior=True,
+    def __init__(self, output_dim, input_dim=None, reg=1., learn_prior=True,
                  name=None):
 
-        super().__init__(input_dim, output_dim, name)
+        super().__init__(output_dim=output_dim, input_dim=input_dim, name=name)
         self.reg = reg
         self.learn_prior = learn_prior
 
-    def build(self):
+    def build(self, input_dim=None):
+        if input_dim is not None:
+            self.input_dim = input_dim
 
         Wdim = (self.input_dim, self.output_dim)
         bdim = (self.output_dim,)

@@ -58,10 +58,10 @@ def main():
     # Create NN
     like = Normal(var=pos(tf.Variable(var)))
     dgp = BayesNN(N=N, likelihood=like)
-    dgp.add(RandomRBF(1, 50))
-    dgp.add(Dense(100, 5))
-    dgp.add(RandomRBF(5, 50))
-    dgp.add(Dense(100, 1))
+    dgp.add(RandomRBF(input_dim=1, n_features=50))
+    dgp.add(Dense(output_dim=5))
+    dgp.add(RandomRBF(n_features=50))
+    dgp.add(Dense(output_dim=1))
 
     X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
     y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
