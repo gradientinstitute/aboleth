@@ -1,5 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as pl
+import bokeh.plotting as bk
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF, Matern
 
@@ -7,7 +7,6 @@ from deepnets import BayesNN, Normal, gen_batch, pos, Dense, RandomRBF
 
 
 # Settings
-pl.style.use("ggplot")
 N = 2000
 Ns = 400
 kernel = RBF(length_scale=.5)
@@ -57,6 +56,7 @@ def main():
 
     # Create NN
     like = Normal(var=pos(tf.Variable(var)))
+
     dgp = BayesNN(N=N, likelihood=like)
     dgp.add(RandomRBF(input_dim=1, n_features=50))
     dgp.add(Dense(output_dim=5))
@@ -96,19 +96,14 @@ def main():
     #     print(sess.run(1. * b.sigma))
 
     # Plot
-    pl.figure()
-    pl.plot(Xr.flatten(), yr.flatten(), 'b.', alpha=0.2)
-    pl.plot(Xs.flatten(), ys.flatten(), 'k')
-    # pl.plot(Xs.flatten(), Ey, 'r', alpha=0.2)
-    # pl.plot(Xs.flatten(), Eymean, 'r--')
-    pl.plot(Xq.flatten(), Ey, 'r', alpha=0.2)
-    pl.plot(Xq.flatten(), Eymean, 'r--')
-
-    pl.figure()
-    pl.plot(range(len(loss_val)), loss_val, 'r')
-    pl.xlabel("Iteration ($\\times 100$)")
-    pl.ylabel("-ve ELBO")
-    pl.show()
+    f = bk.figure(tools='pan,box_zoom,reset', sizing_mode='stretch_both')
+    f.circle(Xr.flatten(), yr.flatten(), fill_color='blue', alpha=0.2,
+            legend='Training')
+    f.line(Xs.flatten(), ys.flatten(), line_color='black', legend='Truth')
+    for y in Ey.T:
+        f.line(Xq.flatten(), y, line_color='red', alpha=0.2, legend='Samples')
+    f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
+    bk.show(f)
 
     # Close the Session when we're done.
     sess.close()
