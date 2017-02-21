@@ -1,117 +1,87 @@
 import numpy as np
-import matplotlib.pyplot as pl
+import bokeh.plotting as bk
 import tensorflow as tf
-from sklearn.gaussian_process.kernels import RBF, Matern
+from sklearn.gaussian_process.kernels import RBF as skl_RBF
 
-from deepnets import BayesNN, Normal, gen_batch, pos, Dense, RandomRBF
+from deepnets import util, likelihood, model
+from deepnets.layer import randomFourier, dense, RBF
 
-
-# Settings
-pl.style.use("ggplot")
+# Data settings
 N = 2000
 Ns = 400
-kernel = RBF(length_scale=.5)
-noise = 0.1
-var = 1.
+kernel = skl_RBF(length_scale=.5)
+true_noise = 0.1
 
-# Setup the network
-no_features = 50
-
-# Optimization
-NITER = 20000
+# Model settings
+variance = 1.
+n_loss_samples = 10
+n_predict_samples = 10
+n_iterations = 10000
+batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
-
-def gen_gausprocess(ntrain, ntest, kern=RBF(length_scale=1.), noise=1.,
-                    scale=1., xmin=-10, xmax=10):
-    """
-    Generate a random (noisy) draw from a Gaussian Process.
-    """
-
-    # Xtrain = np.linspace(xmin, xmax, ntrain)[:, np.newaxis]
-    Xtrain = np.random.rand(ntrain)[:, np.newaxis] * (xmin - xmax) - xmin
-    Xtest = np.linspace(xmin, xmax, ntest)[:, np.newaxis]
-    Xcat = np.vstack((Xtrain, Xtest))
-
-    K = kern(Xcat, Xcat)
-    U, S, V = np.linalg.svd(K)
-    L = U.dot(np.diag(np.sqrt(S))).dot(V)
-    f = np.random.randn(ntrain + ntest).dot(L)
-
-    ytrain = f[0:ntrain] + np.random.randn(ntrain) * noise
-    ftest = f[ntrain:]
-
-    return Xtrain, ytrain[:, np.newaxis], Xtest, ftest[:, np.newaxis]
-
+# Network structure
+layers = [randomFourier(n_features=50, kernel=RBF()),
+          dense(output_dim=5, reg=0.1),
+          randomFourier(n_features=50, kernel=RBF()),
+          dense(output_dim=1, reg=0.1)]
 
 def main():
 
     np.random.seed(10)
 
-    # Get data
-    Xr, yr, Xs, ys = gen_gausprocess(N, Ns, kern=kernel, noise=noise)
-    Xr, yr, Xs, ys = np.float32(Xr), np.float32(yr), np.float32(Xs), \
-        np.float32(ys)
+    # Get training and testing data
+    Xr, Yr, Xs, Ys = util.gp_draws(N, Ns, kern=kernel, noise=true_noise)
+
+    # Prediction points
+    Xq = np.linspace(-20, 20, Ns).astype(np.float32)[:, np.newaxis]
 
     _, D = Xr.shape
 
-    # Create NN
-    like = Normal(var=pos(tf.Variable(var)))
-    dgp = BayesNN(N=N, likelihood=like)
-    dgp.add(RandomRBF(input_dim=1, n_features=50))
-    dgp.add(Dense(output_dim=5))
-    dgp.add(RandomRBF(n_features=50))
-    dgp.add(Dense(output_dim=1))
+    # Data
+    with tf.name_scope("Input"):
+        X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
+        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
+        N_ = tf.placeholder(dtype=tf.float32)
 
-    X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-    y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
+    with tf.name_scope("Likelihood"):
+        lkhood = likelihood.normal(variance=util.pos(
+            tf.Variable(variance)))
 
-    loss = dgp.loss(X_, y_)
-    optimizer = tf.train.AdamOptimizer()
-    train = optimizer.minimize(loss)
+    with tf.name_scope("Deepnet"):
+        Phi, KL = model.deepnet(X_, layers)
 
-    # Launch the graph.
-    init = tf.global_variables_initializer()
-    sess = tf.Session(config=config)
-    sess.run(init)
+    with tf.name_scope("Loss"):
+        loss = model.elbo(Phi, Y_, N_, KL, lkhood, n_loss_samples)
 
-    # Fit the network.
-    batches = gen_batch({X_: Xr, y_: yr}, batch_size=10, n_iter=NITER)
-    loss_val = []
-    for i, data in enumerate(batches):
-        sess.run(train, feed_dict=data)
-        if i % 100 == 0:
-            loss_val.append(sess.run(loss, feed_dict=data))
-            print("Iteration {}, loss = {}".format(i, loss_val[-1]))
+    with tf.name_scope("Train"):
+        optimizer = tf.train.AdamOptimizer()
+        train = optimizer.minimize(loss)
 
-    # Predict
-    Xq = np.linspace(-20, 20, Ns).astype(np.float32)[:, np.newaxis]
-    Ey = np.hstack(sess.run(dgp.predict(Xq)))
-    # Ey = sess.run(dgp.predict(Xs))
-    Eymean = Ey.mean(axis=1)
+    with tf.Session(config=config) as sess:
+        tf.global_variables_initializer().run()
+        batches = util.batch({X_: Xr, Y_: Yr}, N_, batch_size=batch_size,
+                             n_iter=n_iterations)
+        for i, d in enumerate(batches):
+            train.run(feed_dict=d)
+            if i % 100 == 0:
+                l = loss.eval(feed_dict=d)
+                print("Iteration {}, loss = {}".format(i, l))
 
-    print("noise = {}".format(np.sqrt(sess.run(like.var * 1))))
-    # for W, b in zip(dgp.qW, dgp.qb):
-    #     print(sess.run(1. * W.sigma))
-    #     print(sess.run(1. * b.sigma))
+        # Prediction
+        Ey = np.hstack([Phi.eval(feed_dict={X_: Xq})
+                        for _ in range(n_predict_samples)])
+        Eymean = Ey.mean(axis=1)
 
     # Plot
-    pl.figure()
-    pl.plot(Xr.flatten(), yr.flatten(), 'b.', alpha=0.2)
-    pl.plot(Xs.flatten(), ys.flatten(), 'k')
-    # pl.plot(Xs.flatten(), Ey, 'r', alpha=0.2)
-    # pl.plot(Xs.flatten(), Eymean, 'r--')
-    pl.plot(Xq.flatten(), Ey, 'r', alpha=0.2)
-    pl.plot(Xq.flatten(), Eymean, 'r--')
-
-    pl.figure()
-    pl.plot(range(len(loss_val)), loss_val, 'r')
-    pl.xlabel("Iteration ($\\times 100$)")
-    pl.ylabel("-ve ELBO")
-    pl.show()
-
-    # Close the Session when we're done.
-    sess.close()
+    f = bk.figure(tools='pan,box_zoom,reset', sizing_mode='stretch_both')
+    f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue', alpha=0.2,
+            legend='Training')
+    f.line(Xs.flatten(), Ys.flatten(), line_color='black', legend='Truth')
+    for y in Ey.T:
+        f.line(Xq.flatten(), y, line_color='red', alpha=0.2, legend='Samples')
+    f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
+    bk.show(f)
 
 
 if __name__ == "__main__":
