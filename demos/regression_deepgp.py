@@ -56,7 +56,7 @@ def main():
     _, D = Xr.shape
 
     # Create NN
-    like = Normal(var=tf.Variable(pos(var)))
+    like = Normal(var=pos(tf.Variable(var)))
     dgp = BayesNN(N=N, likelihood=like)
     dgp.add(RandomRBF(1, 50))
     dgp.add(Dense(100, 5))

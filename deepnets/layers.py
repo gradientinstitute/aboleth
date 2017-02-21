@@ -69,18 +69,9 @@ class Dense(Layer):
 
         return self
 
-    def apply_mean(self, X):
-
-        XWb = tf.matmul(X, self.qW.mu) + self.qb.mu
-        return XWb
-
-    def apply_sample(self, X):
-
+    def __call__(self, X):
         XWb = tf.matmul(X, self.qW.sample()) + self.qb.sample()
         return XWb
-
-    def __call__(self, X):
-        return self.apply_sample(X)
 
     def KL(self):
         KL = tf.reduce_sum(self.qW.KL(self.pW)) + \
@@ -104,6 +95,11 @@ class Activation(Layer):
 #
 
 class _Weights(Normal):
+
+    # def __init__(self, mu=0., var=1.):
+    #     self.mu = mu
+    #     self.var = var
+    #     self.sigma = tf.sqrt(var)
 
     def sample(self):
         # Reparameterisation trick
