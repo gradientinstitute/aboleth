@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 import tensorflow as tf
 
-from layers import Layer
+from deepnets.layers import Layer
 
 
 class BayesNN():
