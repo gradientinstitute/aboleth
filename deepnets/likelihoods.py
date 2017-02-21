@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from utils import pos
+from deepnets.utils import pos
 
 # TODO: Make these functions, then kwargs them into the loss function
 

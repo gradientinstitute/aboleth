@@ -8,7 +8,7 @@ setup(
     description='Bayesian Deep Nets',
     author='Determinant',
     author_email='determinant@data61.csiro.au',
-    packages=find_packages(),
+    packages=["deepnets"],
     install_requires=[
         'numpy>=1.12.0',
         'scipy>=0.18.1',

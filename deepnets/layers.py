@@ -1,7 +1,7 @@
 import tensorflow as tf
 
-from utils import pos
-from likelihoods import Normal
+from deepnets.utils import pos
+from deepnets.likelihoods import Normal
 
 
 class Layer():

@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from layers import Activation
+from deepnets.layers import Activation
 
 
 class RandomRBF(Activation):
