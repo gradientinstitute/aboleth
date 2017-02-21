@@ -36,7 +36,7 @@ def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1,
 
 def batch(data_dict, N_, batch_size, n_iter=10000, random_state=None):
 
-    N = len(data_dict[list(data_dict.keys())[0]])
+    N = data_dict[list(data_dict.keys())[0]].shape[0]
     perms = endless_permutations(N, random_state)
 
     i = 0

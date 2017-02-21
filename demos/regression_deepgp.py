@@ -16,16 +16,15 @@ true_noise = 0.1
 variance = 1.
 n_loss_samples = 10
 n_predict_samples = 10
-n_iterations = 20000
+n_iterations = 10000
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 # Network structure
 layers = [randomFourier(n_features=50, kernel=RBF()),
-          dense(output_dim=5),
+          dense(output_dim=5, reg=0.1),
           randomFourier(n_features=50, kernel=RBF()),
-          dense(output_dim=1)]
-
+          dense(output_dim=1, reg=0.1)]
 
 def main():
 
@@ -53,7 +52,7 @@ def main():
         Phi, KL = model.deepnet(X_, layers)
 
     with tf.name_scope("Loss"):
-        loss = model.loss(Phi, Y_, N_, KL, lkhood, n_loss_samples)
+        loss = model.elbo(Phi, Y_, N_, KL, lkhood, n_loss_samples)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
