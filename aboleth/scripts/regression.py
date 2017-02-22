@@ -1,10 +1,12 @@
+import click
 import numpy as np
 import bokeh.plotting as bk
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF as skl_RBF
 
-from deepnets import util, likelihood, model
-from deepnets.layer import randomFourier, dense, RBF
+from aboleth import util, likelihood, model
+from aboleth.layer import randomFourier, dense, RBF
+
 
 # Data settings
 N = 2000
@@ -26,6 +28,8 @@ layers = [randomFourier(n_features=50, kernel=RBF()),
           randomFourier(n_features=50, kernel=RBF()),
           dense(output_dim=1, reg=0.1)]
 
+
+@click.command()
 def main():
 
     np.random.seed(10)
@@ -82,7 +86,3 @@ def main():
         f.line(Xq.flatten(), y, line_color='red', alpha=0.2, legend='Samples')
     f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
     bk.show(f)
-
-
-if __name__ == "__main__":
-    main()

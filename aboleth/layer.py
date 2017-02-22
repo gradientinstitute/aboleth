@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from deepnets.util import pos
+from aboleth.util import pos
 
 class _Weights:
 
