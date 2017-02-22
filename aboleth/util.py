@@ -1,5 +1,5 @@
 import tensorflow as tf
-from sklearn.gaussian_process.kernels import RBF, Matern
+from sklearn.gaussian_process.kernels import RBF
 import numpy as np
 
 
@@ -9,8 +9,8 @@ def pos(X, minval=1e-10):
     return tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
 
 
-def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1,
-                    scale=1., xmin=-10, xmax=10):
+def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, scale=1.,
+             xmin=-10, xmax=10):
     """
     Generate a random (noisy) draw from a Gaussian Process.
     """
@@ -47,6 +47,7 @@ def batch(data_dict, N_, batch_size, n_iter=10000, random_state=None):
         batch_dict[N_] = N
         yield batch_dict
 
+
 def endless_permutations(N, random_state=None):
     """
     Generate an endless sequence of random integers from permutations of the
@@ -74,5 +75,3 @@ def endless_permutations(N, random_state=None):
         batch_inds = generator.permutation(N)
         for b in batch_inds:
             yield b
-
-
