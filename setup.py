@@ -18,8 +18,8 @@ setup(
     include_package_data=True,
 
     entry_points={
-        'scripts': [
-            'aboleth-reg = aboleth.scripts.demo_regression:main',
+        'console_scripts': [
+            'aboleth-reg = aboleth.scripts.regression:main'
         ]
     },
     install_requires=[
