@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from aboleth.util import pos
 
+
 class _Weights:
 
     def __init__(self, mu=0., var=1.):
@@ -20,6 +21,16 @@ class _Weights:
         KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1. +
                     (self.mu - p.mu)**2 / p.var)
         return KL
+
+
+def activation(h=lambda X: X):
+
+    def build_activation(X):
+        Phi = h(X)
+        KL = 0.
+        return Phi, KL
+    return build_activation
+
 
 def dense(output_dim, reg=1., learn_prior=True):
 
@@ -62,6 +73,7 @@ class RBF:
         P = np.random.randn(input_dim, n_features).astype(np.float32)
         return P
 
+
 class Matern:
     def __init__(self, p):
         self.p = p
@@ -99,5 +111,3 @@ def randomFourier(n_features, kernel=None):
         return Phi, KL
 
     return build_randomRBF
-
-

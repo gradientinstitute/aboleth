@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import setup, find_packages, Extension, distutils
-import sys, os, re
+from setuptools import setup, find_packages
 
 readme = open('README.md').read()
 
@@ -19,7 +18,8 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'aboleth-reg = aboleth.scripts.regression:main'
+            'aboleth-reg = aboleth.scripts.regression:main',
+            'aboleth-cla = aboleth.scripts.classification:main'
         ]
     },
     install_requires=[
@@ -29,7 +29,7 @@ setup(
         'numpy==1.12.0',
         'scipy==0.18.1',
         'scikit-learn==0.18.1',
-        'tensorflow==1.0.0',
+        'tensorflow-gpu==1.0.0',
     ],
     extras_require={
         'dev': [
