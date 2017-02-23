@@ -1,6 +1,4 @@
 """Neural Net Layer tools."""
-from itertools import repeat
-
 import numpy as np
 import tensorflow as tf
 
@@ -46,7 +44,7 @@ def add(*layers):
     """Add multiple layers/activations."""
     def build_add(X):
 
-        Phis, KLs = zip(*[p(X) for p in layers])
+        Phis, KLs = zip(*(p(X) for p in layers))
         Phi = sum(Phis)
         KL = sum(KLs)
 

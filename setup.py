@@ -29,7 +29,7 @@ setup(
         'numpy==1.12.0',
         'scipy==0.18.1',
         'scikit-learn==0.18.1',
-        'tensorflow-gpu==1.0.0',
+        # 'tensorflow-gpu==1.0.0',
     ],
     extras_require={
         'dev': [
