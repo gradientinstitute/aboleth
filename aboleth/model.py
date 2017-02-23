@@ -1,3 +1,4 @@
+"""Neural Net Construction."""
 import tensorflow as tf
 
 

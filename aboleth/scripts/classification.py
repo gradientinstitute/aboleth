@@ -9,8 +9,7 @@ from sklearn.metrics import accuracy_score, log_loss
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 
-from aboleth import util, likelihood, model
-from aboleth.layer import activation, dense
+import aboleth as ab
 
 
 FOLDS = 5
@@ -24,10 +23,10 @@ PSAMPLES = 20
 
 # Network structure
 layers = [
-    dense(output_dim=20, reg=0.1),
-    activation(h=tf.nn.relu),
-    dense(output_dim=1, reg=0.1),
-    activation(h=tf.nn.sigmoid)
+    ab.dense(output_dim=20, reg=0.1),
+    ab.activation(h=tf.nn.relu),
+    ab.dense(output_dim=1, reg=0.1),
+    ab.activation(h=tf.nn.sigmoid)
 ]
 
 
@@ -50,13 +49,13 @@ def main():
         N_ = tf.placeholder(dtype=tf.float32)
 
     with tf.name_scope("Likelihood"):
-        lkhood = likelihood.bernoulli()
+        lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, KL = model.deepnet(X_, layers)
+        Phi, KL = ab.deepnet(X_, layers)
 
     with tf.name_scope("Loss"):
-        loss = model.elbo(Phi, Y_, N_, KL, lkhood, 10)
+        loss = ab.elbo(Phi, Y_, N_, KL, lkhood, 10)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -75,7 +74,7 @@ def main():
             sess.run(init)
 
             # Fit the network.
-            batches = util.batch(
+            batches = ab.batch(
                 {X_: Xr, Y_: Yr},
                 N_,
                 batch_size=BSIZE,
@@ -106,7 +105,6 @@ def main():
 
 
 def print_k_result(ys, Ep, ll, acc, name):
-
     acc.append(accuracy_score(ys, Ep.argmax(axis=1)))
     ll.append(log_loss(ys, Ep))
     print("{}: accuracy = {:.4g}, log-loss = {:.4g}"

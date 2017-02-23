@@ -1,3 +1,4 @@
+"""Package helper utilities."""
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF
 import numpy as np

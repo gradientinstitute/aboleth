@@ -1,11 +1,12 @@
+"""Demo using aboleth for regression."""
 import click
 import numpy as np
 import bokeh.plotting as bk
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF as skl_RBF
 
-from aboleth import util, likelihood, model
-from aboleth.layer import randomFourier, dense, RBF
+import aboleth as ab
+from aboleth.util import gp_draws
 
 
 # Data settings
@@ -23,10 +24,10 @@ batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 # Network structure
-layers = [randomFourier(n_features=50, kernel=RBF()),
-          dense(output_dim=5, reg=0.1),
-          randomFourier(n_features=50, kernel=RBF()),
-          dense(output_dim=1, reg=0.1)]
+layers = [ab.randomFourier(n_features=50, kernel=ab.RBF()),
+          ab.dense(output_dim=5, reg=0.1),
+          ab.randomFourier(n_features=50, kernel=ab.RBF()),
+          ab.dense(output_dim=1, reg=0.1)]
 
 
 @click.command()
@@ -35,7 +36,7 @@ def main():
     np.random.seed(10)
 
     # Get training and testing data
-    Xr, Yr, Xs, Ys = util.gp_draws(N, Ns, kern=kernel, noise=true_noise)
+    Xr, Yr, Xs, Ys = gp_draws(N, Ns, kern=kernel, noise=true_noise)
 
     # Prediction points
     Xq = np.linspace(-20, 20, Ns).astype(np.float32)[:, np.newaxis]
@@ -49,14 +50,14 @@ def main():
         N_ = tf.placeholder(dtype=tf.float32)
 
     with tf.name_scope("Likelihood"):
-        lkhood = likelihood.normal(variance=util.pos(
+        lkhood = ab.normal(variance=ab.pos(
             tf.Variable(variance)))
 
     with tf.name_scope("Deepnet"):
-        Phi, KL = model.deepnet(X_, layers)
+        Phi, KL = ab.deepnet(X_, layers)
 
     with tf.name_scope("Loss"):
-        loss = model.elbo(Phi, Y_, N_, KL, lkhood, n_loss_samples)
+        loss = ab.elbo(Phi, Y_, N_, KL, lkhood, n_loss_samples)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -64,8 +65,8 @@ def main():
 
     with tf.Session(config=config) as sess:
         tf.global_variables_initializer().run()
-        batches = util.batch({X_: Xr, Y_: Yr}, N_, batch_size=batch_size,
-                             n_iter=n_iterations)
+        batches = ab.batch({X_: Xr, Y_: Yr}, N_, batch_size=batch_size,
+                            n_iter=n_iterations)
         for i, d in enumerate(batches):
             train.run(feed_dict=d)
             if i % 100 == 0:
@@ -80,7 +81,7 @@ def main():
     # Plot
     f = bk.figure(tools='pan,box_zoom,reset', sizing_mode='stretch_both')
     f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue', alpha=0.2,
-            legend='Training')
+             legend='Training')
     f.line(Xs.flatten(), Ys.flatten(), line_color='black', legend='Truth')
     for y in Ey.T:
         f.line(Xq.flatten(), y, line_color='red', alpha=0.2, legend='Samples')
