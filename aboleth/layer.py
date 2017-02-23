@@ -1,4 +1,6 @@
 """Neural Net Layer tools."""
+from itertools import repeat
+
 import numpy as np
 import tensorflow as tf
 
@@ -9,8 +11,17 @@ from aboleth.util import pos
 # Layers
 #
 
-def activation(h=lambda X: X):
+def eye():
+    """Indentity Layer."""
+    def build_eye(X):
+        KL = 0.
+        return X, KL
 
+    return build_eye
+
+
+def activation(h=lambda X: X):
+    """Activation function layer."""
     def build_activation(X):
         Phi = h(X)
         KL = 0.
@@ -18,8 +29,34 @@ def activation(h=lambda X: X):
     return build_activation
 
 
-def dense(output_dim, reg=1., learn_prior=True):
+def cat(*layers):
+    """Concatenate multiple layers/activations."""
+    def build_cat(X):
 
+        Phis, KLs = zip(*[p(X) for p in layers])
+        Phi = tf.concat(Phis, axis=1)
+        KL = sum(KLs)
+
+        return Phi, KL
+
+    return build_cat
+
+
+def add(*layers):
+    """Add multiple layers/activations."""
+    def build_add(X):
+
+        Phis, KLs = zip(*[p(X) for p in layers])
+        Phi = sum(Phis)
+        KL = sum(KLs)
+
+        return Phi, KL
+
+    return build_add
+
+
+def dense(output_dim, reg=1., learn_prior=True):
+    """Dense (fully connected) linear layer, Bayesian style."""
     def build_dense(X):
         input_dim = int(X.get_shape()[1])
         Wdim = (input_dim, output_dim)
@@ -55,7 +92,7 @@ def dense(output_dim, reg=1., learn_prior=True):
 
 
 def randomFourier(n_features, kernel=None):
-
+    """Random fourier feature layer."""
     kernel = kernel if kernel else RBF()
 
     def build_randomRBF(X):
@@ -76,13 +113,15 @@ def randomFourier(n_features, kernel=None):
 #
 
 class RBF:
+    """RBF kernel approximation."""
     def weights(self, input_dim, n_features):
         P = np.random.randn(input_dim, n_features).astype(np.float32)
         return P
 
 
 class Matern:
-    def __init__(self, p):
+    """Matern kernel approximation."""
+    def __init__(self, p=1):
         self.p = p
 
     def weights(self, input_dim, n_features):
