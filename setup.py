@@ -19,10 +19,12 @@ setup(
     entry_points={
         'console_scripts': [
             'aboleth-reg = aboleth.scripts.regression:main',
-            'aboleth-cla = aboleth.scripts.classification:main'
+            'aboleth-cla = aboleth.scripts.classification:main',
+            'aboleth-sarcos = aboleth.scripts.sarcos:main'
         ]
     },
     install_requires=[
+        'six==1.10.0',
         'PyContracts==1.7.15',
         'click==6.7',
         'bokeh==0.12.4',

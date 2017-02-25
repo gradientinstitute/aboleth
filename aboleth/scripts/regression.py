@@ -6,7 +6,7 @@ import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF as skl_RBF
 
 import aboleth as ab
-from aboleth.util import gp_draws
+from aboleth.datasets import gp_draws
 
 
 # Data settings
@@ -17,7 +17,6 @@ true_noise = 0.1
 
 # Model settings
 variance = 1.
-n_loss_samples = 10
 n_predict_samples = 10
 n_iterations = 10000
 batch_size = 10
@@ -57,16 +56,16 @@ def main():
         Phi, KL = ab.deepnet(X_, layers)
 
     with tf.name_scope("Loss"):
-        loss = ab.elbo(Phi, Y_, N_, KL, lkhood, n_loss_samples)
+        loss = ab.elbo(Phi, Y_, N_, KL, lkhood)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
 
-    with tf.Session(config=config) as sess:
+    with tf.Session(config=config):
         tf.global_variables_initializer().run()
         batches = ab.batch({X_: Xr, Y_: Yr}, N_, batch_size=batch_size,
-                            n_iter=n_iterations)
+                           n_iter=n_iterations)
         for i, d in enumerate(batches):
             train.run(feed_dict=d)
             if i % 100 == 0:

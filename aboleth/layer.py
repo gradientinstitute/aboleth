@@ -112,14 +112,19 @@ def randomFourier(n_features, kernel=None):
 
 class RBF:
     """RBF kernel approximation."""
+
+    def __init__(self, lenscale=1.0):
+        self.lenscale = lenscale
+
     def weights(self, input_dim, n_features):
         P = np.random.randn(input_dim, n_features).astype(np.float32)
-        return P
+        return P / self.lenscale
 
 
-class Matern:
+class Matern(RBF):
     """Matern kernel approximation."""
-    def __init__(self, p=1):
+    def __init__(self, p=1, lenscale=1.0):
+        super().__init__(lenscale)
         self.p = p
 
     def weights(self, input_dim, n_features):
@@ -137,7 +142,7 @@ class Matern:
         u = np.random.chisquare(df, size=(n_features,))
         P = y * np.sqrt(df / u)
         P = P.astype(np.float32)
-        return P
+        return P / self.lenscale
 
 
 #
