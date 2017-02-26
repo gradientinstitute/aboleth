@@ -27,34 +27,49 @@ def activation(h=lambda X: X):
     return build_activation
 
 
-def cat(*layers):
-    """Concatenate multiple layers/activations."""
-    def build_cat(X):
+def fork(replicas=2):
+    """Fork an input into multiple, unmodified, outputs."""
+    def build_fork(X):
+        KL = 0.
+        return [X for _ in range(replicas)], KL
 
-        Phis, KLs = zip(*[p(X) for p in layers])
-        Phi = tf.concat(Phis, axis=1)
+    return build_fork
+
+
+def apply(*layers):
+    """Apply layers to multiple inputs (after forking)."""
+    def build_apply(Xs):
+        if len(Xs) != len(layers):
+            raise ValueError("Number of layers and inputs not the same!")
+        Phis, KLs = zip(*[p(X) for p, X in zip(layers, Xs)])
         KL = sum(KLs)
+        return Phis, KL
 
+    return build_apply
+
+
+def cat():
+    """Join multiple inputs by concatenation."""
+    def build_cat(Xs):
+        Phi = tf.concat(Xs, axis=1)
+        KL = 0.
         return Phi, KL
 
     return build_cat
 
 
-def add(*layers):
-    """Add multiple layers/activations."""
-    def build_add(X):
-
-        Phis, KLs = zip(*(p(X) for p in layers))
-        Phi = sum(Phis)
-        KL = sum(KLs)
-
+def add():
+    """Join multiple inputs by addition."""
+    def build_add(Xs):
+        Phi = tf.add_n(Xs)
+        KL = 0.
         return Phi, KL
 
     return build_add
 
 
-def dense(output_dim, reg=1., learn_prior=True):
-    """Dense (fully connected) linear layer, Bayesian style."""
+def dense_var(output_dim, reg=1., learn_prior=True):
+    """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
         input_dim = int(X.get_shape()[1])
         Wdim = (input_dim, output_dim)
@@ -74,11 +89,11 @@ def dense(output_dim, reg=1., learn_prior=True):
 
         # Layer Posteriors
         qW = __Weights(
-            mu=tf.Variable(reg * tf.random_normal(Wdim)),
+            mu=tf.Variable(tf.sqrt(reg) * tf.random_normal(Wdim)),
             var=pos(tf.Variable(reg * tf.random_normal(Wdim)))
         )
         qb = __Weights(
-            mu=tf.Variable(reg * tf.random_normal(bdim)),
+            mu=tf.Variable(tf.sqrt(reg) * tf.random_normal(bdim)),
             var=pos(tf.Variable(reg * tf.random_normal(bdim)))
         )
 
@@ -87,6 +102,33 @@ def dense(output_dim, reg=1., learn_prior=True):
               tf.reduce_sum(qb.KL(pb)))
         return Phi, KL
     return build_dense
+
+
+def dense_map(output_dim, l1_reg=1., l2_reg=1.):
+    """Dense (fully connected) linear layer, with MAP inference."""
+
+    def build_dense_map(X):
+        input_dim = int(X.get_shape()[1])
+        Wdim = (input_dim, output_dim)
+        bdim = (output_dim,)
+
+        W = tf.Variable(tf.random_normal(Wdim))
+        b = tf.Variable(tf.random_normal(bdim))
+
+        # Linear layer
+        Phi = tf.matmul(X, W) + b
+
+        # Regularizers
+        l1, l2 = 0, 0
+        if l2_reg > 0:
+            l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
+        if l1_reg > 0:
+            l1 = l1_reg * (__l1_loss(W) + __l1_loss(b))
+        pen = l1 + l2
+
+        return Phi, pen
+
+    return build_dense_map
 
 
 def randomFourier(n_features, kernel=None):
@@ -166,3 +208,8 @@ class __Weights:
         KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1. +
                     (self.mu - p.mu)**2 / p.var)
         return KL
+
+
+def __l1_loss(X):
+    l1 = tf.reduce_sum(tf.abs(X))
+    return l1

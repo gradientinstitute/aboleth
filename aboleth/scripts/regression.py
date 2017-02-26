@@ -10,23 +10,30 @@ from aboleth.datasets import gp_draws
 
 
 # Data settings
-N = 2000
+N = 200
 Ns = 400
-kernel = skl_RBF(length_scale=.5)
+kernel = skl_RBF(length_scale=0.5)
 true_noise = 0.1
 
 # Model settings
 variance = 1.
-n_predict_samples = 10
+n_predict_samples = 20
 n_iterations = 10000
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 # Network structure
-layers = [ab.randomFourier(n_features=50, kernel=ab.RBF()),
-          ab.dense(output_dim=5, reg=0.1),
-          ab.randomFourier(n_features=50, kernel=ab.RBF()),
-          ab.dense(output_dim=1, reg=0.1)]
+# kern = ab.RBF(lenscale=ab.pos(tf.Variable(1.)))
+# layers = [
+#     ab.randomFourier(n_features=100, kernel=kern),
+#     ab.dense(output_dim=1, reg=.1)
+# ]
+layers = [
+    ab.randomFourier(n_features=200, kernel=ab.RBF()),
+    ab.dense_map(output_dim=5),
+    ab.randomFourier(n_features=50, kernel=ab.RBF()),
+    ab.dense_var(output_dim=1, reg=.1)
+]
 
 
 @click.command()
@@ -53,10 +60,7 @@ def main():
             tf.Variable(variance)))
 
     with tf.name_scope("Deepnet"):
-        Phi, KL = ab.deepnet(X_, layers)
-
-    with tf.name_scope("Loss"):
-        loss = ab.elbo(Phi, Y_, N_, KL, lkhood)
+        Phi, loss = ab.bayesmodel(X_, Y_, N_, layers, lkhood)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()

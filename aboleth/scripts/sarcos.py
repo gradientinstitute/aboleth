@@ -1,3 +1,4 @@
+"""Sarcos regression demo."""
 import click
 import numpy as np
 import tensorflow as tf
@@ -12,14 +13,14 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 VARIANCE = 10.0
 KERN = ab.RBF(lenscale=ab.pos(tf.Variable(tf.ones((21, 1)))))
 LAYERS = [
-    ab.randomFourier(n_features=500, kernel=KERN),
-    ab.dense(output_dim=1),
-    # ab.randomFourier(n_features=100),
-    # ab.dense(output_dim=1)
+    ab.randomFourier(n_features=100, kernel=KERN),
+    ab.dense_var(output_dim=10),
+    ab.randomFourier(n_features=50),
+    ab.dense_var(output_dim=1)
 ]
-BATCH_SIZE = 100
+BATCH_SIZE = 50
 NITERATIONS = 100000
-NPREDICTSAMPLES = 50
+NPREDICTSAMPLES = 100
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
@@ -51,10 +52,7 @@ def main():
         lkhood = ab.normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, KL = ab.deepnet(X_, LAYERS)
-
-    with tf.name_scope("Loss"):
-        loss = ab.elbo(Phi, Y_, N_, KL, lkhood)
+        Phi, loss = ab.bayesmodel(X_, Y_, N_, LAYERS, lkhood)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -66,7 +64,7 @@ def main():
                            n_iter=NITERATIONS)
         for i, d in enumerate(batches):
             train.run(feed_dict=d)
-            if i % 100 == 0:
+            if i % 1000 == 0:
                 l = loss.eval(feed_dict=d)
                 print("Iteration {}, loss = {}".format(i, l))
 

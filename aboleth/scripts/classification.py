@@ -23,9 +23,9 @@ PSAMPLES = 20
 
 # Network structure
 layers = [
-    ab.dense(output_dim=20, reg=0.1),
+    ab.dense_var(output_dim=20),
     ab.activation(h=tf.nn.relu),
-    ab.dense(output_dim=1, reg=0.1),
+    ab.dense_var(output_dim=1, reg=0.1),
     ab.activation(h=tf.nn.sigmoid)
 ]
 
@@ -52,10 +52,7 @@ def main():
         lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, KL = ab.deepnet(X_, layers)
-
-    with tf.name_scope("Loss"):
-        loss = ab.elbo(Phi, Y_, N_, KL, lkhood, 10)
+        Phi, loss = ab.bayesmodel(X_, Y_, N_, layers, lkhood)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
