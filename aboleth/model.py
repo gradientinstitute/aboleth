@@ -24,3 +24,10 @@ def ell(f, Y, likelihood, n_samples):
     ELL = ELL / n_samples
     return ELL
 
+def density(Phi, Y, likelihood, n_samples):
+    """
+    Something about how this is going to work.
+    """
+    samples = [likelihood(Y, Phi) for _ in range(n_samples)]
+    density = tf.reduce_mean(samples, axis=0)
+    return density
