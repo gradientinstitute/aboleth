@@ -33,3 +33,12 @@ def elbo(F, Y, N, KL, likelihood, n_samples=10):
     B = N / tf.to_float(tf.shape(F)[0])
     l = - B * ELL + KL
     return l
+
+
+def density(Phi, Y, likelihood, n_samples=10):
+    """
+    Something about how this is going to work.
+    """
+    samples = [likelihood(Y, Phi) for _ in range(n_samples)]
+    density = tf.reduce_mean(samples, axis=0)
+    return density
