@@ -18,7 +18,7 @@ true_noise = 0.1
 variance = 1.
 n_loss_samples = 10
 n_predict_samples = 10
-n_density_samples = 1000
+n_density_samples = 100
 n_iterations = 10000
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
