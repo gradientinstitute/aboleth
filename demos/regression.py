@@ -1,5 +1,4 @@
 """Demo using aboleth for regression."""
-import click
 import numpy as np
 import bokeh.plotting as bk
 import tensorflow as tf
@@ -32,7 +31,6 @@ layers = [
 ]
 
 
-@click.command()
 def main():
 
     np.random.seed(10)
@@ -102,3 +100,7 @@ def main():
         f.line(Xq.flatten(), y, line_color='black', legend='Samples')
     f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
     bk.show(f)
+
+
+if __name__ == "__main__":
+    main()

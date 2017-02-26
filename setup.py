@@ -15,14 +15,6 @@ setup(
     packages=find_packages(),
     package_dir={'aboleth': 'aboleth'},
     include_package_data=True,
-
-    entry_points={
-        'console_scripts': [
-            'aboleth-reg = scripts.regression:main',
-            'aboleth-cla = scripts.classification:main',
-            'aboleth-sarcos = scripts.sarcos:main'
-        ]
-    },
     install_requires=[
         'six==1.10.0',
         'PyContracts==1.7.15',

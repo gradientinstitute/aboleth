@@ -1,5 +1,4 @@
 """Sarcos regression demo."""
-import click
 import numpy as np
 import tensorflow as tf
 from scipy.stats import norm
@@ -25,7 +24,6 @@ NPREDICTSAMPLES = 100
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 
-@click.command()
 def main():
 
     data = fetch_gpml_sarcos_data()
@@ -91,3 +89,7 @@ def msll(Y_true, Y_pred, V_pred, Y_train):
     rand_ll = norm.logpdf(Y_true, loc=mt, scale=st)
     msll = - (ll - rand_ll).mean()
     return msll
+
+
+if __name__ == "__main__":
+    main()

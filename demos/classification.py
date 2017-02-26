@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 import tensorflow as tf
 import numpy as np
-import click
 
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import KFold
@@ -31,7 +30,6 @@ layers = [
 ]
 
 
-@click.command()
 def main():
 
     data = load_breast_cancer()
@@ -112,3 +110,6 @@ def print_k_result(ys, Ep, ll, acc, name):
 def print_final_result(acc, ll, name):
     print("{} final: accuracy = {:.4g} ({:.4g}), log-loss = {:.4g} ({:.4g})"
           .format(name, np.mean(acc), np.std(acc), np.mean(ll), np.std(ll)))
+
+if __name__ == "__main__":
+    main()
