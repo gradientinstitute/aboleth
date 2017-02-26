@@ -16,14 +16,15 @@ FOLDS = 5
 RSEED = 100
 
 # Optimization
-NITER = 30000
+NITER = 20000
 BSIZE = 10
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 PSAMPLES = 20
 
 # Network structure
 layers = [
-    ab.dense_var(output_dim=20),
+    # ab.dense_var(output_dim=20),
+    ab.dense_map(output_dim=20),
     ab.activation(h=tf.nn.relu),
     ab.dense_var(output_dim=1, reg=0.1),
     ab.activation(h=tf.nn.sigmoid)

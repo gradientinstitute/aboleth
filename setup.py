@@ -18,9 +18,9 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'aboleth-reg = aboleth.scripts.regression:main',
-            'aboleth-cla = aboleth.scripts.classification:main',
-            'aboleth-sarcos = aboleth.scripts.sarcos:main'
+            'aboleth-reg = scripts.regression:main',
+            'aboleth-cla = scripts.classification:main',
+            'aboleth-sarcos = scripts.sarcos:main'
         ]
     },
     install_requires=[

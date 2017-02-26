@@ -11,10 +11,10 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 
 
 VARIANCE = 10.0
-KERN = ab.RBF(lenscale=ab.pos(tf.Variable(tf.ones((21, 1)))))
+KERN = ab.RBF(lenscale=ab.pos(tf.Variable(10. * tf.ones((21, 1)))))
 LAYERS = [
     ab.randomFourier(n_features=100, kernel=KERN),
-    ab.dense_var(output_dim=10),
+    ab.dense_map(output_dim=10, l2_reg=0),
     ab.randomFourier(n_features=50),
     ab.dense_var(output_dim=1)
 ]

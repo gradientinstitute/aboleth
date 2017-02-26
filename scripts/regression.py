@@ -18,18 +18,12 @@ true_noise = 0.1
 # Model settings
 variance = 1.
 n_predict_samples = 20
-n_iterations = 10000
+n_iterations = 20000
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
-# Network structure
-# kern = ab.RBF(lenscale=ab.pos(tf.Variable(1.)))
-# layers = [
-#     ab.randomFourier(n_features=100, kernel=kern),
-#     ab.dense(output_dim=1, reg=.1)
-# ]
 layers = [
-    ab.randomFourier(n_features=200, kernel=ab.RBF()),
+    ab.randomFourier(n_features=50, kernel=ab.RBF()),
     ab.dense_map(output_dim=5),
     ab.randomFourier(n_features=50, kernel=ab.RBF()),
     ab.dense_var(output_dim=1, reg=.1)
