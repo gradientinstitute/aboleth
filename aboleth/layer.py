@@ -98,8 +98,7 @@ def dense_var(output_dim, reg=1., learn_prior=True):
         )
 
         Phi = tf.matmul(X, qW.sample()) + qb.sample()
-        KL = (tf.reduce_sum(qW.KL(pW)) +
-              tf.reduce_sum(qb.KL(pb)))
+        KL = tf.reduce_sum(qW.KL(pW)) + tf.reduce_sum(qb.KL(pb))
         return Phi, KL
     return build_dense
 
