@@ -2,6 +2,10 @@
 import tensorflow as tf
 
 
+#
+# Graph Building
+#
+
 def bayesmodel(X, Y, N, layers, likelihood):
     """Make a supervised Bayesian model.
 
@@ -23,17 +27,14 @@ def deepnet(X, layers):
 
 
 def elbo(F, Y, N, KL, likelihood):
-    """Evaluate the evidence lower bound."""
+    """Build the evidence lower bound loss."""
     B = N / tf.to_float(tf.shape(F)[0])  # Batch amplification factor
     ELL = tf.reduce_sum(likelihood(Y, F))  # YOSO, you only sample once
     l = - B * ELL + KL
     return l
 
 
-def density(Phi, Y, likelihood, n_samples=10):
-    """
-    Something about how this is going to work.
-    """
-    samples = [likelihood(Y, Phi) for _ in range(n_samples)]
-    density = tf.reduce_mean(samples, axis=0)
-    return density
+def log_prob(Y, likelihood, Phi):
+    """Build the log probability density of the model."""
+    log_prob = likelihood(Y, Phi)
+    return log_prob
