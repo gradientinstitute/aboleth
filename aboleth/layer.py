@@ -140,9 +140,9 @@ def randomFourier(n_features, kernel=None):
 
     def build_randomRBF(X):
         input_dim = int(X[0].get_shape()[1])
+        P = kernel.weights(input_dim, n_features)
 
         def phi(x):
-            P = kernel.weights(input_dim, n_features)
             XP = tf.matmul(x, P)
             real = tf.cos(XP)
             imag = tf.sin(XP)

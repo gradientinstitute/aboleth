@@ -17,14 +17,15 @@ true_noise = 0.1
 
 # Model settings
 n_samples = 10
-n_pred_samples = 10
-n_iterations = 20000
+n_pred_samples = 100
+n_iterations = 10000
 batch_size = 100
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 # lenscale = tf.Variable(.2)
 lenscale = 1.
-variance = tf.Variable(1.)
+# variance = tf.Variable(0.1)
+variance = 0.1
 
 layers = [
     ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),

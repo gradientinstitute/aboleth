@@ -11,7 +11,7 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10):
 
     Note: This simply combines calls to ``deepnet`` and ``elbo``.
     """
-    Phi = [X for k in range(n_samples)]
+    Phi = [X] * n_samples
     KL = 0.
     for l in layers:
         Phi, kl = l(Phi)
