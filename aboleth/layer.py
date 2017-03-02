@@ -18,60 +18,63 @@ def eye():
     return build_eye
 
 
-def activation(h=lambda X: X):
-    """Activation function layer."""
-    def build_activation(X):
-        Phi = h(X)
-        KL = 0.
-        return Phi, KL
-    return build_activation
+# def activation(h=lambda X: X):
+#     """Activation function layer."""
+#     def build_activation(X):
+#         Phi = h(X)
+#         KL = 0.
+#         return Phi, KL
+#     return build_activation
 
 
-def fork(replicas=2):
-    """Fork an input into multiple, unmodified, outputs."""
-    def build_fork(X):
-        KL = 0.
-        return [X for _ in range(replicas)], KL
+# def fork(replicas=2):
+#     """Fork an input into multiple, unmodified, outputs."""
+#     def build_fork(X):
+#         KL = 0.
+#         return [X for _ in range(replicas)], KL
 
-    return build_fork
-
-
-def apply(*layers):
-    """Apply layers to multiple inputs (after forking)."""
-    def build_apply(Xs):
-        if len(Xs) != len(layers):
-            raise ValueError("Number of layers and inputs not the same!")
-        Phis, KLs = zip(*[p(X) for p, X in zip(layers, Xs)])
-        KL = sum(KLs)
-        return Phis, KL
-
-    return build_apply
+#     return build_fork
 
 
-def cat():
-    """Join multiple inputs by concatenation."""
-    def build_cat(Xs):
-        Phi = tf.concat(Xs, axis=1)
-        KL = 0.
-        return Phi, KL
+# def apply(*layers):
+#     """Apply layers to multiple inputs (after forking)."""
+#     def build_apply(Xs):
+#         if len(Xs) != len(layers):
+#             raise ValueError("Number of layers and inputs not the same!")
+#         Phis, KLs = zip(*[p(X) for p, X in zip(layers, Xs)])
+#         KL = sum(KLs)
+#         return Phis, KL
 
-    return build_cat
+#     return build_apply
 
 
-def add():
-    """Join multiple inputs by addition."""
-    def build_add(Xs):
-        Phi = tf.add_n(Xs)
-        KL = 0.
-        return Phi, KL
+# def cat():
+#     """Join multiple inputs by concatenation."""
+#     def build_cat(Xs):
+#         Phi = tf.concat(Xs, axis=1)
+#         KL = 0.
+#         return Phi, KL
 
-    return build_add
+#     return build_cat
+
+
+# def add():
+#     """Join multiple inputs by addition."""
+#     def build_add(Xs):
+#         Phi = tf.add_n(Xs)
+#         KL = 0.
+#         return Phi, KL
+
+#     return build_add
 
 
 def dense_var(output_dim, reg=1., learn_prior=True):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
-        input_dim = int(X.get_shape()[1])
+        """
+        X is now a list
+        """
+        input_dim = int(X[0].get_shape()[1])
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
@@ -87,7 +90,7 @@ def dense_var(output_dim, reg=1., learn_prior=True):
             if learn_prior else reg * tf.ones(bdim)
         )
 
-        # Layer Posteriors
+        # Layer Posterior samples
         qW = __Weights(
             mu=tf.Variable(tf.sqrt(reg) * tf.random_normal(Wdim)),
             var=pos(tf.Variable(reg * tf.random_normal(Wdim)))
@@ -97,37 +100,38 @@ def dense_var(output_dim, reg=1., learn_prior=True):
             var=pos(tf.Variable(reg * tf.random_normal(bdim)))
         )
 
-        Phi = tf.matmul(X, qW.sample()) + qb.sample()
+        Phi = [tf.matmul(x, qW.sample()) + qb.sample() for x in X]
         KL = tf.reduce_sum(qW.KL(pW)) + tf.reduce_sum(qb.KL(pb))
         return Phi, KL
+
     return build_dense
 
 
-def dense_map(output_dim, l1_reg=1., l2_reg=1.):
-    """Dense (fully connected) linear layer, with MAP inference."""
+# def dense_map(output_dim, l1_reg=1., l2_reg=1.):
+#     """Dense (fully connected) linear layer, with MAP inference."""
 
-    def build_dense_map(X):
-        input_dim = int(X.get_shape()[1])
-        Wdim = (input_dim, output_dim)
-        bdim = (output_dim,)
+#     def build_dense_map(X):
+#         input_dim = int(X.get_shape()[1])
+#         Wdim = (input_dim, output_dim)
+#         bdim = (output_dim,)
 
-        W = tf.Variable(tf.random_normal(Wdim))
-        b = tf.Variable(tf.random_normal(bdim))
+#         W = tf.Variable(tf.random_normal(Wdim))
+#         b = tf.Variable(tf.random_normal(bdim))
 
-        # Linear layer
-        Phi = tf.matmul(X, W) + b
+#         # Linear layer
+#         Phi = tf.matmul(X, W) + b
 
-        # Regularizers
-        l1, l2 = 0, 0
-        if l2_reg > 0:
-            l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
-        if l1_reg > 0:
-            l1 = l1_reg * (__l1_loss(W) + __l1_loss(b))
-        pen = l1 + l2
+#         # Regularizers
+#         l1, l2 = 0, 0
+#         if l2_reg > 0:
+#             l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
+#         if l1_reg > 0:
+#             l1 = l1_reg * (__l1_loss(W) + __l1_loss(b))
+#         pen = l1 + l2
 
-        return Phi, pen
+#         return Phi, pen
 
-    return build_dense_map
+#     return build_dense_map
 
 
 def randomFourier(n_features, kernel=None):
@@ -135,12 +139,17 @@ def randomFourier(n_features, kernel=None):
     kernel = kernel if kernel else RBF()
 
     def build_randomRBF(X):
-        input_dim = int(X.get_shape()[1])
-        P = kernel.weights(input_dim, n_features)
-        XP = tf.matmul(X, P)
-        real = tf.cos(XP)
-        imag = tf.sin(XP)
-        Phi = tf.concat([real, imag], axis=1) / np.sqrt(n_features)
+        input_dim = int(X[0].get_shape()[1])
+
+        def phi(x):
+            P = kernel.weights(input_dim, n_features)
+            XP = tf.matmul(x, P)
+            real = tf.cos(XP)
+            imag = tf.sin(XP)
+            result = tf.concat([real, imag], axis=1) / np.sqrt(n_features)
+            return result
+
+        Phi = [phi(x) for x in X]
         KL = 0.0
         return Phi, KL
 
