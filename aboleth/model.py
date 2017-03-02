@@ -20,10 +20,10 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10):
     return Phi, loss
 
 
-def elbo(F, Y, N, KL, likelihood):
+def elbo(Phi, Y, N, KL, likelihood):
     """Build the evidence lower bound loss."""
-    B = N / tf.to_float(tf.shape(F)[0])  # Batch amplification factor
-    ELL = tf.reduce_sum([likelihood(Y, phi) for phi in F]) / len(F)
+    B = N / tf.to_float(tf.shape(Phi[0])[0])  # Batch amplification factor
+    ELL = sum([tf.reduce_sum(likelihood(Y, phi)) for phi in Phi]) / len(Phi)
     l = - B * ELL + KL
     return l
 
