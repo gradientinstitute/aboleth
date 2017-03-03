@@ -1,6 +1,7 @@
 """Package init."""
 from .model import deepnet, elbo, log_prob
-from .layer import eye, dense_var, randomFourier, Matern, RBF
+from .layer import (eye, activation, dense_var, dense_map, randomFourier,
+                    Matern, RBF)
 from .likelihood import normal, bernoulli, binomial
 from .util import batch, pos
 
@@ -9,7 +10,9 @@ __all__ = [
     'elbo',
     'log_prob',
     'eye',
+    'activation',
     'dense_var',
+    'dense_map',
     'randomFourier',
     'RBF',
     'Matern',

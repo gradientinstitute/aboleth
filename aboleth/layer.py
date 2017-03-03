@@ -18,13 +18,13 @@ def eye():
     return build_eye
 
 
-# def activation(h=lambda X: X):
-#     """Activation function layer."""
-#     def build_activation(X):
-#         Phi = h(X)
-#         KL = 0.
-#         return Phi, KL
-#     return build_activation
+def activation(h=lambda X: X):
+    """Activation function layer."""
+    def build_activation(X):
+        Phi = [h(x) for x in X]
+        KL = 0.
+        return Phi, KL
+    return build_activation
 
 
 # def fork(replicas=2):
@@ -107,31 +107,31 @@ def dense_var(output_dim, reg=1., learn_prior=True):
     return build_dense
 
 
-# def dense_map(output_dim, l1_reg=1., l2_reg=1.):
-#     """Dense (fully connected) linear layer, with MAP inference."""
+def dense_map(output_dim, l1_reg=1., l2_reg=1.):
+    """Dense (fully connected) linear layer, with MAP inference."""
 
-#     def build_dense_map(X):
-#         input_dim = int(X.get_shape()[1])
-#         Wdim = (input_dim, output_dim)
-#         bdim = (output_dim,)
+    def build_dense_map(X):
+        input_dim = int(X[0].get_shape()[1])
+        Wdim = (input_dim, output_dim)
+        bdim = (output_dim,)
 
-#         W = tf.Variable(tf.random_normal(Wdim))
-#         b = tf.Variable(tf.random_normal(bdim))
+        W = tf.Variable(tf.random_normal(Wdim))
+        b = tf.Variable(tf.random_normal(bdim))
 
-#         # Linear layer
-#         Phi = tf.matmul(X, W) + b
+        # Linear layer
+        Phi = [tf.matmul(x, W) + b for x in X]
 
-#         # Regularizers
-#         l1, l2 = 0, 0
-#         if l2_reg > 0:
-#             l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
-#         if l1_reg > 0:
-#             l1 = l1_reg * (__l1_loss(W) + __l1_loss(b))
-#         pen = l1 + l2
+        # Regularizers
+        l1, l2 = 0, 0
+        if l2_reg > 0:
+            l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
+        if l1_reg > 0:
+            l1 = l1_reg * (__l1_loss(W) + __l1_loss(b))
+        pen = l1 + l2
 
-#         return Phi, pen
+        return Phi, pen
 
-#     return build_dense_map
+    return build_dense_map
 
 
 def randomFourier(n_features, kernel=None):
