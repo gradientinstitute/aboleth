@@ -29,8 +29,8 @@ variance = 0.1
 
 layers = [
     ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
-    # ab.dense_var(output_dim=5, reg=0.1),
-    ab.dense_map(output_dim=5),
+    ab.dense_var(output_dim=5, reg=0.1),
+    # ab.dense_map(output_dim=5),
     ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
     ab.dense_var(output_dim=1, reg=0.1),
 ]

@@ -27,45 +27,45 @@ def activation(h=lambda X: X):
     return build_activation
 
 
-# def fork(replicas=2):
-#     """Fork an input into multiple, unmodified, outputs."""
-#     def build_fork(X):
-#         KL = 0.
-#         return [X for _ in range(replicas)], KL
+def fork(replicas=2):
+    """Fork an input into multiple, unmodified, outputs."""
+    def build_fork(X):
+        KL = 0.
+        return [X for _ in range(replicas)], KL
 
-#     return build_fork
-
-
-# def apply(*layers):
-#     """Apply layers to multiple inputs (after forking)."""
-#     def build_apply(Xs):
-#         if len(Xs) != len(layers):
-#             raise ValueError("Number of layers and inputs not the same!")
-#         Phis, KLs = zip(*[p(X) for p, X in zip(layers, Xs)])
-#         KL = sum(KLs)
-#         return Phis, KL
-
-#     return build_apply
+    return build_fork
 
 
-# def cat():
-#     """Join multiple inputs by concatenation."""
-#     def build_cat(Xs):
-#         Phi = tf.concat(Xs, axis=1)
-#         KL = 0.
-#         return Phi, KL
+def lmap(*layers):
+    """Map multiple layers to multiple inputs (after forking)."""
+    def build_lmap(Xs):
+        if len(Xs) != len(layers):
+            raise ValueError("Number of layers and inputs not the same!")
+        Phis, KLs = zip(*map(lambda p, X: p(X), layers, Xs))
+        KL = sum(KLs)
+        return Phis, KL
 
-#     return build_cat
+    return build_lmap
 
 
-# def add():
-#     """Join multiple inputs by addition."""
-#     def build_add(Xs):
-#         Phi = tf.add_n(Xs)
-#         KL = 0.
-#         return Phi, KL
+def cat():
+    """Join multiple inputs by concatenation."""
+    def build_cat(Xs):
+        Phi = [tf.concat(X, axis=1) for X in Xs]
+        KL = 0.
+        return Phi, KL
 
-#     return build_add
+    return build_cat
+
+
+def add():
+    """Join multiple inputs by addition."""
+    def build_add(Xs):
+        Phi = [tf.add_n(X) for X in Xs]
+        KL = 0.
+        return Phi, KL
+
+    return build_add
 
 
 def dense_var(output_dim, reg=1., learn_prior=True):
@@ -74,7 +74,7 @@ def dense_var(output_dim, reg=1., learn_prior=True):
         """
         X is now a list
         """
-        input_dim = int(X[0].get_shape()[1])
+        input_dim = __input_dim(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
@@ -111,7 +111,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
     """Dense (fully connected) linear layer, with MAP inference."""
 
     def build_dense_map(X):
-        input_dim = int(X[0].get_shape()[1])
+        input_dim = __input_dim(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
@@ -139,7 +139,7 @@ def randomFourier(n_features, kernel=None):
     kernel = kernel if kernel else RBF()
 
     def build_randomRBF(X):
-        input_dim = int(X[0].get_shape()[1])
+        input_dim = __input_dim(X)
         P = kernel.weights(input_dim, n_features)
 
         def phi(x):
@@ -221,3 +221,8 @@ class __Weights:
 def __l1_loss(X):
     l1 = tf.reduce_sum(tf.abs(X))
     return l1
+
+
+def __input_dim(X):
+        input_dim = int(X[0].get_shape()[1])
+        return input_dim

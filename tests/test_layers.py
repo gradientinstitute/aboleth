@@ -7,8 +7,7 @@ import aboleth as ab
 
 def test_eye(make_data):
     """Test identity layer."""
-    x, _ = make_data
-    X = [x] * 3
+    x, _, X = make_data
     eye = ab.eye()
 
     F, KL = eye(X)
@@ -19,8 +18,7 @@ def test_eye(make_data):
 
 def test_activation(make_data):
     """Test nonlinear activation layer."""
-    x, _ = make_data
-    X = [x] * 3
+    x, _, X = make_data
     act = ab.activation(tf.tanh)
 
     tc = tf.test.TestCase()
@@ -31,55 +29,59 @@ def test_activation(make_data):
         assert KL == 0
 
 
-# def test_fork(make_data):
-#     """Test forking layers."""
-#     X, _ = make_data
-#     fork = ab.fork(replicas=2)
+def test_fork(make_data):
+    """Test forking layers."""
+    x, _, X = make_data
+    fork = ab.fork(replicas=2)
 
-#     (X1, X2), KL = fork(X)
+    (X1, X2), KL = fork(X)
 
-#     assert np.all(X == X1) and np.all(X == X2)
-#     assert KL == 0
-
-
-# def test_apply(make_data):
-#     """Test apply functions to multiple input layers."""
-#     X, _ = make_data
-#     app = ab.apply(ab.activation(tf.tanh), ab.eye())
-
-#     tc = tf.test.TestCase()
-#     with tc.test_session():
-#         (Xtan, Xeye), KL = app([X, X])
-
-#         assert np.all(np.tanh(X) == Xtan.eval())
-#         assert np.all(X == Xeye)
-#         assert KL == 0
+    for x1, x2 in zip(X1, X2):
+        assert np.all(x == x1) and np.all(x == x2)
+    assert KL == 0
 
 
-# def test_add(make_data):
-#     """Test adding of forked input layers."""
-#     X, _ = make_data
-#     add = ab.add()
+def test_lmap(make_data):
+    """Test layer map functions to multiple input layers."""
+    x, _, X = make_data
+    app = ab.lmap(ab.activation(tf.tanh), ab.eye())
 
-#     tc = tf.test.TestCase()
-#     with tc.test_session():
-#         Xadd, KL = add([X, X, X])
-#         assert np.all(3 * X == Xadd.eval())
-#         assert KL == 0
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        (Xtan, Xeye), KL = app([X, X])
+
+        for xtan, xeye in zip(Xtan, Xeye):
+            assert np.all(np.tanh(x) == xtan.eval())
+            assert np.all(x == xeye)
+        assert KL == 0
 
 
-# def test_cat(make_data):
-#     """Test concatenating of forked input layers."""
-#     X, _ = make_data
-#     cat = ab.cat()
+def test_add(make_data):
+    """Test adding of forked input layers."""
+    x, _, X = make_data
+    add = ab.add()
 
-#     N, D = X.shape
-#     tc = tf.test.TestCase()
-#     with tc.test_session():
-#         Xcat, KL = cat([X, X, X])
-#         assert Xcat.eval().shape == (N, 3 * D)
-#         assert np.all(Xcat.eval() == np.hstack([X, X, X]))
-#         assert KL == 0
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        Xadd, KL = add([X, X, X])
+        for xadd in Xadd:
+            assert np.all(3 * x == xadd.eval())
+        assert KL == 0
+
+
+def test_cat(make_data):
+    """Test concatenating of forked input layers."""
+    x, _, X = make_data
+    cat = ab.cat()
+
+    N, D = x.shape
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        Xcat, KL = cat([X, X, X])
+        for xcat in Xcat:
+            assert xcat.eval().shape == (N, 3 * D)
+            assert np.all(xcat.eval() == np.hstack(X))
+        assert KL == 0
 
 
 @pytest.mark.parametrize('kernels', [
@@ -98,7 +100,7 @@ def test_kernels(kernels, make_data):
     assert P.shape == (d, D)
 
     # Check behaving properly with k(x, x) ~ 1.0
-    x, _ = make_data
+    x, _, _ = make_data
     x_ = tf.placeholder(tf.float32, x.shape)
     N = x.shape[0]
     X_ = [x_] * 3
