@@ -68,40 +68,34 @@ def add():
     return build_add
 
 
-def dense_var(output_dim, reg=1., learn_prior=True):
+def dense_var(output_dim, reg=1., learn_prior=True, mixtures=1):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
         """
         X is now a list
         """
-        input_dim = __input_dim(X)
+        input_dim = _input_dim(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
         # Layer priors
-        pW = __Weights(
-            mu=tf.zeros(Wdim),
-            var=pos(tf.Variable(reg)) * tf.ones(Wdim)
-            if learn_prior else reg * tf.ones(Wdim)
-        )
-        pb = __Weights(
-            mu=tf.zeros(bdim),
-            var=pos(tf.Variable(reg)) * tf.ones(bdim)
-            if learn_prior else reg * tf.ones(bdim)
-        )
+        pW = _NormPrior(dim=Wdim, var=reg, learn_var=learn_prior)
+        pb = _NormPrior(dim=bdim, var=reg, learn_var=learn_prior)
 
         # Layer Posterior samples
-        qW = __Weights(
-            mu=tf.Variable(tf.sqrt(reg) * tf.random_normal(Wdim)),
-            var=pos(tf.Variable(reg * tf.random_normal(Wdim)))
-        )
-        qb = __Weights(
-            mu=tf.Variable(tf.sqrt(reg) * tf.random_normal(bdim)),
-            var=pos(tf.Variable(reg * tf.random_normal(bdim)))
-        )
+        if mixtures > 1:
+            qW = _MixPosterior(dim=Wdim, prior_var=reg, K=mixtures)
+            qb = _MixPosterior(dim=bdim, prior_var=reg, K=mixtures)
+        else:
+            qW = _NormPosterior(dim=Wdim, prior_var=reg)
+            qb = _NormPosterior(dim=bdim, prior_var=reg)
 
+        # Linear layer
         Phi = [tf.matmul(x, qW.sample()) + qb.sample() for x in X]
+
+        # Regularizers
         KL = tf.reduce_sum(qW.KL(pW)) + tf.reduce_sum(qb.KL(pb))
+
         return Phi, KL
 
     return build_dense
@@ -111,7 +105,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
     """Dense (fully connected) linear layer, with MAP inference."""
 
     def build_dense_map(X):
-        input_dim = __input_dim(X)
+        input_dim = _input_dim(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
@@ -126,7 +120,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
         if l2_reg > 0:
             l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
         if l1_reg > 0:
-            l1 = l1_reg * (__l1_loss(W) + __l1_loss(b))
+            l1 = l1_reg * (_l1_loss(W) + _l1_loss(b))
         pen = l1 + l2
 
         return Phi, pen
@@ -139,7 +133,7 @@ def randomFourier(n_features, kernel=None):
     kernel = kernel if kernel else RBF()
 
     def build_randomRBF(X):
-        input_dim = __input_dim(X)
+        input_dim = _input_dim(X)
         P = kernel.weights(input_dim, n_features)
 
         def phi(x):
@@ -173,6 +167,7 @@ class RBF:
 
 class Matern(RBF):
     """Matern kernel approximation."""
+
     def __init__(self, p=1, lenscale=1.0):
         super().__init__(lenscale)
         self.p = p
@@ -199,7 +194,7 @@ class Matern(RBF):
 # Private module stuff
 #
 
-class __Weights:
+class _Normal:
 
     def __init__(self, mu=0., var=1.):
         self.mu = mu
@@ -218,11 +213,62 @@ class __Weights:
         return KL
 
 
-def __l1_loss(X):
+class _NormPrior(_Normal):
+
+    def __init__(self, dim, var, learn_var):
+        mu = tf.zeros(dim)
+        var = pos(tf.Variable(var)) if learn_var else var
+        super().__init__(mu, var)
+
+
+class _NormPosterior(_Normal):
+
+    def __init__(self, dim, prior_var):
+        mu = tf.Variable(tf.sqrt(prior_var) * tf.random_normal(dim))
+        var = pos(tf.Variable(prior_var * tf.random_normal(dim)))
+        super().__init__(mu, var)
+
+
+class _MixPosterior:
+
+    def __init__(self, dim, prior_var, K):
+        self.comps = [_NormPosterior(dim, prior_var) for _ in range(K)]
+        self.K = K
+
+    def sample(self):
+        # Sample randomly from one mixture component
+        # NOT particularly efficient, or even workable....
+        k = tf.multinomial([[np.log(1. / self.K)] * self.K], 1)[0][0]
+        z = tf.zeros_like(self.comps[0].mu)
+        sample = z
+        for i, qk in enumerate(self.comps):
+            sample += tf.cond(tf.equal(k, i), qk.sample, lambda: z)
+        return sample
+
+    def KL(self, p):
+        """Lower bound on KL between a mixture and normal."""
+        KL = 0.
+        for qk in self.comps:
+            lp = _log_norm(qk.mu, p.mu, p.var)
+            tr = tf.reduce_sum(qk.var / p.var)
+            lq = [_log_norm(qk.mu, qj.mu, qk.var + qj.var) - self.K
+                  for qj in self.comps]
+            h = tf.reduce_logsumexp(lq)
+            KL += (tr / 2. - lp + h) / self.K
+        return KL
+
+
+def _l1_loss(X):
     l1 = tf.reduce_sum(tf.abs(X))
     return l1
 
 
-def __input_dim(X):
+# TODO: this is repeated in likelihoods (wihtout the sum)
+def _log_norm(x, mu, var):
+    ll = -0.5 * tf.reduce_sum(tf.log(2 * var * np.pi) + (x - mu)**2 / var)
+    return ll
+
+
+def _input_dim(X):
         input_dim = int(X[0].get_shape()[1])
         return input_dim
