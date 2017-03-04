@@ -12,7 +12,7 @@ from aboleth.datasets import gp_draws
 # Data settings
 N = 200
 Ns = 400
-kernel = skl_RBF(length_scale=1.2)
+kernel = skl_RBF(length_scale=0.5)
 true_noise = 0.1
 
 # Model settings
@@ -22,17 +22,17 @@ n_iterations = 10000
 batch_size = 100
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
-lenscale = tf.Variable(1.)
-# lenscale = 1.
+# lenscale = tf.Variable(1.)
+lenscale = 1.
 # variance = tf.Variable(0.1)
 variance = 0.01
 
 layers = [
-    ab.randomFourier(n_features=100, kernel=ab.RBF(ab.pos(lenscale))),
-    # ab.dense_var(output_dim=5, reg=0.1),
+    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
+    ab.dense_var(output_dim=5, reg=0.1),
     # ab.dense_map(output_dim=5),
-    # ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
-    ab.dense_var(output_dim=1, reg=0.1, mixtures=5),
+    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
+    ab.dense_var(output_dim=1, reg=0.1),
 ]
 
 
