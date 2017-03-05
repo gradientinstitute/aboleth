@@ -68,7 +68,7 @@ def add():
     return build_add
 
 
-def dense_var(output_dim, reg=1., learn_prior=True, mixtures=1):
+def dense_var(output_dim, reg=1., learn_prior=True, full=False):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
         """
@@ -83,12 +83,9 @@ def dense_var(output_dim, reg=1., learn_prior=True, mixtures=1):
         pb = _NormPrior(dim=bdim, var=reg, learn_var=learn_prior)
 
         # Layer Posterior samples
-        if mixtures > 1:
-            qW = _MixPosterior(dim=Wdim, prior_var=reg, K=mixtures)
-            qb = _MixPosterior(dim=bdim, prior_var=reg, K=mixtures)
-        else:
-            qW = _NormPosterior(dim=Wdim, prior_var=reg)
-            qb = _NormPosterior(dim=bdim, prior_var=reg)
+        qW = (_GausPosterior(dim=Wdim, prior_var=reg) if full else
+              _NormPosterior(dim=Wdim, prior_var=reg))
+        qb = _NormPosterior(dim=bdim, prior_var=reg)  # TODO: keep independent?
 
         # Linear layer
         Phi = [tf.matmul(x, qW.sample()) + qb.sample() for x in X]
@@ -200,16 +197,42 @@ class _Normal:
         self.mu = mu
         self.var = var
         self.sigma = tf.sqrt(var)
+        self.D = tf.shape(mu)
 
     def sample(self):
         # Reparameterisation trick
-        e = tf.random_normal(self.mu.get_shape())
+        e = tf.random_normal(self.D)
         x = self.mu + e * self.sigma
         return x
 
     def KL(self, p):
         KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1. +
                     (self.mu - p.mu)**2 / p.var)
+        return KL
+
+
+# TODO get this working for (..., D, D) matrices!
+class _Gaussian:
+
+    def __init__(self, mu, L):
+        self.mu = mu
+        self.L = L
+        self.D = tf.shape(mu)
+
+    def sample(self):
+        # Reparameterisation trick
+        e = tf.random_normal(self.D)
+        x = self.mu + tf.matmul(self.L, e)
+        return x
+
+    def KL(self, p):
+        """KL between self and univariate prior, p."""
+        D = tf.to_float(self.D)
+        S = tf.matmul(self.L, tf.transpose(self.L))
+        tr = tf.trace(S) / p.var
+        dist = tf.nn.l2_loss(p.mu - self.mu) / p.var
+        logdet = D * tf.log(p.var) - _chollogdet(self.L)
+        KL = 0.5 * (tr + dist + logdet - D)
         return KL
 
 
@@ -229,33 +252,18 @@ class _NormPosterior(_Normal):
         super().__init__(mu, var)
 
 
-class _MixPosterior:
+# TODO get this working for (..., D, D) matrices!
+class _GausPosterior(_Gaussian):
 
-    def __init__(self, dim, prior_var, K):
-        self.comps = [_NormPosterior(dim, prior_var) for _ in range(K)]
-        self.K = K
-
-    def sample(self):
-        # Sample randomly from one mixture component
-        # NOT particularly efficient, or even workable....
-        k = tf.multinomial([[np.log(1. / self.K)] * self.K], 1)[0][0]
-        z = tf.zeros_like(self.comps[0].mu)
-        sample = z
-        for i, qk in enumerate(self.comps):
-            sample += tf.cond(tf.equal(k, i), qk.sample, lambda: z)
-        return sample
-
-    def KL(self, p):
-        """Lower bound on KL between a mixture and normal."""
-        KL = 0.
-        for qk in self.comps:
-            lp = _log_norm(qk.mu, p.mu, p.var)
-            tr = tf.reduce_sum(qk.var / p.var)
-            lq = [_log_norm(qk.mu, qj.mu, qk.var + qj.var) - self.K
-                  for qj in self.comps]
-            h = tf.reduce_logsumexp(lq)
-            KL += (tr / 2. - lp + h) / self.K
-        return KL
+    def __init__(self, dim, prior_var):
+        # HACK to ONLY work with 1D output!
+        D = dim[0]
+        I = tf.eye(D) * tf.sqrt(prior_var)
+        Le = tf.contrib.distributions.WishartCholesky(df=D, scale=I).sample()
+        e = tf.random_normal(dim)
+        mu = tf.Variable(tf.matmul(Le, e))
+        L = tf.matrix_band_part(tf.Variable(Le), -1, 0)
+        super().__init__(mu=mu, L=L)
 
 
 def _l1_loss(X):
@@ -263,10 +271,10 @@ def _l1_loss(X):
     return l1
 
 
-# TODO: this is repeated in likelihoods (wihtout the sum)
-def _log_norm(x, mu, var):
-    ll = -0.5 * tf.reduce_sum(tf.log(2 * var * np.pi) + (x - mu)**2 / var)
-    return ll
+def _chollogdet(L):
+    l = tf.diag_part(L)
+    logdet = 2. * tf.log(tf.reduce_sum(l))
+    return logdet
 
 
 def _input_dim(X):
