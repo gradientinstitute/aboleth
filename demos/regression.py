@@ -12,25 +12,27 @@ from aboleth.datasets import gp_draws
 # Data settings
 N = 200
 Ns = 400
-kernel = skl_RBF(length_scale=.5)
+kernel = skl_RBF(length_scale=0.5)
 true_noise = 0.1
 
 # Model settings
-n_pred_samples = 10
-n_iterations = 3000
+n_samples = 10
+n_pred_samples = 100
+n_iterations = 10000
 batch_size = 100
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
-# lenscale = tf.Variable(.2)
+# lenscale = tf.Variable(1.)
 lenscale = 1.
-variance = tf.Variable(1.)
+# variance = tf.Variable(0.1)
+variance = 0.01
 
 layers = [
     ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
-    ab.dense_map(output_dim=5, l1_reg=0.01, l2_reg=0.01),
-    # ab.dense_var(output_dim=5, reg=0.1),
-    ab.randomFourier(n_features=50, kernel=ab.RBF()),
-    ab.dense_var(output_dim=1, reg=.1)
+    ab.dense_var(output_dim=5, reg=0.1),
+    # ab.dense_map(output_dim=5),
+    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
+    ab.dense_var(output_dim=1, reg=0.1),
 ]
 
 
@@ -43,7 +45,7 @@ def main():
 
     # Prediction points
     Xq = np.linspace(-20, 20, Ns).astype(np.float32)[:, np.newaxis]
-    Yq = np.linspace(-5, 5, Ns).astype(np.float32)[:, np.newaxis]
+    Yq = np.linspace(-4, 4, Ns).astype(np.float32)[:, np.newaxis]
 
     # Image
     Xi, Yi = np.meshgrid(Xq, Yq)
@@ -62,7 +64,7 @@ def main():
         lkhood = ab.normal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.bayesmodel(X_, Y_, N_, layers, lkhood)
+        Phi, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -74,6 +76,7 @@ def main():
     with tf.Session(config=config):
         tf.global_variables_initializer().run()
         batches = ab.batch({X_: Xr, Y_: Yr}, N_, batch_size=batch_size,
+
                            n_iter=n_iterations)
         for i, d in enumerate(batches):
             train.run(feed_dict=d)
@@ -82,10 +85,9 @@ def main():
                 print("Iteration {}, loss = {}".format(i, l))
 
         # Prediction
-        Ey = [Phi.eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
+        Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
         Eymean = sum(Ey) / n_pred_samples
-        logPY = sum([logprob.eval(feed_dict={Y_: Yi, X_: Xi})
-                     for _ in range(n_pred_samples)]) / n_pred_samples
+        logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
 
     Py = np.exp(logPY.reshape(Ns, Ns))
 
@@ -94,8 +96,8 @@ def main():
     im_size = np.amax(Py) - im_min
     img = (Py - im_min) / im_size
     f = bk.figure(tools='pan,box_zoom,reset', sizing_mode='stretch_both')
-    f.image(image=[img], x=-20., y=-5., dw=40., dh=10,
-            palette=bp.Greys9, alpha=0.2)
+    f.image(image=[img], x=-20., y=-4., dw=40., dh=8,
+            palette=bp.Plasma256)
     f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue', legend='Training')
     f.line(Xs.flatten(), Ys.flatten(), line_color='blue', legend='Truth')
     for y in Ey:

@@ -21,7 +21,7 @@ def eye():
 def activation(h=lambda X: X):
     """Activation function layer."""
     def build_activation(X):
-        Phi = h(X)
+        Phi = [h(x) for x in X]
         KL = 0.
         return Phi, KL
     return build_activation
@@ -36,22 +36,22 @@ def fork(replicas=2):
     return build_fork
 
 
-def apply(*layers):
-    """Apply layers to multiple inputs (after forking)."""
-    def build_apply(Xs):
+def lmap(*layers):
+    """Map multiple layers to multiple inputs (after forking)."""
+    def build_lmap(Xs):
         if len(Xs) != len(layers):
             raise ValueError("Number of layers and inputs not the same!")
-        Phis, KLs = zip(*[p(X) for p, X in zip(layers, Xs)])
+        Phis, KLs = zip(*map(lambda p, X: p(X), layers, Xs))
         KL = sum(KLs)
         return Phis, KL
 
-    return build_apply
+    return build_lmap
 
 
 def cat():
     """Join multiple inputs by concatenation."""
     def build_cat(Xs):
-        Phi = tf.concat(Xs, axis=1)
+        Phi = [tf.concat(X, axis=1) for X in Xs]
         KL = 0.
         return Phi, KL
 
@@ -61,45 +61,39 @@ def cat():
 def add():
     """Join multiple inputs by addition."""
     def build_add(Xs):
-        Phi = tf.add_n(Xs)
+        Phi = [tf.add_n(X) for X in Xs]
         KL = 0.
         return Phi, KL
 
     return build_add
 
 
-def dense_var(output_dim, reg=1., learn_prior=True):
+def dense_var(output_dim, reg=1., learn_prior=True, mixtures=1):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
-        input_dim = int(X.get_shape()[1])
+        """
+        X is now a list
+        """
+        input_dim = _input_dim(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
         # Layer priors
-        pW = __Weights(
-            mu=tf.zeros(Wdim),
-            var=pos(tf.Variable(reg)) * tf.ones(Wdim)
-            if learn_prior else reg * tf.ones(Wdim)
-        )
-        pb = __Weights(
-            mu=tf.zeros(bdim),
-            var=pos(tf.Variable(reg)) * tf.ones(bdim)
-            if learn_prior else reg * tf.ones(bdim)
-        )
+        pW = _NormPrior(dim=Wdim, var=reg, learn_var=learn_prior)
+        pb = _NormPrior(dim=bdim, var=reg, learn_var=learn_prior)
 
-        # Layer Posteriors
-        qW = __Weights(
-            mu=tf.Variable(tf.sqrt(reg) * tf.random_normal(Wdim)),
-            var=pos(tf.Variable(reg * tf.random_normal(Wdim)))
-        )
-        qb = __Weights(
-            mu=tf.Variable(tf.sqrt(reg) * tf.random_normal(bdim)),
-            var=pos(tf.Variable(reg * tf.random_normal(bdim)))
-        )
+        # Layer Posterior samples
+        qW = _NormPosterior(dim=Wdim, prior_var=reg)
+        qb = _NormPosterior(dim=bdim, prior_var=reg)
 
-        Phi = tf.matmul(X, qW.sample()) + qb.sample()
+        # Linear layer
+        Phi = [tf.matmul(x, qW.sample()) + qb.sample() for x in X]
+
+        # Regularizers
         KL = tf.reduce_sum(qW.KL(pW)) + tf.reduce_sum(qb.KL(pb))
+
         return Phi, KL
+
     return build_dense
 
 
@@ -107,7 +101,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
     """Dense (fully connected) linear layer, with MAP inference."""
 
     def build_dense_map(X):
-        input_dim = int(X.get_shape()[1])
+        input_dim = _input_dim(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
@@ -115,14 +109,14 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
         b = tf.Variable(tf.random_normal(bdim))
 
         # Linear layer
-        Phi = tf.matmul(X, W) + b
+        Phi = [tf.matmul(x, W) + b for x in X]
 
         # Regularizers
         l1, l2 = 0, 0
         if l2_reg > 0:
             l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
         if l1_reg > 0:
-            l1 = l1_reg * (__l1_loss(W) + __l1_loss(b))
+            l1 = l1_reg * (_l1_loss(W) + _l1_loss(b))
         pen = l1 + l2
 
         return Phi, pen
@@ -135,12 +129,17 @@ def randomFourier(n_features, kernel=None):
     kernel = kernel if kernel else RBF()
 
     def build_randomRBF(X):
-        input_dim = int(X.get_shape()[1])
+        input_dim = _input_dim(X)
         P = kernel.weights(input_dim, n_features)
-        XP = tf.matmul(X, P)
-        real = tf.cos(XP)
-        imag = tf.sin(XP)
-        Phi = tf.concat([real, imag], axis=1) / np.sqrt(n_features)
+
+        def phi(x):
+            XP = tf.matmul(x, P)
+            real = tf.cos(XP)
+            imag = tf.sin(XP)
+            result = tf.concat([real, imag], axis=1) / np.sqrt(n_features)
+            return result
+
+        Phi = [phi(x) for x in X]
         KL = 0.0
         return Phi, KL
 
@@ -164,6 +163,7 @@ class RBF:
 
 class Matern(RBF):
     """Matern kernel approximation."""
+
     def __init__(self, p=1, lenscale=1.0):
         super().__init__(lenscale)
         self.p = p
@@ -190,7 +190,7 @@ class Matern(RBF):
 # Private module stuff
 #
 
-class __Weights:
+class _Normal:
 
     def __init__(self, mu=0., var=1.):
         self.mu = mu
@@ -209,6 +209,27 @@ class __Weights:
         return KL
 
 
-def __l1_loss(X):
+class _NormPrior(_Normal):
+
+    def __init__(self, dim, var, learn_var):
+        mu = tf.zeros(dim)
+        var = pos(tf.Variable(var)) if learn_var else var
+        super().__init__(mu, var)
+
+
+class _NormPosterior(_Normal):
+
+    def __init__(self, dim, prior_var):
+        mu = tf.Variable(tf.sqrt(prior_var) * tf.random_normal(dim))
+        var = pos(tf.Variable(prior_var * tf.random_normal(dim)))
+        super().__init__(mu, var)
+
+
+def _l1_loss(X):
     l1 = tf.reduce_sum(tf.abs(X))
     return l1
+
+
+def _input_dim(X):
+        input_dim = int(X[0].get_shape()[1])
+        return input_dim

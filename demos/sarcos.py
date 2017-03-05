@@ -50,7 +50,7 @@ def main():
         lkhood = ab.normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.bayesmodel(X_, Y_, N_, LAYERS, lkhood)
+        Phi, loss = ab.deepnet(X_, Y_, N_, LAYERS, lkhood)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -67,7 +67,7 @@ def main():
                 print("Iteration {}, loss = {}".format(i, l))
 
         # Prediction
-        Ey = np.hstack([Phi.eval(feed_dict={X_: Xs})
+        Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
                         for _ in range(NPREDICTSAMPLES)])
         sigma2 = (1. * var).eval()
 
