@@ -228,8 +228,7 @@ class _Gaussian:
     def KL(self, p):
         """KL between self and univariate prior, p."""
         D = tf.to_float(self.D)
-        S = tf.matmul(self.L, tf.transpose(self.L))
-        tr = tf.trace(S) / p.var
+        tr = tf.reduce_sum(self.L * self.L) / p.var
         dist = tf.nn.l2_loss(p.mu - self.mu) / p.var
         logdet = D * tf.log(p.var) - _chollogdet(self.L)
         KL = 0.5 * (tr + dist + logdet - D)
@@ -258,8 +257,7 @@ class _GausPosterior(_Gaussian):
     def __init__(self, dim, prior_var):
         # HACK to ONLY work with 1D output!
         D = dim[0]
-        I = tf.eye(D) * tf.sqrt(prior_var)
-        Le = tf.contrib.distributions.WishartCholesky(df=D, scale=I).sample()
+        Le = tf.eye(D) * tf.sqrt(prior_var)  # TODO make random diagonal
         e = tf.random_normal(dim)
         mu = tf.Variable(tf.matmul(Le, e))
         L = tf.matrix_band_part(tf.Variable(Le), -1, 0)
@@ -273,7 +271,7 @@ def _l1_loss(X):
 
 def _chollogdet(L):
     l = tf.diag_part(L)
-    logdet = 2. * tf.log(tf.reduce_sum(l))
+    logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet
 
 

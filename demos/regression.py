@@ -18,17 +18,18 @@ true_noise = 0.1
 # Model settings
 n_samples = 10
 n_pred_samples = 100
-n_iterations = 30000
-batch_size = 100
+n_iterations = 40000
+batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 lenscale = tf.Variable(1.)
 # lenscale = 1.
-# variance = tf.Variable(0.1)
-variance = 0.01
+variance = tf.Variable(0.1)
+# variance = 0.01
 
 layers = [
-    ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale))),
+    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
+    # ab.dense_var(output_dim=5, reg=0.1, full=True),  # Probably only 1d out
     # ab.dense_var(output_dim=5, reg=0.1),
     # ab.dense_map(output_dim=5),
     # ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
@@ -38,7 +39,7 @@ layers = [
 
 def main():
 
-    np.random.seed(10)
+    np.random.seed(100)
 
     # Get training and testing data
     Xr, Yr, Xs, Ys = gp_draws(N, Ns, kern=kernel, noise=true_noise)
