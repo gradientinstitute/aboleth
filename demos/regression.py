@@ -3,36 +3,35 @@ import numpy as np
 import bokeh.plotting as bk
 import bokeh.palettes as bp
 import tensorflow as tf
-from sklearn.gaussian_process.kernels import RBF as skl_RBF
+from sklearn.gaussian_process.kernels import Matern as kern
+# from sklearn.gaussian_process.kernels import RBF as kern
 
 import aboleth as ab
 from aboleth.datasets import gp_draws
 
 
 # Data settings
-N = 200
+N = 1000
 Ns = 400
-kernel = skl_RBF(length_scale=1.2)
+kernel = kern(length_scale=1.)
 true_noise = 0.1
 
 # Model settings
 n_samples = 10
 n_pred_samples = 100
-n_iterations = 40000
+n_iterations = 30000
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
-lenscale = tf.Variable(1.)
-# lenscale = 1.
-variance = tf.Variable(0.1)
+# lenscale = tf.Variable(1.)
+lenscale = 1.
+variance = tf.Variable(1.)
 # variance = 0.01
 
 layers = [
-    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
-    # ab.dense_var(output_dim=5, reg=0.1, full=True),  # Probably only 1d out
-    # ab.dense_var(output_dim=5, reg=0.1),
-    # ab.dense_map(output_dim=5),
-    # ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))),
+    ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale))),
+    ab.dense_var(output_dim=5, reg=0.1, full=True),
+    ab.randomFourier(n_features=10, kernel=ab.RBF(ab.pos(lenscale))),
     ab.dense_var(output_dim=1, reg=0.1, full=True)
 ]
 

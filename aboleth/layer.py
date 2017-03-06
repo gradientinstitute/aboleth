@@ -211,25 +211,33 @@ class _Normal:
         return KL
 
 
-# TODO get this working for (..., D, D) matrices!
 class _Gaussian:
+    """
+    Gaussian prior/posterior.
+
+    Parameters:
+        mu : Tensor
+            mean, shape [d_i, d_o]
+        L : Tensor
+            Cholesky, shape [d_o, d_i, d_i]
+    """
 
     def __init__(self, mu, L):
-        self.mu = mu
-        self.L = L
-        self.D = tf.shape(mu)
+        self.mu = tf.expand_dims(tf.transpose(mu), 1)  # O x 1 x I
+        self.L = L  # O x I x I
+        self.d = tf.shape(mu)
+        self.D = tf.shape(self.mu)
 
     def sample(self):
-        # Reparameterisation trick
         e = tf.random_normal(self.D)
-        x = self.mu + tf.matmul(self.L, e)
+        x = tf.reshape(self.mu + tf.matmul(e, self.L), self.d)
         return x
 
     def KL(self, p):
         """KL between self and univariate prior, p."""
         D = tf.to_float(self.D)
         tr = tf.reduce_sum(self.L * self.L) / p.var
-        dist = tf.nn.l2_loss(p.mu - self.mu) / p.var
+        dist = tf.nn.l2_loss(p.mu - tf.reshape(self.mu, self.d)) / p.var
         logdet = D * tf.log(p.var) - _chollogdet(self.L)
         KL = 0.5 * (tr + dist + logdet - D)
         return KL
@@ -251,16 +259,20 @@ class _NormPosterior(_Normal):
         super().__init__(mu, var)
 
 
-# TODO get this working for (..., D, D) matrices!
 class _GausPosterior(_Gaussian):
 
     def __init__(self, dim, prior_var):
-        # HACK to ONLY work with 1D output!
-        D = dim[0]
-        Le = tf.eye(D) * tf.sqrt(prior_var)  # TODO make random diagonal
-        e = tf.random_normal(dim)
-        mu = tf.Variable(tf.matmul(Le, e))
-        L = tf.matrix_band_part(tf.Variable(Le), -1, 0)
+        I, O = dim
+        mu, L = [], []
+        for o in range(O):
+            Le = tf.eye(I) * tf.sqrt(prior_var)  # TODO make random diagonal
+            e = tf.random_normal((I, 1))
+            mu.append(tf.Variable(tf.matmul(Le, e)))
+            L.append(tf.matrix_band_part(tf.Variable(Le), -1, 0))
+
+        mu = tf.concat(mu, axis=1)
+        L = tf.stack(L)
+
         super().__init__(mu=mu, L=L)
 
 
@@ -270,7 +282,8 @@ def _l1_loss(X):
 
 
 def _chollogdet(L):
-    l = tf.diag_part(L)
+    """L is [..., D, D]."""
+    l = tf.map_fn(tf.diag_part, L)
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet
 
