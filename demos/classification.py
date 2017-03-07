@@ -22,10 +22,9 @@ PSAMPLES = 20
 
 # Network structure
 layers = [
-    # ab.dense_var(output_dim=20),
-    ab.dense_map(output_dim=20),
+    ab.dense_var(output_dim=20, full=True),
     ab.activation(h=tf.nn.relu),
-    ab.dense_var(output_dim=1, reg=0.1),
+    ab.dense_var(output_dim=1, reg=0.1, full=True),
     ab.activation(h=tf.nn.sigmoid)
 ]
 

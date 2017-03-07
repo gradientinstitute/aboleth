@@ -21,7 +21,7 @@ def eye():
 def activation(h=lambda X: X):
     """Activation function layer."""
     def build_activation(X):
-        Phi = [h(x) for x in X]
+        Phi = tf.map_fn(h, X)
         KL = 0.
         return Phi, KL
     return build_activation
@@ -51,7 +51,7 @@ def lmap(*layers):
 def cat():
     """Join multiple inputs by concatenation."""
     def build_cat(Xs):
-        Phi = [tf.concat(X, axis=1) for X in Xs]
+        Phi = tf.concat(Xs, axis=2)
         KL = 0.
         return Phi, KL
 
@@ -61,7 +61,7 @@ def cat():
 def add():
     """Join multiple inputs by addition."""
     def build_add(Xs):
-        Phi = [tf.add_n(X) for X in Xs]
+        Phi = tf.add_n(Xs)
         KL = 0.
         return Phi, KL
 
@@ -71,10 +71,8 @@ def add():
 def dense_var(output_dim, reg=1., learn_prior=True, full=False):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
-        """
-        X is now a list
-        """
-        input_dim = _input_dim(X)
+        """X is a rank 3 tensor, [n_samples, N, D]."""
+        n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
@@ -88,7 +86,9 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False):
         qb = _NormPosterior(dim=bdim, prior_var=reg)  # TODO: keep independent?
 
         # Linear layer
-        Phi = [tf.matmul(x, qW.sample()) + qb.sample() for x in X]
+        Wsamples = _sample(qW, n_samples)
+        bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
+        Phi = tf.matmul(X, Wsamples) + bsamples
 
         # Regularizers
         KL = tf.reduce_sum(qW.KL(pW)) + tf.reduce_sum(qb.KL(pb))
@@ -102,15 +102,15 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
     """Dense (fully connected) linear layer, with MAP inference."""
 
     def build_dense_map(X):
-        input_dim = _input_dim(X)
+        n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
         W = tf.Variable(tf.random_normal(Wdim))
         b = tf.Variable(tf.random_normal(bdim))
 
-        # Linear layer
-        Phi = [tf.matmul(x, W) + b for x in X]
+        # Linear layer, don't want to copy Variable, so map
+        Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)
 
         # Regularizers
         l1, l2 = 0, 0
@@ -129,22 +129,22 @@ def randomFourier(n_features, kernel=None):
     """Random fourier feature layer."""
     kernel = kernel if kernel else RBF()
 
-    def build_randomRBF(X):
-        input_dim = _input_dim(X)
+    def build_randomFF(X):
+        n_samples, input_dim = _get_dims(X)
+
+        # Random weights, copy faster than map here
         P = kernel.weights(input_dim, n_features)
+        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
-        def phi(x):
-            XP = tf.matmul(x, P)
-            real = tf.cos(XP)
-            imag = tf.sin(XP)
-            result = tf.concat([real, imag], axis=1) / np.sqrt(n_features)
-            return result
-
-        Phi = [phi(x) for x in X]
+        # Random features
+        XP = tf.matmul(X, Ps)
+        real = tf.cos(XP)
+        imag = tf.sin(XP)
+        Phi = tf.concat([real, imag], axis=2) / np.sqrt(n_features)
         KL = 0.0
         return Phi, KL
 
-    return build_randomRBF
+    return build_randomFF
 
 
 #
@@ -165,7 +165,7 @@ class RBF:
 class Matern(RBF):
     """Matern kernel approximation."""
 
-    def __init__(self, p=1, lenscale=1.0):
+    def __init__(self, lenscale=1.0, p=1):
         super().__init__(lenscale)
         self.p = p
 
@@ -288,6 +288,11 @@ def _chollogdet(L):
     return logdet
 
 
-def _input_dim(X):
-        input_dim = int(X[0].get_shape()[1])
-        return input_dim
+def _get_dims(X):
+        n_samples, input_dim = X.shape[0], X.shape[2]
+        return int(n_samples), int(input_dim)
+
+
+def _sample(dist, n_samples):
+    samples = tf.stack([dist.sample() for _ in range(n_samples)])
+    return samples

@@ -11,7 +11,7 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10):
 
     Note: This simply combines calls to ``deepnet`` and ``elbo``.
     """
-    Phi = [X] * n_samples
+    Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
     KL = 0.
     for l in layers:
         Phi, kl = l(Phi)
@@ -22,13 +22,14 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10):
 
 def elbo(Phi, Y, N, KL, likelihood):
     """Build the evidence lower bound loss."""
-    B = N / tf.to_float(tf.shape(Phi[0])[0])  # Batch amplification factor
-    ELL = sum([tf.reduce_sum(likelihood(Y, phi)) for phi in Phi]) / len(Phi)
+    B = N / tf.to_float(tf.shape(Phi)[1])  # Batch amplification factor
+    n_samples = tf.to_float(tf.shape(Phi)[0])
+    ELL = tf.reduce_sum(likelihood(Y, Phi)) / n_samples  # Just mean over samps
     l = - B * ELL + KL
     return l
 
 
 def log_prob(Y, likelihood, Phi):
     """Build the log probability density of the model."""
-    log_prob = tf.reduce_mean([likelihood(Y, p) for p in Phi], axis=0)
+    log_prob = tf.reduce_mean(likelihood(Y, Phi), axis=0)
     return log_prob
