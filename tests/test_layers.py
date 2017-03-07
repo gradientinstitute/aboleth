@@ -12,7 +12,9 @@ def test_eye(make_data):
 
     F, KL = eye(X)
 
-    assert np.all([x == f for x, f in zip(X, F)])
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        assert np.all(X.eval() == F.eval())
     assert KL == 0
 
 
@@ -25,7 +27,7 @@ def test_activation(make_data):
     with tc.test_session():
         F, KL = act(X)
 
-        assert np.all([np.tanh(x) == f.eval() for x, f in zip(X, F)])
+        assert np.all(np.tanh(X.eval()) == F.eval())
         assert KL == 0
 
 
@@ -36,9 +38,10 @@ def test_fork(make_data):
 
     (X1, X2), KL = fork(X)
 
-    for x1, x2 in zip(X1, X2):
-        assert np.all(x == x1) and np.all(x == x2)
-    assert KL == 0
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        assert np.all(X.eval() == X1.eval()) and np.all(X.eval() == X2.eval())
+        assert KL == 0
 
 
 def test_lmap(make_data):
@@ -50,9 +53,8 @@ def test_lmap(make_data):
     with tc.test_session():
         (Xtan, Xeye), KL = app([X, X])
 
-        for xtan, xeye in zip(Xtan, Xeye):
-            assert np.all(np.tanh(x) == xtan.eval())
-            assert np.all(x == xeye)
+        assert np.all(np.tanh(X.eval()) == Xtan.eval())
+        assert np.all(X.eval() == Xeye.eval())
         assert KL == 0
 
 
@@ -64,8 +66,7 @@ def test_add(make_data):
     tc = tf.test.TestCase()
     with tc.test_session():
         Xadd, KL = add([X, X, X])
-        for xadd in Xadd:
-            assert np.all(3 * x == xadd.eval())
+        assert np.all(3 * X.eval() == Xadd.eval())
         assert KL == 0
 
 
@@ -78,9 +79,7 @@ def test_cat(make_data):
     tc = tf.test.TestCase()
     with tc.test_session():
         Xcat, KL = cat([X, X, X])
-        for xcat in Xcat:
-            assert xcat.eval().shape == (N, 3 * D)
-            assert np.all(xcat.eval() == np.hstack(X))
+        assert Xcat.eval().shape == (3, N, 3 * D)
         assert KL == 0
 
 
@@ -102,14 +101,14 @@ def test_kernels(kernels, make_data):
     # Check behaving properly with k(x, x) ~ 1.0
     x, _, _ = make_data
     x_ = tf.placeholder(tf.float32, x.shape)
+    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
     N = x.shape[0]
-    X_ = [x_] * 3
 
     rff = ab.randomFourier(D, kernel=k)
     Phi, KL = rff(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        for phi in Phi:
-            p = phi.eval(feed_dict={x_: x})
-            assert np.allclose((p**2).sum(axis=1), np.ones(N))
+        P = Phi.eval(feed_dict={x_: x})
+        for i in range(P.shape[0]):
+            assert np.allclose((P[i]**2).sum(axis=1), np.ones(N))

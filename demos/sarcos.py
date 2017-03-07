@@ -12,10 +12,10 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 VARIANCE = 10.0
 KERN = ab.RBF(lenscale=ab.pos(tf.Variable(10. * tf.ones((21, 1)))))
 LAYERS = [
-    ab.randomFourier(n_features=100, kernel=KERN),
-    ab.dense_map(output_dim=10, l2_reg=0),
-    ab.randomFourier(n_features=50),
-    ab.dense_var(output_dim=1)
+    ab.randomFourier(n_features=400, kernel=KERN),
+    ab.dense_map(output_dim=20, l1_reg=0),
+    ab.randomFourier(n_features=20),
+    ab.dense_var(output_dim=1, full=True)
 ]
 BATCH_SIZE = 50
 NITERATIONS = 100000
@@ -79,7 +79,7 @@ def main():
     smse = 1 - r2
 
     print("------------")
-    print("r-square: {:.4g}, smse: {:.4g}, msll: {:.4g}."
+    print("r-square: {:.4f}, smse: {:.4f}, msll: {:.4f}."
           .format(r2, smse, snlp))
 
 
