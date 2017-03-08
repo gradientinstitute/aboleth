@@ -98,17 +98,38 @@ def test_kernels(kernels, make_data):
     P = k.weights(input_dim=d, n_features=D)
     assert P.shape == (d, D)
 
-    # Check behaving properly with k(x, x) ~ 1.0
     x, _, _ = make_data
     x_ = tf.placeholder(tf.float32, x.shape)
     X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
     N = x.shape[0]
 
-    rff = ab.randomFourier(D, kernel=k)
-    Phi, KL = rff(X_)
+    Phi, KL = ab.randomFourier(D, kernel=k)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         P = Phi.eval(feed_dict={x_: x})
         for i in range(P.shape[0]):
-            assert np.allclose((P[i]**2).sum(axis=1), np.ones(N))
+            p = P[i]
+            assert p.shape == (N, 2 * D)
+            # Check behaving properly with k(x, x) ~ 1.0
+            assert np.allclose((p**2).sum(axis=1), np.ones(N))
+
+
+@pytest.mark.parametrize('dense', [ab.dense_map, ab.dense_var])
+def test_dense_outputs(dense, make_data):
+    """Make sure the dense layers output expected dimensions."""
+    x, _, _ = make_data
+    D = 20
+
+    x_ = tf.placeholder(tf.float32, x.shape)
+    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
+    N = x.shape[0]
+
+    Phi, KL = dense(output_dim=D)(X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        P = Phi.eval(feed_dict={x_: x})
+        assert P.shape == (3, N, D)
+        assert P.dtype == np.float32
