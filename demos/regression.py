@@ -19,7 +19,8 @@ true_noise = 0.1
 # Model settings
 n_samples = 10
 n_pred_samples = 100
-n_iterations = 30000
+# n_iterations = 30000
+n_epochs = 30
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
@@ -58,40 +59,61 @@ def main():
 
     # Data
     with tf.name_scope("Input"):
-        X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
-        N_ = tf.placeholder(dtype=tf.float32)
+
+        X_in = tf.constant(Xr)
+        Y_in = tf.constant(Yr)
+        N_train = tf.constant(Xr.shape[0])
+        X_element, Y_element = tf.train.slice_input_producer(
+            [X_in, Y_in], num_epochs=n_epochs, shuffle=True)
+        X, Y = tf.train.batch([X_element, Y_element], batch_size=batch_size)
 
     with tf.name_scope("Likelihood"):
         lkhood = ab.normal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples)
+        Phi, loss = ab.deepnet(X, Y, N, layers, lkhood, n_samples)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
+        logprob = ab.log_prob(Y, lkhood, Phi)
 
-    with tf.name_scope("LogProb"):
-        logprob = ab.log_prob(Y_, lkhood, Phi)
+    saver = tf.train.Saver()
+    init_op = tf.group(tf.initialize_all_variables(),
+                       tf.initialize_local_variables())
 
-    with tf.Session(config=config):
-        tf.global_variables_initializer().run()
-        batches = ab.batch({X_: Xr, Y_: Yr}, N_, batch_size=batch_size,
+    with tf.Session(config=config) as sess:
+        init_op.run()
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        try:
+            step = 0
+            while not coord.should_stop():
+                train.run()
+                if step % 100 == 0:
+                    l = loss.eval()
+                    print("Iteration {}, loss = {}".format(step, l))
 
-                           n_iter=n_iterations)
-        for i, d in enumerate(batches):
-            train.run(feed_dict=d)
-            if i % 100 == 0:
-                l = loss.eval(feed_dict=d)
-                print("Iteration {}, loss = {}".format(i, l))
+                # Save a checkpoint periodically.
+                if (step + 1) % 1000 == 0:
+                    print('Saving')
+                    saver.save(sess, ".", global_step=step)
+                step += 1
 
-        # Prediction
-        Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
-        Eymean = sum(Ey) / n_pred_samples
-        logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
+        except tf.errors.OutOfRangeError:
+            print('Training Complete. Saving final model')
+            saver.save(sess, ".", global_step=step)
+        finally:
+            coord.request_stop()
 
-    Py = np.exp(logPY.reshape(Ns, Ns))
+        coord.join(threads)
+
+        # # Prediction
+        # Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
+        # Eymean = sum(Ey) / n_pred_samples
+        # logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
+
+    # Py = np.exp(logPY.reshape(Ns, Ns))
 
     # Plot
     im_min = np.amin(Py)
