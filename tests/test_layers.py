@@ -113,6 +113,7 @@ def test_kernels(kernels, make_data):
             assert p.shape == (N, 2 * D)
             # Check behaving properly with k(x, x) ~ 1.0
             assert np.allclose((p**2).sum(axis=1), np.ones(N))
+        assert KL == 0
 
 
 @pytest.mark.parametrize('dense', [ab.dense_map, ab.dense_var])
@@ -133,3 +134,4 @@ def test_dense_outputs(dense, make_data):
         P = Phi.eval(feed_dict={x_: x})
         assert P.shape == (3, N, D)
         assert P.dtype == np.float32
+        assert np.isscalar(KL.eval(feed_dict={x_: x}))
