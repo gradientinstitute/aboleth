@@ -103,10 +103,10 @@ class GausPosterior(Gaussian):
         l = (sig0 * np.random.randn(I * (I - 1) // 2, O)).astype(np.float32)
         l = tf.Variable(l)
         u, v = np.tril_indices(I, -1)
-        import IPython; IPython.embed()
-        L = tf.scatter_nd(u * I + v, l, shape=(I * I, O))
+        indices = (u * I + v)[: , np.newaxis]
+        L = tf.scatter_nd(indices, l, shape=(I * I, O))
         L = tf.reshape(L, (O, I, I))
-        
+
         # L = tf.Variable(tf.zeros((I * I, O)), trainable=False)
         # L = tf.scatter_update(L, u * I + v, l)
 
