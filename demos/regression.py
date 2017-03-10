@@ -19,8 +19,7 @@ true_noise = 0.1
 # Model settings
 n_samples = 10
 n_pred_samples = 100
-# n_iterations = 30000
-n_epochs = 30
+n_epochs = 1000
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
@@ -32,7 +31,7 @@ variance = tf.Variable(1.)
 # variance = 0.01
 
 layers = [
-    ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale1))),
+    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
     ab.dense_var(output_dim=5, reg=0.1, full=True),
     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale2))),
     ab.dense_var(output_dim=1, reg=0.1, full=True)
@@ -42,6 +41,7 @@ layers = [
 def main():
 
     np.random.seed(100)
+    print("Iterations = {}".format(int(round(n_epochs * N / batch_size))))
 
     # Get training and testing data
     Xr, Yr, Xs, Ys = gp_draws(N, Ns, kern=kernel, noise=true_noise)
@@ -60,23 +60,21 @@ def main():
     # Data
     with tf.name_scope("Input"):
 
-        X_in = tf.constant(Xr)
-        Y_in = tf.constant(Yr)
-        N_train = tf.constant(Xr.shape[0])
-        X_element, Y_element = tf.train.slice_input_producer(
-            [X_in, Y_in], num_epochs=n_epochs, shuffle=True)
-        X, Y = tf.train.batch([X_element, Y_element], batch_size=batch_size)
+        Xb, Yb = batch_training(Xr, Yr, n_epochs=n_epochs,
+                                batch_size=batch_size)
+        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
+        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
 
     with tf.name_scope("Likelihood"):
         lkhood = ab.normal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X, Y, N, layers, lkhood, n_samples)
+        Phi, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
-        logprob = ab.log_prob(Y, lkhood, Phi)
+        logprob = ab.log_prob(Y_, lkhood, Phi)
 
     saver = tf.train.Saver()
     init_op = tf.group(tf.initialize_all_variables(),
@@ -97,23 +95,23 @@ def main():
                 # Save a checkpoint periodically.
                 if (step + 1) % 1000 == 0:
                     print('Saving')
-                    saver.save(sess, ".", global_step=step)
+                    saver.save(sess, "regression", global_step=step)
                 step += 1
 
         except tf.errors.OutOfRangeError:
             print('Training Complete. Saving final model')
-            saver.save(sess, ".", global_step=step)
+            saver.save(sess, "regression_final", global_step=step)
         finally:
             coord.request_stop()
 
         coord.join(threads)
 
-        # # Prediction
-        # Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
-        # Eymean = sum(Ey) / n_pred_samples
-        # logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
+        # Prediction
+        Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
+        Eymean = sum(Ey) / n_pred_samples
+        logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
 
-    # Py = np.exp(logPY.reshape(Ns, Ns))
+    Py = np.exp(logPY.reshape(Ns, Ns))
 
     # Plot
     im_min = np.amin(Py)
@@ -129,6 +127,14 @@ def main():
                alpha=0.2)
     f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
     bk.show(f)
+
+
+def batch_training(X, Y, batch_size, n_epochs, num_threads=4):
+    samples = tf.train.slice_input_producer([X, Y], num_epochs=n_epochs,
+                                            shuffle=True)
+    X_batch, Y_batch = tf.train.batch(samples, batch_size=batch_size,
+                                      num_threads=num_threads)
+    return X_batch, Y_batch
 
 
 if __name__ == "__main__":
