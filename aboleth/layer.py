@@ -2,7 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
-from aboleth.distributions import NormPrior, NormPosterior, GausPosterior
+from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
 
 
 #
@@ -77,13 +77,13 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False):
         bdim = (output_dim,)
 
         # Layer priors
-        pW = NormPrior(dim=Wdim, var=reg, learn_var=learn_prior)
-        pb = NormPrior(dim=bdim, var=reg, learn_var=learn_prior)
+        pW = norm_prior(dim=Wdim, var=reg, learn_var=learn_prior)
+        pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
 
         # Layer Posterior samples
-        qW = (GausPosterior(dim=Wdim, var0=reg) if full else
-              NormPosterior(dim=Wdim, var0=reg))
-        qb = NormPosterior(dim=bdim, var0=reg)  # TODO: keep independent?
+        qW = (gaus_posterior(dim=Wdim, var0=reg) if full else
+              norm_posterior(dim=Wdim, var0=reg))
+        qb = norm_posterior(dim=bdim, var0=reg)  # TODO: keep independent?
 
         # Linear layer
         Wsamples = _sample(qW, n_samples)

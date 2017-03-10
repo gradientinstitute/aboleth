@@ -74,43 +74,38 @@ class Gaussian:
 # Streamlined interfaces for initialising the priors and posteriors
 #
 
-class NormPrior(Normal):
-
-    def __init__(self, dim, var, learn_var):
-        mu = tf.zeros(dim)
-        var = pos(tf.Variable(var)) if learn_var else var
-        super().__init__(mu, var)
-
-
-class NormPosterior(Normal):
-
-    def __init__(self, dim, var0):
-        mu = tf.Variable(tf.sqrt(var0) * tf.random_normal(dim))
-        var = pos(tf.Variable(var0 * tf.random_normal(dim)))
-        super().__init__(mu, var)
+def norm_prior(dim, var, learn_var):
+    mu = np.zeros(dim, dtype=np.float32)
+    var = pos(tf.Variable(var)) if learn_var else var
+    P = Normal(mu, var)
+    return P
 
 
-class GausPosterior(Gaussian):
+def norm_posterior(dim, var0):
+    mu = np.sqrt(var0) * np.random.randn(*dim)
+    mu = tf.Variable((mu.astype(np.float32)))
+    var = var0 * np.random.randn(*dim)
+    var = pos(tf.Variable(var.astype(np.float32)))
+    Q = Normal(mu, var)
+    return Q
 
-    def __init__(self, dim, var0):
-        I, O = dim
 
-        sig0 = np.sqrt(var0)
-        mu = (np.random.randn(I, O) * sig0).astype(np.float32)
-        # Le = np.tile(np.eye(I, dtype=np.float32), [O, 1, 1]) * np.sqrt(var0)
-        # L = tf.matrix_band_part(tf.Variable(Le), -1, 0)
+def gaus_posterior(dim, var0):
+    I, O = dim
+    sig0 = np.sqrt(var0)
+    mu = (np.random.randn(I, O) * sig0).astype(np.float32)
+    Le = np.tile(np.eye(I, dtype=np.float32), [O, 1, 1]) * np.sqrt(var0)
+    L = tf.matrix_band_part(tf.Variable(Le), -1, 0)
 
-        l = (sig0 * np.random.randn(I * (I - 1) // 2, O)).astype(np.float32)
-        l = tf.Variable(l)
-        u, v = np.tril_indices(I, -1)
-        indices = (u * I + v)[: , np.newaxis]
-        L = tf.scatter_nd(indices, l, shape=(I * I, O))
-        L = tf.reshape(L, (O, I, I))
+    # l = (sig0 * np.random.randn(I * (I - 1) // 2, O)).astype(np.float32)
+    # l = tf.Variable(l)
+    # u, v = np.tril_indices(I, -1)
+    # indices = (u * I + v)[:, np.newaxis]
+    # L = tf.scatter_nd(indices, l, shape=(I * I, O))
+    # L = tf.reshape(L, (O, I, I))
 
-        # L = tf.Variable(tf.zeros((I * I, O)), trainable=False)
-        # L = tf.scatter_update(L, u * I + v, l)
-
-        super().__init__(mu=mu, L=L)
+    Q = Gaussian(mu, L)
+    return Q
 
 
 #
