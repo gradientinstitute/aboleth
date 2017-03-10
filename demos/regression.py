@@ -4,6 +4,8 @@ import bokeh.plotting as bk
 import bokeh.palettes as bp
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import Matern as kern
+from tensorflow.python.client import timeline
+
 # from sklearn.gaussian_process.kernels import RBF as kern
 
 import aboleth as ab
@@ -19,7 +21,7 @@ true_noise = 0.1
 # Model settings
 n_samples = 10
 n_pred_samples = 100
-n_epochs = 1000
+n_epochs = 10
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
@@ -31,8 +33,8 @@ variance = tf.Variable(1.)
 # variance = 0.01
 
 layers = [
-    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
-    ab.dense_var(output_dim=5, reg=0.1, full=True),
+    ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale1))),
+    ab.dense_var(output_dim=10, reg=0.1, full=True),
     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale2))),
     ab.dense_var(output_dim=1, reg=0.1, full=True)
 ]
@@ -87,10 +89,16 @@ def main():
         try:
             step = 0
             while not coord.should_stop():
-                train.run()
                 if step % 100 == 0:
+                    run_options = tf.RunOptions(
+                        trace_level=tf.RunOptions.FULL_TRACE)
+                    run_metadata = tf.RunMetadata()
+                    sess.run(train, options=run_options,
+                             run_metadata=run_metadata)
                     l = loss.eval()
                     print("Iteration {}, loss = {}".format(step, l))
+                else:
+                    train.run()
 
                 # Save a checkpoint periodically.
                 if (step + 1) % 1000 == 0:
@@ -110,6 +118,12 @@ def main():
         Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
         Eymean = sum(Ey) / n_pred_samples
         logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
+
+        # Create the Timeline object, and write it to a json
+        tl = timeline.Timeline(run_metadata.step_stats)
+        ctf = tl.generate_chrome_trace_format()
+        with open('timeline_cpu.json', 'w') as f:
+            f.write(ctf)
 
     Py = np.exp(logPY.reshape(Ns, Ns))
 
@@ -131,9 +145,9 @@ def main():
 
 def batch_training(X, Y, batch_size, n_epochs, num_threads=4):
     samples = tf.train.slice_input_producer([X, Y], num_epochs=n_epochs,
-                                            shuffle=True)
+                                            shuffle=True, capacity=100)
     X_batch, Y_batch = tf.train.batch(samples, batch_size=batch_size,
-                                      num_threads=num_threads)
+                                      num_threads=num_threads, capacity=100)
     return X_batch, Y_batch
 
 

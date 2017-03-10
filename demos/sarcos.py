@@ -21,7 +21,7 @@ BATCH_SIZE = 50
 NITERATIONS = 100000
 NPREDICTSAMPLES = 100
 
-CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
+CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU
 
 
 def main():
