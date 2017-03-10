@@ -17,19 +17,23 @@ LAYERS = [
     ab.randomFourier(n_features=20),
     ab.dense_var(output_dim=1, full=True)
 ]
-BATCH_SIZE = 50
-NITERATIONS = 100000
+BATCH_SIZE = 10
+NEPOCHS = 10
 NPREDICTSAMPLES = 100
 
-CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU
+# CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU
 
 
 def main():
 
     data = fetch_gpml_sarcos_data()
-    Xr, Yr = data.train.data, data.train.targets[:, np.newaxis]
-    Xs, Ys = data.test.data, data.test.targets[:, np.newaxis]
+    Xr = data.train.data.astype(np.float32)
+    Yr = data.train.targets.astype(np.float32)[:, np.newaxis]
+    Xs = data.test.data.astype(np.float32)
+    Ys = data.test.targets.astype(np.float32)[:, np.newaxis]
     N, D = Xr.shape
+
+    print("Iterations: {}".format(int(round(N * NEPOCHS / BATCH_SIZE))))
 
     # Scale and centre the data
     ss = StandardScaler()
@@ -41,30 +45,42 @@ def main():
 
     # Data
     with tf.name_scope("Input"):
-        X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
-        N_ = tf.placeholder(dtype=tf.float32)
+        Xb, Yb = batch_training(Xr, Yr, n_epochs=NEPOCHS,
+                                batch_size=BATCH_SIZE)
+        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
+        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
 
     with tf.name_scope("Likelihood"):
         var = ab.pos(tf.Variable(VARIANCE))
         lkhood = ab.normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N_, LAYERS, lkhood)
+        Phi, loss = ab.deepnet(X_, Y_, N, LAYERS, lkhood, n_samples=10)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
 
-    with tf.Session(config=CONFIG):
-        tf.global_variables_initializer().run()
-        batches = ab.batch({X_: Xr, Y_: Yr}, N_, batch_size=BATCH_SIZE,
-                           n_iter=NITERATIONS)
-        for i, d in enumerate(batches):
-            train.run(feed_dict=d)
-            if i % 1000 == 0:
-                l = loss.eval(feed_dict=d)
-                print("Iteration {}, loss = {}".format(i, l))
+    init_op = tf.group(tf.initialize_all_variables(),
+                       tf.initialize_local_variables())
+
+    # with tf.Session(config=CONFIG):
+    with tf.Session():
+        init_op.run()
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(coord=coord)
+        try:
+            step = 0
+            while not coord.should_stop():
+                train.run()
+                if step % 1000 == 0:
+                    l = loss.eval()
+                    print("Iteration {}, loss = {}".format(step, l))
+                step += 1
+
+        finally:
+            coord.request_stop()
+        coord.join(threads)
 
         # Prediction
         Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
@@ -89,6 +105,14 @@ def msll(Y_true, Y_pred, V_pred, Y_train):
     rand_ll = norm.logpdf(Y_true, loc=mt, scale=st)
     msll = - (ll - rand_ll).mean()
     return msll
+
+
+def batch_training(X, Y, batch_size, n_epochs, num_threads=4):
+    samples = tf.train.slice_input_producer([X, Y], num_epochs=n_epochs,
+                                            shuffle=True, capacity=100)
+    X_batch, Y_batch = tf.train.batch(samples, batch_size=batch_size,
+                                      num_threads=num_threads, capacity=100)
+    return X_batch, Y_batch
 
 
 if __name__ == "__main__":

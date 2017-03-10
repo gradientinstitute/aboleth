@@ -1,4 +1,6 @@
 """Demo using aboleth for regression."""
+from time import time
+
 import numpy as np
 import bokeh.plotting as bk
 import bokeh.palettes as bp
@@ -23,7 +25,7 @@ n_samples = 10
 n_pred_samples = 100
 n_epochs = 10
 batch_size = 10
-config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
+config = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU
 
 lenscale1 = tf.Variable(1.)
 # lenscale1 = 1.
@@ -62,10 +64,13 @@ def main():
     # Data
     with tf.name_scope("Input"):
 
-        Xb, Yb = batch_training(Xr, Yr, n_epochs=n_epochs,
-                                batch_size=batch_size)
-        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
-        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
+        # Xb, Yb = batch_training(Xr, Yr, n_epochs=n_epochs,
+        #                         batch_size=batch_size)
+        # X_ = tf.placeholder_with_default(Xb, shape=(None, D))
+        # Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
+
+        X_ = tf.constant(Xr)
+        Y_ = tf.constant(Yr)
 
     with tf.name_scope("Likelihood"):
         lkhood = ab.normal(variance=ab.pos(variance))
@@ -78,69 +83,74 @@ def main():
         train = optimizer.minimize(loss)
         logprob = ab.log_prob(Y_, lkhood, Phi)
 
-    saver = tf.train.Saver()
+    # saver = tf.train.Saver()
     init_op = tf.group(tf.initialize_all_variables(),
                        tf.initialize_local_variables())
 
-    with tf.Session(config=config) as sess:
+    with tf.Session(config=config):
         init_op.run()
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-        try:
-            step = 0
-            while not coord.should_stop():
-                if step % 100 == 0:
-                    run_options = tf.RunOptions(
-                        trace_level=tf.RunOptions.FULL_TRACE)
-                    run_metadata = tf.RunMetadata()
-                    sess.run(train, options=run_options,
-                             run_metadata=run_metadata)
-                    l = loss.eval()
-                    print("Iteration {}, loss = {}".format(step, l))
-                else:
-                    train.run()
+        # coord = tf.train.Coordinator()
+        # threads = tf.train.start_queue_runners(coord=coord)
+        # try:
+        step = 0
+        time_inc = time()
+        while step < 10000:
+        # while not coord.should_stop():
+            train.run()
+            if step % 500 == 0:
+                # run_options = tf.RunOptions(
+                #     trace_level=tf.RunOptions.FULL_TRACE)
+                # run_metadata = tf.RunMetadata()
+                # sess.run(train, options=run_options,
+                #          run_metadata=run_metadata)
+                delta = step / (time() - time_inc)
+                l = loss.eval()
+                print("Iteration {}, loss = {}, speed = {}"
+                      .format(step, l, delta))
+            # else:
+                # train.run()
 
-                # Save a checkpoint periodically.
-                if (step + 1) % 1000 == 0:
-                    print('Saving')
-                    saver.save(sess, "regression", global_step=step)
-                step += 1
+            # Save a checkpoint periodically.
+            # if (step + 1) % 1000 == 0:
+            #     print('Saving')
+            #     saver.save(sess, "regression", global_step=step)
+            step += 1
 
-        except tf.errors.OutOfRangeError:
-            print('Training Complete. Saving final model')
-            saver.save(sess, "regression_final", global_step=step)
-        finally:
-            coord.request_stop()
+        # except tf.errors.OutOfRangeError:
+            # print('Training Complete. Saving final model')
+            # saver.save(sess, "regression_final", global_step=step)
+        # finally:
+            # coord.request_stop()
 
-        coord.join(threads)
+        # coord.join(threads)
 
         # Prediction
-        Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
-        Eymean = sum(Ey) / n_pred_samples
-        logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
+        # Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
+        # Eymean = sum(Ey) / n_pred_samples
+        # logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
 
         # Create the Timeline object, and write it to a json
-        tl = timeline.Timeline(run_metadata.step_stats)
-        ctf = tl.generate_chrome_trace_format()
-        with open('timeline_cpu.json', 'w') as f:
-            f.write(ctf)
+        # tl = timeline.Timeline(run_metadata.step_stats)
+        # ctf = tl.generate_chrome_trace_format()
+        # with open('timeline_cpu.json', 'w') as f:
+        #     f.write(ctf)
 
-    Py = np.exp(logPY.reshape(Ns, Ns))
+    # Py = np.exp(logPY.reshape(Ns, Ns))
 
-    # Plot
-    im_min = np.amin(Py)
-    im_size = np.amax(Py) - im_min
-    img = (Py - im_min) / im_size
-    f = bk.figure(tools='pan,box_zoom,reset', sizing_mode='stretch_both')
-    f.image(image=[img], x=-20., y=-4., dw=40., dh=8,
-            palette=bp.Plasma256)
-    f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue', legend='Training')
-    f.line(Xs.flatten(), Ys.flatten(), line_color='blue', legend='Truth')
-    for y in Ey:
-        f.line(Xq.flatten(), y.flatten(), line_color='red', legend='Samples',
-               alpha=0.2)
-    f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
-    bk.show(f)
+    # # Plot
+    # im_min = np.amin(Py)
+    # im_size = np.amax(Py) - im_min
+    # img = (Py - im_min) / im_size
+    # f = bk.figure(tools='pan,box_zoom,reset', sizing_mode='stretch_both')
+    # f.image(image=[img], x=-20., y=-4., dw=40., dh=8,
+    #         palette=bp.Plasma256)
+    # f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue', legend='Training')
+    # f.line(Xs.flatten(), Ys.flatten(), line_color='blue', legend='Truth')
+    # for y in Ey:
+    #     f.line(Xq.flatten(), y.flatten(), line_color='red', legend='Samples',
+    #            alpha=0.2)
+    # f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
+    # bk.show(f)
 
 
 def batch_training(X, Y, batch_size, n_epochs, num_threads=4):

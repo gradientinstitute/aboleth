@@ -81,9 +81,9 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False):
         pb = NormPrior(dim=bdim, var=reg, learn_var=learn_prior)
 
         # Layer Posterior samples
-        qW = (GausPosterior(dim=Wdim, prior_var=reg) if full else
-              NormPosterior(dim=Wdim, prior_var=reg))
-        qb = NormPosterior(dim=bdim, prior_var=reg)  # TODO: keep independent?
+        qW = (GausPosterior(dim=Wdim, var0=reg) if full else
+              NormPosterior(dim=Wdim, var0=reg))
+        qb = NormPosterior(dim=bdim, var0=reg)  # TODO: keep independent?
 
         # Linear layer
         Wsamples = _sample(qW, n_samples)

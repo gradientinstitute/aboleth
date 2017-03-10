@@ -1,4 +1,5 @@
 """Model parameter distributions."""
+import numpy as np
 import tensorflow as tf
 
 from aboleth.util import pos
@@ -49,14 +50,14 @@ class Gaussian:
     """
 
     def __init__(self, mu, L):
-        self.mu = tf.expand_dims(tf.transpose(mu), 1)  # O x 1 x I
+        self.mu = tf.expand_dims(tf.transpose(mu), 2)  # O x I x 1
         self.L = L  # O x I x I
         self.d = tf.shape(mu)
         self.D = tf.shape(self.mu)
 
     def sample(self):
         e = tf.random_normal(self.D)
-        x = tf.reshape(self.mu + tf.matmul(e, self.L), self.d)
+        x = tf.reshape(self.mu + tf.matmul(self.L, e), self.d)
         return x
 
     def KL(self, p):
@@ -83,25 +84,31 @@ class NormPrior(Normal):
 
 class NormPosterior(Normal):
 
-    def __init__(self, dim, prior_var):
-        mu = tf.Variable(tf.sqrt(prior_var) * tf.random_normal(dim))
-        var = pos(tf.Variable(prior_var * tf.random_normal(dim)))
+    def __init__(self, dim, var0):
+        mu = tf.Variable(tf.sqrt(var0) * tf.random_normal(dim))
+        var = pos(tf.Variable(var0 * tf.random_normal(dim)))
         super().__init__(mu, var)
 
 
 class GausPosterior(Gaussian):
 
-    def __init__(self, dim, prior_var):
+    def __init__(self, dim, var0):
         I, O = dim
-        mu, L = [], []
-        for o in range(O):
-            Le = tf.eye(I) * tf.sqrt(prior_var)  # TODO make random diagonal
-            e = tf.random_normal((I, 1))
-            mu.append(tf.Variable(tf.matmul(Le, e)))
-            L.append(tf.matrix_band_part(tf.Variable(Le), -1, 0))
 
-        mu = tf.concat(mu, axis=1)
-        L = tf.stack(L)
+        sig0 = np.sqrt(var0)
+        mu = (np.random.randn(I, O) * sig0).astype(np.float32)
+        # Le = np.tile(np.eye(I, dtype=np.float32), [O, 1, 1]) * np.sqrt(var0)
+        # L = tf.matrix_band_part(tf.Variable(Le), -1, 0)
+
+        l = (sig0 * np.random.randn(I * (I - 1) // 2, O)).astype(np.float32)
+        l = tf.Variable(l)
+        u, v = np.tril_indices(I, -1)
+        import IPython; IPython.embed()
+        L = tf.scatter_nd(u * I + v, l, shape=(I * I, O))
+        L = tf.reshape(L, (O, I, I))
+        
+        # L = tf.Variable(tf.zeros((I * I, O)), trainable=False)
+        # L = tf.scatter_update(L, u * I + v, l)
 
         super().__init__(mu=mu, L=L)
 
@@ -112,6 +119,6 @@ class GausPosterior(Gaussian):
 
 def _chollogdet(L):
     """L is [..., D, D]."""
-    l = tf.map_fn(tf.diag_part, L)
+    l = tf.matrix_diag_part(L)
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet
