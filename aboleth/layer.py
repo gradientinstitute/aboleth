@@ -104,10 +104,10 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
     def build_dense_map(X):
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
-        bdim = (output_dim,)
+        bdim = output_dim
 
-        W = tf.Variable(tf.random_normal(Wdim))
-        b = tf.Variable(tf.random_normal(bdim))
+        W = tf.Variable(np.random.randn(*Wdim).astype(np.float32))
+        b = tf.Variable(np.random.randn(bdim).astype(np.float32))
 
         # Linear layer, don't want to copy Variable, so map
         Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)

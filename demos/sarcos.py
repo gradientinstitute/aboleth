@@ -1,4 +1,6 @@
 """Sarcos regression demo."""
+from time import time
+
 import numpy as np
 import tensorflow as tf
 from scipy.stats import norm
@@ -12,8 +14,9 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 VARIANCE = 10.0
 KERN = ab.RBF(lenscale=ab.pos(tf.Variable(10. * tf.ones((21, 1)))))
 LAYERS = [
-    ab.randomFourier(n_features=400, kernel=KERN),
-    ab.dense_map(output_dim=20, l1_reg=0),
+    ab.randomFourier(n_features=50, kernel=KERN),
+    ab.dense_var(output_dim=20, full=True),
+    # ab.dense_map(output_dim=20, l1_reg=0),
     ab.randomFourier(n_features=20),
     ab.dense_var(output_dim=1, full=True)
 ]
@@ -21,7 +24,7 @@ BATCH_SIZE = 10
 NEPOCHS = 10
 NPREDICTSAMPLES = 100
 
-# CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU
+CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
 
 
 def main():
@@ -64,18 +67,20 @@ def main():
     init_op = tf.group(tf.initialize_all_variables(),
                        tf.initialize_local_variables())
 
-    # with tf.Session(config=CONFIG):
-    with tf.Session():
+    with tf.Session(config=CONFIG):
         init_op.run()
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord)
         try:
             step = 0
+            time_inc = time()
             while not coord.should_stop():
                 train.run()
                 if step % 1000 == 0:
+                    delta = step / (time() - time_inc)
                     l = loss.eval()
-                    print("Iteration {}, loss = {}".format(step, l))
+                    print("Iteration {}, loss = {}, speed = {}"
+                          .format(step, l, delta))
                 step += 1
 
         finally:
