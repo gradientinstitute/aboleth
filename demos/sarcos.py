@@ -14,14 +14,14 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 VARIANCE = 10.0
 KERN = ab.RBF(lenscale=ab.pos(tf.Variable(10. * tf.ones((21, 1)))))
 LAYERS = [
-    ab.randomFourier(n_features=50, kernel=KERN),
-    ab.dense_var(output_dim=20, full=True),
-    # ab.dense_map(output_dim=20, l1_reg=0),
-    ab.randomFourier(n_features=20),
+    ab.randomFourier(n_features=2000, kernel=KERN),
+    # ab.dense_var(output_dim=20, full=True),
+    ab.dense_map(output_dim=20, l1_reg=0),
+    ab.randomFourier(n_features=100),
     ab.dense_var(output_dim=1, full=True)
 ]
 BATCH_SIZE = 10
-NEPOCHS = 10
+NEPOCHS = 100
 NPREDICTSAMPLES = 100
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
@@ -82,7 +82,8 @@ def main():
                     print("Iteration {}, loss = {}, speed = {}"
                           .format(step, l, delta))
                 step += 1
-
+        except tf.errors.OutOfRangeError:
+            pass
         finally:
             coord.request_stop()
         coord.join(threads)
