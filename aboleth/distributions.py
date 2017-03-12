@@ -94,19 +94,14 @@ def norm_posterior(dim, var0):
 def gaus_posterior(dim, var0):
     I, O = dim
     sig0 = np.sqrt(var0)
-    l = gamma.rvs(sig0, size=(O, I)).astype(np.float32)
-    d1, d2 = np.diag_indices(I)
-    L = np.zeros((O, I, I), dtype=np.float32)
-    L[:, d1, d2] = l
-    L = tf.matrix_band_part(tf.Variable(L), -1, 0)
-
-    # l = gamma.rvs(sig0, size=(I * (I - 1) // 2, O)).astype(np.float32)
-    # l = tf.Variable(l)
-    # u, v = np.tril_indices(I, -1)
-    # indices = (u * I + v)[:, np.newaxis]
-    # L = tf.scatter_nd(indices, l, shape=(I * I, O))
-    # L = tf.reshape(L, (O, I, I))
-
+    u, v = np.tril_indices(I)
+    indices = (u * I + v)[:, np.newaxis]
+    l_i = np.eye(I)[u, v][:, np.newaxis]
+    l = np.tile(l_i, [1, O]).astype(np.float32)
+    lt = tf.Variable(l)
+    L = tf.scatter_nd(indices, lt, shape=(I * I, O))
+    L = tf.transpose(L)
+    L = tf.reshape(L, (O, I, I))
     mu = tf.Variable((np.random.randn(I, O) * sig0).astype(np.float32))
     Q = Gaussian(mu, L)
     return Q
