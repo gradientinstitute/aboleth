@@ -21,15 +21,16 @@ class Normal:
             variance, shape [d_i, d_o]
     """
 
-    def __init__(self, mu=0., var=1.):
+    def __init__(self, mu=0., var=1., seed=None):
         self.mu = mu
         self.var = var
         self.sigma = tf.sqrt(var)
         self.D = tf.shape(mu)
+        self.seed = seed
 
     def sample(self):
         # Reparameterisation trick
-        e = tf.random_normal(self.D)
+        e = tf.random_normal(self.D, seed=self.seed)
         x = self.mu + e * self.sigma
         return x
 
@@ -50,14 +51,15 @@ class Gaussian:
             Cholesky, shape [d_o, d_i, d_i]
     """
 
-    def __init__(self, mu, L):
+    def __init__(self, mu, L, seed=None):
         self.mu = tf.expand_dims(tf.transpose(mu), 2)  # O x I x 1
         self.L = L  # O x I x I
         self.d = tf.shape(mu)
         self.D = tf.shape(self.mu)
+        self.seed = seed
 
     def sample(self):
-        e = tf.random_normal(self.D)
+        e = tf.random_normal(self.D, seed=self.seed)
         x = tf.reshape(self.mu + tf.matmul(self.L, e), self.d)
         return x
 
@@ -82,21 +84,23 @@ def norm_prior(dim, var, learn_var):
     return P
 
 
-def norm_posterior(dim, var0):
-    mu = np.sqrt(var0) * np.random.randn(*dim)
+def norm_posterior(dim, var0, seed=None):
+    rand = np.random.RandomState(seed)
+    mu = np.sqrt(var0) * rand.randn(*dim)
     mu = tf.Variable((mu.astype(np.float32)))
-    var = var0 * np.random.randn(*dim)
+    var = var0 * rand.randn(*dim)
     var = pos(tf.Variable(var.astype(np.float32)))
-    Q = Normal(mu, var)
+    Q = Normal(mu, var, seed=seed)
     return Q
 
 
-def gaus_posterior(dim, var0):
+def gaus_posterior(dim, var0, seed=None):
     I, O = dim
     sig0 = np.sqrt(var0)
+    rand = np.random.RandomState(seed)
 
     # Masking out upper triangular
-    l = gamma.rvs(sig0, size=(O, I)).astype(np.float32)
+    l = rand.gamma(shape=sig0, size=(O, I)).astype(np.float32)
     d1, d2 = np.diag_indices(I)
     L = np.zeros((O, I, I), dtype=np.float32)
     L[:, d1, d2] = l
@@ -107,13 +111,13 @@ def gaus_posterior(dim, var0):
     # indices = (u * I + v)[:, np.newaxis]
     # l_i = np.eye(I)[u, v][:, np.newaxis]
     # l = np.tile(l_i, [1, O]).astype(np.float32)
-    # lt = tf.Variable(l * gamma.rvs(sig0, size=l.shape).astype(np.float32))
+    # lt = tf.Variable(l * rand.gamma(sig0, size=l.shape).astype(np.float32))
     # L = tf.scatter_nd(indices, lt, shape=(I * I, O))
     # L = tf.transpose(L)
     # L = tf.reshape(L, (O, I, I))
 
-    mu = tf.Variable((np.random.randn(I, O) * sig0).astype(np.float32))
-    Q = Gaussian(mu, L)
+    mu = tf.Variable((rand.randn(I, O) * sig0).astype(np.float32))
+    Q = Gaussian(mu, L, seed=seed)
     return Q
 
 

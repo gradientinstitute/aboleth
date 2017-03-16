@@ -10,7 +10,7 @@ def pos(X, minval=1e-10):
     return tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
 
 
-def batch(data_dict, N_, batch_size, n_iter=10000, random_state=None):
+def batch(data_dict, N_, batch_size, n_iter=10000, seed=None):
     """
     Create random batches for Stochastic gradients.
 
@@ -30,7 +30,7 @@ def batch(data_dict, N_, batch_size, n_iter=10000, random_state=None):
         number of data points in each batch.
     n_iter : int, optional
         The number of iterations
-    random_state : None, int or RandomState, optional
+    seed : None, int or RandomState, optional
         random seed
 
     Yields
@@ -41,7 +41,7 @@ def batch(data_dict, N_, batch_size, n_iter=10000, random_state=None):
         evaluating a loss, training, etc.
     """
     N = data_dict[list(data_dict.keys())[0]].shape[0]
-    perms = endless_permutations(N, random_state)
+    perms = endless_permutations(N, seed)
 
     i = 0
     while i < n_iter:
@@ -52,7 +52,7 @@ def batch(data_dict, N_, batch_size, n_iter=10000, random_state=None):
         yield batch_dict
 
 
-def endless_permutations(N, random_state=None):
+def endless_permutations(N, seed=None):
     """
     Generate an endless sequence of permutations of the set [0, ..., N).
 
@@ -63,7 +63,7 @@ def endless_permutations(N, random_state=None):
     ----------
     N: int
         the length of the set
-    random_state: int or RandomState, optional
+    seed: None, int or RandomState, optional
         random seed
 
     Yields
@@ -71,10 +71,10 @@ def endless_permutations(N, random_state=None):
     int:
         a random int from the set [0, ..., N)
     """
-    if isinstance(random_state, np.random.RandomState):
-        generator = random_state
+    if isinstance(seed, np.random.RandomState):
+        generator = seed
     else:
-        generator = np.random.RandomState(random_state)
+        generator = np.random.RandomState(seed)
 
     while True:
         batch_inds = generator.permutation(N)

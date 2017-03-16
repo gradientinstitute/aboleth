@@ -68,7 +68,7 @@ def add():
     return build_add
 
 
-def dense_var(output_dim, reg=1., learn_prior=True, full=False):
+def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
         """X is a rank 3 tensor, [n_samples, N, D]."""
@@ -81,9 +81,9 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False):
         pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
 
         # Layer Posterior samples
-        qW = (gaus_posterior(dim=Wdim, var0=reg) if full else
-              norm_posterior(dim=Wdim, var0=reg))
-        qb = norm_posterior(dim=bdim, var0=reg)  # TODO: keep independent?
+        qW = (gaus_posterior(dim=Wdim, var0=reg, seed=seed) if full else
+              norm_posterior(dim=Wdim, var0=reg, seed=seed))
+        qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
 
         # Linear layer
         Wsamples = _sample(qW, n_samples)
@@ -98,16 +98,17 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False):
     return build_dense
 
 
-def dense_map(output_dim, l1_reg=1., l2_reg=1.):
+def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None):
     """Dense (fully connected) linear layer, with MAP inference."""
 
     def build_dense_map(X):
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
         bdim = output_dim
+        rand = np.random.RandomState(seed)
 
-        W = tf.Variable(np.random.randn(*Wdim).astype(np.float32))
-        b = tf.Variable(np.random.randn(bdim).astype(np.float32))
+        W = tf.Variable(rand.randn(*Wdim).astype(np.float32))
+        b = tf.Variable(rand.randn(bdim).astype(np.float32))
 
         # Linear layer, don't want to copy Variable, so map
         Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)
@@ -125,7 +126,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1.):
     return build_dense_map
 
 
-def randomFourier(n_features, kernel=None):
+def randomFourier(n_features, kernel=None, seed=None):
     """Random fourier feature layer."""
     kernel = kernel if kernel else RBF()
 
@@ -133,7 +134,7 @@ def randomFourier(n_features, kernel=None):
         n_samples, input_dim = _get_dims(X)
 
         # Random weights, copy faster than map here
-        P = kernel.weights(input_dim, n_features)
+        P = kernel.weights(input_dim, n_features, seed)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
@@ -157,8 +158,9 @@ class RBF:
     def __init__(self, lenscale=1.0):
         self.lenscale = lenscale
 
-    def weights(self, input_dim, n_features):
-        P = np.random.randn(input_dim, n_features).astype(np.float32)
+    def weights(self, input_dim, n_features, seed=None):
+        rand = np.random.RandomState(seed)
+        P = rand.randn(input_dim, n_features).astype(np.float32)
         return P / self.lenscale
 
 
@@ -169,7 +171,7 @@ class Matern(RBF):
         super().__init__(lenscale)
         self.p = p
 
-    def weights(self, input_dim, n_features):
+    def weights(self, input_dim, n_features, seed=None):
         # p is the matern number (v = p + .5) and the two is a transformation
         # of variables between Rasmussen 2006 p84 and the CF of a Multivariate
         # Student t (see wikipedia). Also see "A Note on the Characteristic
@@ -180,8 +182,9 @@ class Matern(RBF):
         # from wikipedia, x = y * np.sqrt(df / u) where y ~ norm(0, I),
         # u ~ chi2(df), then x ~ mvt(0, I, df)
         df = 2 * (self.p + 0.5)
-        y = np.random.randn(input_dim, n_features)
-        u = np.random.chisquare(df, size=(n_features,))
+        rand = np.random.RandomState(seed)
+        y = rand.randn(input_dim, n_features)
+        u = rand.chisquare(df, size=(n_features,))
         P = y * np.sqrt(df / u)
         P = P.astype(np.float32)
         return P / self.lenscale
