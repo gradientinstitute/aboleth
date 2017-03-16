@@ -25,7 +25,7 @@ n_samples = 10
 n_pred_samples = 100
 n_epochs = 200
 batch_size = 10
-config = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
+config = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU
 
 lenscale1 = tf.Variable(1.)
 # lenscale1 = 1.
