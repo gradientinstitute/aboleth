@@ -99,22 +99,15 @@ def gaus_posterior(dim, var0, seed=None):
     sig0 = np.sqrt(var0)
     rand = np.random.RandomState(seed)
 
-    # Masking out upper triangular
-    l = rand.gamma(shape=sig0, size=(O, I)).astype(np.float32)
-    d1, d2 = np.diag_indices(I)
-    L = np.zeros((O, I, I), dtype=np.float32)
-    L[:, d1, d2] = l
-    L = tf.matrix_band_part(tf.Variable(L), -1, 0)
-
-    # Optimize only values in lower triangular (needs more testing)
-    # u, v = np.tril_indices(I)
-    # indices = (u * I + v)[:, np.newaxis]
-    # l_i = np.eye(I)[u, v][:, np.newaxis]
-    # l = np.tile(l_i, [1, O]).astype(np.float32)
-    # lt = tf.Variable(l * rand.gamma(sig0, size=l.shape).astype(np.float32))
-    # L = tf.scatter_nd(indices, lt, shape=(I * I, O))
-    # L = tf.transpose(L)
-    # L = tf.reshape(L, (O, I, I))
+    # Optimize only values in lower triangular
+    u, v = np.tril_indices(I)
+    indices = (u * I + v)[:, np.newaxis]
+    g = np.minimum(rand.gamma(shape=sig0, size=(O, I, 1)), 1e-1)  # Numer. stab
+    l = (np.tile(np.eye(I), [O, 1, 1]) * g)[:, u, v].T
+    l = tf.Variable(l.astype(np.float32))
+    L = tf.scatter_nd(indices, l, shape=(I * I, O))
+    L = tf.transpose(L)
+    L = tf.reshape(L, (O, I, I))
 
     mu = tf.Variable((rand.randn(I, O) * sig0).astype(np.float32))
     Q = Gaussian(mu, L, seed=seed)
