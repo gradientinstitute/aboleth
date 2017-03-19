@@ -33,3 +33,9 @@ def log_prob(Y, likelihood, Phi):
     """Build the log probability density of the model."""
     log_prob = tf.reduce_mean(likelihood(Y, Phi), axis=0)
     return log_prob
+
+
+def predict_nlp(Y, likelihood, Phi):
+    """Build the mean negative log probability of the the model."""
+    nlp = -tf.reduce_mean(likelihood(Y, Phi[0]))
+    return nlp
