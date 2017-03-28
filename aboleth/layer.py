@@ -68,7 +68,8 @@ def add():
     return build_add
 
 
-def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None):
+def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
+              bias=True):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
         """X is a rank 3 tensor, [n_samples, N, D]."""
@@ -76,29 +77,32 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None):
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
-        # Layer priors
+        # Layer weights
         pW = norm_prior(dim=Wdim, var=reg, learn_var=learn_prior)
-        pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
-
-        # Layer Posterior samples
         qW = (gaus_posterior(dim=Wdim, var0=reg, seed=seed) if full else
               norm_posterior(dim=Wdim, var0=reg, seed=seed))
-        qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
+        Wsamples = _sample(qW, n_samples)
 
         # Linear layer
-        Wsamples = _sample(qW, n_samples)
-        bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
-        Phi = tf.matmul(X, Wsamples) + bsamples
+        Phi = tf.matmul(X, Wsamples)
 
         # Regularizers
-        KL = tf.reduce_sum(qW.KL(pW)) + tf.reduce_sum(qb.KL(pb))
+        KL = tf.reduce_sum(qW.KL(pW))
+
+        # Optional bias
+        if bias:
+            qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
+            pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
+            bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
+            Phi += bsamples
+            KL += tf.reduce_sum(qb.KL(pb))
 
         return Phi, KL
 
     return build_dense
 
 
-def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None):
+def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None, bias=True):
     """Dense (fully connected) linear layer, with MAP inference."""
 
     def build_dense_map(X):
@@ -108,18 +112,18 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None):
         rand = np.random.RandomState(seed)
 
         W = tf.Variable(rand.randn(*Wdim).astype(np.float32))
-        b = tf.Variable(rand.randn(bdim).astype(np.float32))
 
         # Linear layer, don't want to copy Variable, so map
         Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)
 
         # Regularizers
-        l1, l2 = 0, 0
-        if l2_reg > 0:
-            l2 = l2_reg * (tf.nn.l2_loss(W) + tf.nn.l2_loss(b))
-        if l1_reg > 0:
-            l1 = l1_reg * (_l1_loss(W) + _l1_loss(b))
-        pen = l1 + l2
+        pen = l2_reg * tf.nn.l2_loss(W) + l1_reg * _l1_loss(W)
+
+        # Optional Bias
+        if bias:
+            b = tf.Variable(rand.randn(bdim).astype(np.float32))
+            Phi += b
+            pen += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
 
         return Phi, pen
 
