@@ -91,11 +91,14 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
 
         # Optional bias
         if bias:
-            qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
-            pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
-            bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
-            Phi += bsamples
-            KL += tf.reduce_sum(qb.KL(pb))
+            if bias is True:
+                qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
+                pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
+                b = tf.expand_dims(_sample(qb, n_samples), 1)
+                Phi += b
+                KL += tf.reduce_sum(qb.KL(pb))
+            else:
+                Phi += bias
 
         return Phi, KL
 
@@ -113,7 +116,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None, bias=True):
 
         W = tf.Variable(rand.randn(*Wdim).astype(np.float32))
 
-        # Linear layer, don't want to copy Variable, so map
+        # Linear layer, don't want to copy Variable, (W) so map over X
         Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)
 
         # Regularizers
@@ -121,9 +124,12 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None, bias=True):
 
         # Optional Bias
         if bias:
-            b = tf.Variable(rand.randn(bdim).astype(np.float32))
-            Phi += b
-            pen += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
+            if bias is True:
+                b = tf.Variable(rand.randn(bdim).astype(np.float32))
+                Phi += b
+                pen += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
+            else:
+                Phi += bias
 
         return Phi, pen
 
