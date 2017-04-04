@@ -61,14 +61,15 @@ def main():
     # Launch the graph.
     acc, acc_o, ll, ll_o = [], [], [], []
     init = tf.global_variables_initializer()
-    for k, (r_ind, s_ind) in enumerate(kfold.split(X)):
-        Xr, Yr = X[r_ind], y[r_ind]
-        Xs, Ys = X[s_ind], y[s_ind]
 
-        with tf.Session(config=CONFIG) as sess:
-            sess.run(init)
+    with tf.Session(config=CONFIG):
 
-            # Fit the network.
+        for k, (r_ind, s_ind) in enumerate(kfold.split(X)):
+            init.run()
+
+            Xr, Yr = X[r_ind], y[r_ind]
+            Xs, Ys = X[s_ind], y[s_ind]
+
             batches = ab.batch(
                 {X_: Xr, Y_: Yr},
                 N_,
@@ -77,7 +78,7 @@ def main():
                 seed=RSEED
             )
             for i, data in enumerate(batches):
-                sess.run(train, feed_dict=data)
+                train.run(feed_dict=data)
                 if i % 1000 == 0:
                     loss_val = loss.eval(feed_dict=data)
                     print("Iteration {}, loss = {}".format(i, loss_val))
@@ -86,17 +87,18 @@ def main():
             Eys = [Phi[0].eval(feed_dict={X_: Xs}) for _ in range(PSAMPLES)]
             Ey = np.hstack(Eys).mean(axis=1)
 
-        print("Fold {}:".format(k))
-        Ep = np.vstack((1 - Ey, Ey)).T
-        print_k_result(Ys, Ep, ll, acc, "DGP")
+            print("Fold {}:".format(k))
+            Ep = np.vstack((1. - Ey, Ey)).T
 
-        bcl.fit(Xr, Yr.flatten())
-        Ep_o = bcl.predict_proba(Xs)
-        print_k_result(Ys, Ep_o, ll_o, acc_o, "RF")
-        print("-----")
+            print_k_result(Ys, Ep, ll, acc, "DGP")
 
-    print_final_result(acc, ll, "DGP")
-    print_final_result(acc_o, ll_o, "RF")
+            bcl.fit(Xr, Yr.flatten())
+            Ep_o = bcl.predict_proba(Xs)
+            print_k_result(Ys, Ep_o, ll_o, acc_o, "RF")
+            print("-----")
+
+        print_final_result(acc, ll, "DGP")
+        print_final_result(acc_o, ll_o, "RF")
 
 
 def print_k_result(ys, Ep, ll, acc, name):
@@ -109,6 +111,7 @@ def print_k_result(ys, Ep, ll, acc, name):
 def print_final_result(acc, ll, name):
     print("{} final: accuracy = {:.4g} ({:.4g}), log-loss = {:.4g} ({:.4g})"
           .format(name, np.mean(acc), np.std(acc), np.mean(ll), np.std(ll)))
+
 
 if __name__ == "__main__":
     main()
