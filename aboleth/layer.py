@@ -21,7 +21,7 @@ def eye():
 def activation(h=lambda X: X):
     """Activation function layer."""
     def build_activation(X):
-        Phi = tf.map_fn(h, X)
+        Phi = h(X)
         KL = 0.
         return Phi, KL
     return build_activation
