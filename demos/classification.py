@@ -74,7 +74,7 @@ def main():
                 N_,
                 batch_size=BSIZE,
                 n_iter=NITER,
-                random_state=RSEED
+                seed=RSEED
             )
             for i, data in enumerate(batches):
                 sess.run(train, feed_dict=data)
