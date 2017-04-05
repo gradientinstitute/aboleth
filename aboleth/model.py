@@ -6,7 +6,7 @@ import tensorflow as tf
 # Graph Building
 #
 
-def deepnet(X, Y, N, layers, likelihood, n_samples=10):
+def deepnet(X, Y, N, layers, likelihood, n_samples=10, bias_fn=None):
     """Make a supervised Bayesian deep network.
 
     Note: This simply combines calls to ``deepnet`` and ``elbo``.
@@ -16,15 +16,19 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10):
     for l in layers:
         Phi, kl = l(Phi)
         KL += kl
-    loss = elbo(Phi, Y, N, KL, likelihood)
+    loss = elbo(Phi, Y, N, KL, likelihood, bias_fn)
     return Phi, loss
 
 
-def elbo(Phi, Y, N, KL, likelihood):
+def elbo(Phi, Y, N, KL, likelihood, bias_fn=None):
     """Build the evidence lower bound loss."""
     B = N / tf.to_float(tf.shape(Phi)[1])  # Batch amplification factor
     n_samples = tf.to_float(tf.shape(Phi)[0])
-    ELL = tf.reduce_sum(likelihood(Y, Phi)) / n_samples  # Just mean over samps
+    if not bias_fn:
+        ELL = tf.reduce_sum(likelihood(Y, Phi)) / n_samples  # Just mean over samps
+    else:
+        ELL = tf.reduce_sum(likelihood(Y, Phi) * bias_fn(Y)) / n_samples  # Just mean over samps
+
     l = - B * ELL + KL
     return l
 
