@@ -1,7 +1,7 @@
 """Model parameter distributions."""
 import numpy as np
 import tensorflow as tf
-from scipy.stats import gamma
+# from scipy.stats import gamma
 
 from aboleth.util import pos
 
