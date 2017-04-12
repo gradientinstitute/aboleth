@@ -1,7 +1,6 @@
 """Model parameter distributions."""
 import numpy as np
 import tensorflow as tf
-# from scipy.stats import gamma
 
 from aboleth.util import pos
 
@@ -59,6 +58,7 @@ class Gaussian:
         self.seed = seed
 
     def sample(self):
+        # Reparameterisation trick
         e = tf.random_normal(self.D, seed=self.seed)
         x = tf.reshape(self.mu + tf.matmul(self.L, e), self.d)
         return x
@@ -120,6 +120,6 @@ def gaus_posterior(dim, var0, seed=None):
 
 def _chollogdet(L):
     """L is [..., D, D]."""
-    l = tf.matrix_diag_part(L)
+    l = pos(tf.matrix_diag_part(L))  # Make sure we don't go to zero
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet

@@ -5,19 +5,6 @@ import tensorflow as tf
 import aboleth as ab
 
 
-def test_eye(make_data):
-    """Test identity layer."""
-    x, _, X = make_data
-    eye = ab.eye()
-
-    F, KL = eye(X)
-
-    tc = tf.test.TestCase()
-    with tc.test_session():
-        assert np.all(X.eval() == F.eval())
-    assert KL == 0
-
-
 def test_activation(make_data):
     """Test nonlinear activation layer."""
     x, _, X = make_data
@@ -31,55 +18,39 @@ def test_activation(make_data):
         assert KL == 0
 
 
-def test_fork(make_data):
-    """Test forking layers."""
+def test_fork_cat(make_data):
+    """Test forking layers with concatenation join."""
     x, _, X = make_data
-    fork = ab.fork(replicas=2)
+    l1 = [ab.activation(), ab.activation()]
+    l2 = [ab.activation()]
+    fork = ab.fork('cat', l1, l2)
 
-    (X1, X2), KL = fork(X)
+    F, KL = fork(X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        assert np.all(X.eval() == X1.eval()) and np.all(X.eval() == X2.eval())
+        forked = F.eval()
+        orig = X.eval()
+        assert forked.shape == orig.shape[0:2] + (2 * orig.shape[2],)
+        assert np.all(forked == np.dstack((orig, orig)))
         assert KL == 0
 
 
-def test_lmap(make_data):
-    """Test layer map functions to multiple input layers."""
+def test_fork_add(make_data):
+    """Test forking layers with add join."""
     x, _, X = make_data
-    app = ab.lmap(ab.activation(tf.tanh), ab.eye())
+    l1 = [ab.activation(), ab.activation()]
+    l2 = [ab.activation()]
+    fork = ab.fork('add', l1, l2)
+
+    F, KL = fork(X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        (Xtan, Xeye), KL = app([X, X])
-
-        assert np.all(np.tanh(X.eval()) == Xtan.eval())
-        assert np.all(X.eval() == Xeye.eval())
-        assert KL == 0
-
-
-def test_add(make_data):
-    """Test adding of forked input layers."""
-    x, _, X = make_data
-    add = ab.add()
-
-    tc = tf.test.TestCase()
-    with tc.test_session():
-        Xadd, KL = add([X, X, X])
-        assert np.all(3 * X.eval() == Xadd.eval())
-        assert KL == 0
-
-
-def test_cat(make_data):
-    """Test concatenating of forked input layers."""
-    x, _, X = make_data
-    cat = ab.cat()
-
-    N, D = x.shape
-    tc = tf.test.TestCase()
-    with tc.test_session():
-        Xcat, KL = cat([X, X, X])
-        assert Xcat.eval().shape == (3, N, 3 * D)
+        forked = F.eval()
+        orig = X.eval()
+        assert forked.shape == orig.shape
+        assert np.all(forked == 2 * orig)
         assert KL == 0
 
 

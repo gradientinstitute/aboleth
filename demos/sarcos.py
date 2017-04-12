@@ -12,19 +12,24 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 
 
 VARIANCE = 10.0
-KERN = ab.RBF(lenscale=ab.pos(tf.Variable(10. * tf.ones((21, 1)))))
+# KERN = ab.RBF(lenscale=ab.pos(tf.Variable(10. * tf.ones((21, 1)))))
+# LAYERS = [
+#     ab.randomFourier(n_features=2000, kernel=KERN),
+#     ab.dense_var(output_dim=20, full=False),
+#     ab.randomFourier(n_features=100),
+#     ab.dense_var(output_dim=1, full=True)
+# ]
 LAYERS = [
-    ab.randomFourier(n_features=2000, kernel=KERN),
-    # ab.dense_var(output_dim=20, full=True),
-    ab.dense_map(output_dim=20, l1_reg=0),
-    ab.randomFourier(n_features=100),
+    ab.dense_var(output_dim=20, full=True),
+    ab.activation(tf.tanh),
     ab.dense_var(output_dim=1, full=True)
 ]
+NSAMPLES = 10
 BATCH_SIZE = 10
-NEPOCHS = 100
+NEPOCHS = 10
 NPREDICTSAMPLES = 100
 
-CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
+CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU ?
 
 
 def main():
@@ -58,7 +63,7 @@ def main():
         lkhood = ab.normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N, LAYERS, lkhood, n_samples=10)
+        Phi, loss = ab.deepnet(X_, Y_, N, LAYERS, lkhood, n_samples=NSAMPLES)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()

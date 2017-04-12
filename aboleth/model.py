@@ -1,18 +1,17 @@
 """Neural Net Construction."""
 import tensorflow as tf
 
+from aboleth.layer import compose_layers
 
 #
-# Graph Building
+# Graph Building -- Models and Optimisation
 #
+
 
 def deepnet(X, Y, N, layers, likelihood, n_samples=10, bias_fn=None):
     """Make a supervised Bayesian deep network."""
     Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
-    KL = 0.
-    for l in layers:
-        Phi, kl = l(Phi)
-        KL += kl
+    Phi, KL = compose_layers(layers, Phi)
     loss = elbo(Phi, Y, N, KL, likelihood, bias_fn)
     return Phi, loss
 
@@ -32,13 +31,25 @@ def elbo(Phi, Y, N, KL, likelihood, bias_fn=None):
     return l
 
 
+#
+# Graph Building -- Prediction and evaluation
+#
+
+
 def log_prob(Y, likelihood, Phi):
-    """Build the log probability density of the model using ``n_samples``."""
+    """Build the log probability density of the model for each observation.
+
+    NOTE: This uses ``n_samples`` (from ``deepnet``) of the posterior to build
+        up the log probability for each sample.
+    """
     log_prob = tf.reduce_mean(likelihood(Y, Phi), axis=0)
     return log_prob
 
 
-def predict_nlp(Y, likelihood, Phi):
-    """Build the mean negative log probability for one sample."""
-    nlp = - tf.reduce_mean(likelihood(Y, Phi[0]))
-    return nlp
+def average_log_prob(Y, likelihood, Phi):
+    """Build the mean log probability of the model over the observations.
+
+    NOTE: This only returns one posterior sample of this log probability.
+    """
+    lp = tf.reduce_mean(likelihood(Y, Phi[0]))
+    return lp

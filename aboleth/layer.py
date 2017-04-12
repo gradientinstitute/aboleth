@@ -9,13 +9,13 @@ from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
 # Layers
 #
 
-def eye():
-    """Indentity Layer."""
-    def build_eye(X):
-        KL = 0.
-        return X, KL
+def compose_layers(layers, Phi):
+    KL = 0.
+    for l in layers:
+        Phi, kl = l(Phi)
+        KL += kl
 
-    return build_eye
+    return Phi, KL
 
 
 def activation(h=lambda X: X):
@@ -27,45 +27,25 @@ def activation(h=lambda X: X):
     return build_activation
 
 
-def fork(replicas=2):
-    """Fork an input into multiple, unmodified, outputs."""
+def fork(join='cat', *layers):
+    """Fork into multiple layer-pipelines, then join the outputs."""
+    joinops = {
+        'cat': lambda Xs: tf.concat(Xs, axis=2),
+        'add': lambda Xs: tf.add_n(Xs),
+    }
+
+    if not callable(join):
+        join = joinops[join]
+
     def build_fork(X):
-        KL = 0.
-        return [X for _ in range(replicas)], KL
+
+        Phis, KLs = zip(*map(lambda l: compose_layers(l, X), layers))
+        KL = sum(KLs)
+        Phi = join(Phis)
+
+        return Phi, KL
 
     return build_fork
-
-
-def lmap(*layers):
-    """Map multiple layers to multiple inputs (after forking)."""
-    def build_lmap(Xs):
-        if len(Xs) != len(layers):
-            raise ValueError("Number of layers and inputs not the same!")
-        Phis, KLs = zip(*map(lambda p, X: p(X), layers, Xs))
-        KL = sum(KLs)
-        return Phis, KL
-
-    return build_lmap
-
-
-def cat():
-    """Join multiple inputs by concatenation."""
-    def build_cat(Xs):
-        Phi = tf.concat(Xs, axis=2)
-        KL = 0.
-        return Phi, KL
-
-    return build_cat
-
-
-def add():
-    """Join multiple inputs by addition."""
-    def build_add(Xs):
-        Phi = tf.add_n(Xs)
-        KL = 0.
-        return Phi, KL
-
-    return build_add
 
 
 def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
