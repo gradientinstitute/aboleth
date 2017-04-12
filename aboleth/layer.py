@@ -6,10 +6,11 @@ from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
 
 
 #
-# Layers
+# Layer Composition
 #
 
 def compose_layers(layers, Phi):
+    """Compose a list of layers into a network."""
     KL = 0.
     for l in layers:
         Phi, kl = l(Phi)
@@ -17,6 +18,10 @@ def compose_layers(layers, Phi):
 
     return Phi, KL
 
+
+#
+# Layers
+#
 
 def activation(h=lambda X: X):
     """Activation function layer."""

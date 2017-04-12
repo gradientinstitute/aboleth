@@ -17,7 +17,7 @@ RSEED = 100
 # Optimization
 NITER = 20000
 BSIZE = 10
-CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use CPU
+CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 PSAMPLES = 20
 
 # Network structure

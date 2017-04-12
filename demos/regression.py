@@ -6,7 +6,6 @@ import bokeh.plotting as bk
 import bokeh.palettes as bp
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import Matern as kern
-from tensorflow.python.client import timeline
 
 # from sklearn.gaussian_process.kernels import RBF as kern
 
@@ -25,7 +24,7 @@ n_samples = 10
 n_pred_samples = 100
 n_epochs = 200
 batch_size = 10
-config = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU
+config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 lenscale1 = tf.Variable(1.)
 # lenscale1 = 1.

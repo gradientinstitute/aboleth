@@ -12,15 +12,17 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 
 
 VARIANCE = 10.0
-# KERN = ab.RBF(lenscale=ab.pos(tf.Variable(10. * tf.ones((21, 1)))))
+# KERN = ab.RBF(
+#     lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
+# )
 # LAYERS = [
-#     ab.randomFourier(n_features=2000, kernel=KERN),
-#     ab.dense_var(output_dim=20, full=False),
-#     ab.randomFourier(n_features=100),
+#     ab.randomFourier(n_features=1000, kernel=KERN),
 #     ab.dense_var(output_dim=1, full=True)
 # ]
 LAYERS = [
-    ab.dense_var(output_dim=20, full=True),
+    ab.dense_var(output_dim=1000, full=False),
+    ab.activation(tf.tanh),
+    ab.dense_var(output_dim=100, full=False),
     ab.activation(tf.tanh),
     ab.dense_var(output_dim=1, full=True)
 ]
@@ -29,7 +31,7 @@ BATCH_SIZE = 10
 NEPOCHS = 10
 NPREDICTSAMPLES = 100
 
-CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use CPU ?
+CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
 
 
 def main():
