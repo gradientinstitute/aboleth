@@ -21,6 +21,34 @@ def test_deepnet_outputs(make_graph):
         assert np.isscalar(l)
 
 
+def test_deepnet_likelihood_weights(make_graph):
+    """Test for expected output dimensions from deepnet."""
+    x, y, N, X_, Y_, N_, like, layers = make_graph
+
+    # Now test with likelihood weights
+    lw = np.ones_like(y)
+    lw_ = tf.placeholder(tf.float32, (len(y), 1))
+    Phiw, lossw = ab.deepnet(X_, Y_, N_, layers, like, like_weights=lw_)
+    Phif, lossf = ab.deepnet(X_, Y_, N_, layers, like,
+                             like_weights=lambda y: 1.)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+
+        P = Phiw.eval(feed_dict={X_: x, Y_: y, N_: float(N), lw_: lw})
+        l = lossw.eval(feed_dict={X_: x, Y_: y, N_: float(N), lw_: lw})
+
+        assert P.shape == (10, N, 1)
+        assert np.isscalar(l)
+
+        P = Phif.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
+        l = lossf.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
+
+        assert P.shape == (10, N, 1)
+        assert np.isscalar(l)
+
+
 def test_elbo_output(make_graph):
     """Test for scalar output from elbo."""
     x, y, N, X_, Y_, N_, like, layers = make_graph

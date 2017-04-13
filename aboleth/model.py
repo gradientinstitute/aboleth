@@ -8,24 +8,26 @@ from aboleth.layer import compose_layers
 #
 
 
-def deepnet(X, Y, N, layers, likelihood, n_samples=10, bias_fn=None):
+def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     """Make a supervised Bayesian deep network."""
     Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
     Phi, KL = compose_layers(layers, Phi)
-    loss = elbo(Phi, Y, N, KL, likelihood, bias_fn)
+    loss = elbo(Phi, Y, N, KL, likelihood, like_weights)
     return Phi, loss
 
 
-def elbo(Phi, Y, N, KL, likelihood, bias_fn=None):
+def elbo(Phi, Y, N, KL, likelihood, like_weights=None):
     """Build the evidence lower bound loss."""
     B = N / tf.to_float(tf.shape(Phi)[1])  # Batch amplification factor
     n_samples = tf.to_float(tf.shape(Phi)[0])
 
     # Just mean over samps for expected log-likelihood
-    if not bias_fn:
+    if like_weights is None:
         ELL = tf.reduce_sum(likelihood(Y, Phi)) / n_samples
+    elif callable(like_weights):
+        ELL = tf.reduce_sum(likelihood(Y, Phi) * like_weights(Y)) / n_samples
     else:
-        ELL = tf.reduce_sum(likelihood(Y, Phi) * bias_fn(Y)) / n_samples
+        ELL = tf.reduce_sum(likelihood(Y, Phi) * like_weights) / n_samples
 
     l = - B * ELL + KL
     return l

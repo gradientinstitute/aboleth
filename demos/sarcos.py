@@ -20,9 +20,9 @@ VARIANCE = 10.0
 #     ab.dense_var(output_dim=1, full=True)
 # ]
 LAYERS = [
-    ab.dense_var(output_dim=1000, full=False),
+    ab.dense_var(output_dim=100, full=True),
     ab.activation(tf.tanh),
-    ab.dense_var(output_dim=100, full=False),
+    ab.dense_var(output_dim=100, full=True),
     ab.activation(tf.tanh),
     ab.dense_var(output_dim=1, full=True)
 ]
