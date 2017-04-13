@@ -71,8 +71,8 @@ def main():
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
 
-    init_op = tf.group(tf.initialize_all_variables(),
-                       tf.initialize_local_variables())
+    init_op = tf.group(tf.global_variables_initializer(),
+                       tf.local_variables_initializer())
 
     with tf.Session(config=CONFIG):
         init_op.run()
