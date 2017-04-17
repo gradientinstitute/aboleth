@@ -16,29 +16,47 @@ from aboleth.datasets import gp_draws
 # Data settings
 N = 2000
 Ns = 400
-kernel = kern(length_scale=0.5)
+kernel = kern(length_scale=2.)
 true_noise = 0.1
 
 # Model settings
 n_samples = 10
 n_pred_samples = 100
-n_epochs = 200
+n_epochs = 400
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
-lenscale1 = tf.Variable(1.)
-# lenscale1 = 1.
-# lenscale2 = tf.Variable(1.)
-lenscale2 = 1.
 variance = tf.Variable(1.)
 # variance = 0.01
 
+# lenscale1 = tf.Variable(1.)
+# lenscale1 = 1.
+# lenscale2 = tf.Variable(1.)
+# lenscale2 = 1.
+# layers = [
+#     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale1))),
+#     ab.dense_var(output_dim=5, reg=0.1, full=True),
+#     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale2))),
+#     ab.dense_var(output_dim=1, reg=0.1, full=True)
+# ]
 layers = [
-    ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale1))),
-    ab.dense_var(output_dim=5, reg=0.1, full=True),
-    ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale2))),
-    ab.dense_var(output_dim=1, reg=0.1, full=True)
+    ab.dense_var(output_dim=3, full=False),
+    ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
+    ab.dense_var(output_dim=3, full=True),
+    ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
+    ab.dense_var(output_dim=1, full=True)
 ]
+
+# layers = [
+#     ab.dense_var(output_dim=5),
+#     ab.activation(tf.tanh),
+#     ab.dense_var(output_dim=5, full=True),
+#     ab.activation(tf.tanh),
+#     ab.dense_var(output_dim=5, full=True),
+#     ab.activation(tf.tanh),
+#     ab.dense_var(output_dim=1, full=True)
+# ]
+
 
 
 def main():
@@ -80,8 +98,8 @@ def main():
         logprob = ab.log_prob(Y_, lkhood, Phi)
 
     # saver = tf.train.Saver()
-    init_op = tf.group(tf.initialize_all_variables(),
-                       tf.initialize_local_variables())
+    init_op = tf.group(tf.global_variables_initializer(),
+                       tf.local_variables_initializer())
 
     with tf.Session(config=config):
         init_op.run()

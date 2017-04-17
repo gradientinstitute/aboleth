@@ -19,11 +19,18 @@ VARIANCE = 10.0
 #     ab.randomFourier(n_features=1000, kernel=KERN),
 #     ab.dense_var(output_dim=1, full=True)
 # ]
+# LAYERS = [
+#     ab.dense_var(output_dim=100, full=True),
+#     ab.activation(tf.tanh),
+#     ab.dense_var(output_dim=100, full=True),
+#     ab.activation(tf.tanh),
+#     ab.dense_var(output_dim=1, full=True)
+# ]
 LAYERS = [
-    ab.dense_var(output_dim=100, full=True),
-    ab.activation(tf.tanh),
-    ab.dense_var(output_dim=100, full=True),
-    ab.activation(tf.tanh),
+    ab.dense_var(output_dim=200, full=True),
+    ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
+    # ab.dense_var(output_dim=10, full=True),
+    # ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
     ab.dense_var(output_dim=1, full=True)
 ]
 NSAMPLES = 10
