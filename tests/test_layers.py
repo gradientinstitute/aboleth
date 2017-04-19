@@ -18,6 +18,22 @@ def test_activation(make_data):
         assert KL == 0
 
 
+def test_dropout(make_data):
+    """Test dropout layer."""
+    x, _, X = make_data
+    drop = ab.dropout(0.5)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        F, KL = drop(X)
+        f = F.eval()
+        prop_zero = np.sum(f == 0) / np.prod(f.shape)
+
+        assert f.shape == X.eval().shape
+        assert (prop_zero > 0.4) and (prop_zero < 0.6)
+        assert KL == 0
+
+
 def test_fork_cat(make_data):
     """Test forking layers with concatenation join."""
     x, _, X = make_data

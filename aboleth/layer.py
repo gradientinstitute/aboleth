@@ -29,6 +29,7 @@ def activation(h=lambda X: X):
         Phi = h(X)
         KL = 0.
         return Phi, KL
+
     return build_activation
 
 
@@ -43,14 +44,24 @@ def fork(join='cat', *layers):
         join = joinops[join]
 
     def build_fork(X):
-
         Phis, KLs = zip(*map(lambda l: compose_layers(l, X), layers))
         KL = sum(KLs)
         Phi = join(Phis)
-
         return Phi, KL
 
     return build_fork
+
+
+def dropout(keep_prob, seed=None):
+    """Dropout layer, Bernoulli probability of not setting an input to zero."""
+    def build_dropout(X):
+        # samples nned to have same dropout pattern
+        noise_shape = tf.concat(([1], tf.shape(X)[1:]), axis=0)
+        Phi = tf.nn.dropout(X, keep_prob, noise_shape, seed)
+        KL = 0.
+        return Phi, KL
+
+    return build_dropout
 
 
 def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
@@ -92,7 +103,6 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
 
 def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None, bias=True):
     """Dense (fully connected) linear layer, with MAP inference."""
-
     def build_dense_map(X):
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
