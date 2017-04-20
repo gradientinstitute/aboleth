@@ -20,14 +20,14 @@ kernel = kern(length_scale=2.)
 true_noise = 0.1
 
 # Model settings
-n_samples = 10
+n_samples = 5
 n_pred_samples = 100
 n_epochs = 400
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 variance = tf.Variable(1.)
-# variance = 0.01
+reg = 1.
 
 # lenscale1 = tf.Variable(1.)
 # lenscale1 = 1.
@@ -35,27 +35,21 @@ variance = tf.Variable(1.)
 # lenscale2 = 1.
 # layers = [
 #     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale1))),
-#     ab.dense_var(output_dim=5, reg=0.1, full=True),
+#     ab.dense_var(output_dim=5, reg=reg, full=True),
 #     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale2))),
-#     ab.dense_var(output_dim=1, reg=0.1, full=True)
+#     ab.dense_var(output_dim=1, reg=reg, full=True)
 # ]
 layers = [
-    ab.dense_var(output_dim=3, full=False),
-    ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
-    ab.dense_var(output_dim=3, full=True),
-    ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
-    ab.dense_var(output_dim=1, full=True)
+    ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
+    # ab.activation(tf.tanh),
+    ab.activation(tf.nn.relu),
+    ab.dropout(0.9),
+    ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
+    # ab.activation(tf.tanh),
+    ab.activation(tf.nn.relu),
+    ab.dropout(0.9),
+    ab.dense_map(output_dim=1, l1_reg=0, l2_reg=reg),
 ]
-
-# layers = [
-#     ab.dense_var(output_dim=5),
-#     ab.activation(tf.tanh),
-#     ab.dense_var(output_dim=5, full=True),
-#     ab.activation(tf.tanh),
-#     ab.dense_var(output_dim=5, full=True),
-#     ab.activation(tf.tanh),
-#     ab.dense_var(output_dim=1, full=True)
-# ]
 
 
 
