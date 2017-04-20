@@ -18,13 +18,28 @@ RSEED = 100
 NITER = 20000
 BSIZE = 10
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
-PSAMPLES = 20
+LSAMPLES = 5
+PSAMPLES = 50
+REG = 1e-5
 
 # Network structure
+# layers = [
+#     ab.dense_var(output_dim=20, reg=REG, full=False),
+#     ab.activation(h=tf.nn.relu),
+#     ab.dense_var(output_dim=20, reg=REG, full=False),
+#     ab.activation(h=tf.nn.relu),
+#     ab.dense_var(output_dim=1, reg=REG, full=False),
+#     ab.activation(h=tf.nn.sigmoid)
+# ]
 layers = [
-    ab.dense_var(output_dim=20, full=True),
+    ab.dropout(0.95),
+    ab.dense_map(output_dim=20, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
-    ab.dense_var(output_dim=1, reg=0.1, full=True),
+    ab.dropout(0.5),
+    ab.dense_map(output_dim=20, l1_reg=0., l2_reg=REG),
+    ab.activation(h=tf.nn.relu),
+    ab.dropout(0.5),
+    ab.dense_map(output_dim=1, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.sigmoid)
 ]
 
@@ -50,7 +65,7 @@ def main():
         lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N_, layers, lkhood)
+        Phi, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples=LSAMPLES)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()

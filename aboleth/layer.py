@@ -55,8 +55,7 @@ def fork(join='cat', *layers):
 def dropout(keep_prob, seed=None):
     """Dropout layer, Bernoulli probability of not setting an input to zero."""
     def build_dropout(X):
-        # samples nned to have same dropout pattern
-        noise_shape = tf.concat(([1], tf.shape(X)[1:]), axis=0)
+        noise_shape = None  # equivalent to different samples from posterior
         Phi = tf.nn.dropout(X, keep_prob, noise_shape, seed)
         KL = 0.
         return Phi, KL
@@ -90,10 +89,10 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
             if bias is True:
                 qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
                 pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
-                b = tf.expand_dims(_sample(qb, n_samples), 1)
-                Phi += b
+                bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
+                Phi += bsamples
                 KL += tf.reduce_sum(qb.KL(pb))
-            else:
+            else:  # Bias is set value
                 Phi += bias
 
         return Phi, KL
