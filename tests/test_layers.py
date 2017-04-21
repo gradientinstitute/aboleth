@@ -23,9 +23,10 @@ def test_dropout(make_data):
     x, _, X = make_data
     drop = ab.dropout(0.5)
 
+    F, KL = drop(X)
+
     tc = tf.test.TestCase()
     with tc.test_session():
-        F, KL = drop(X)
         f = F.eval()
         prop_zero = np.sum(f == 0) / np.prod(f.shape)
 
@@ -100,6 +101,22 @@ def test_kernels(kernels, make_data):
             assert p.shape == (N, 2 * D)
             # Check behaving properly with k(x, x) ~ 1.0
             assert np.allclose((p**2).sum(axis=1), np.ones(N))
+        assert KL == 0
+
+
+def test_arc_cosine(make_data):
+    """Test the random Arc Cosine kernel."""
+    x, _, _ = make_data
+    x_ = tf.placeholder(tf.float32, x.shape)
+    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
+
+    F, KL = ab.randomArcCosine(n_features=10)(X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        f = F.eval(feed_dict={x_: x})
+
+        assert f.shape == (3, x.shape[0], 10)
         assert KL == 0
 
 

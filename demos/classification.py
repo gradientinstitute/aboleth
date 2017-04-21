@@ -18,9 +18,9 @@ RSEED = 100
 NITER = 20000
 BSIZE = 10
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
-LSAMPLES = 5
+LSAMPLES = 10
 PSAMPLES = 50
-REG = 1e-5
+REG = 0.1
 
 # Network structure
 # layers = [
@@ -33,10 +33,10 @@ REG = 1e-5
 # ]
 layers = [
     ab.dropout(0.95),
-    ab.dense_map(output_dim=20, l1_reg=0., l2_reg=REG),
+    ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
     ab.dropout(0.5),
-    ab.dense_map(output_dim=20, l1_reg=0., l2_reg=REG),
+    ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
     ab.dropout(0.5),
     ab.dense_map(output_dim=1, l1_reg=0., l2_reg=REG),
@@ -68,7 +68,7 @@ def main():
         Phi, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples=LSAMPLES)
 
     with tf.name_scope("Train"):
-        optimizer = tf.train.AdamOptimizer()
+        optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
         train = optimizer.minimize(loss)
 
     kfold = KFold(n_splits=FOLDS, shuffle=True, random_state=RSEED)
@@ -105,14 +105,14 @@ def main():
             print("Fold {}:".format(k))
             Ep = np.vstack((1. - Ey, Ey)).T
 
-            print_k_result(Ys, Ep, ll, acc, "DGP")
+            print_k_result(Ys, Ep, ll, acc, "BNN")
 
             bcl.fit(Xr, Yr.flatten())
             Ep_o = bcl.predict_proba(Xs)
             print_k_result(Ys, Ep_o, ll_o, acc_o, "RF")
             print("-----")
 
-        print_final_result(acc, ll, "DGP")
+        print_final_result(acc, ll, "BNN")
         print_final_result(acc_o, ll_o, "RF")
 
 

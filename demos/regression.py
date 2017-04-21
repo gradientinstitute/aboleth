@@ -16,40 +16,43 @@ from aboleth.datasets import gp_draws
 # Data settings
 N = 2000
 Ns = 400
-kernel = kern(length_scale=2.)
+kernel = kern(length_scale=1.)
 true_noise = 0.1
 
 # Model settings
 n_samples = 5
 n_pred_samples = 100
-n_epochs = 400
+n_epochs = 300
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 variance = tf.Variable(1.)
 reg = 1.
 
-# lenscale1 = tf.Variable(1.)
+lenscale1 = tf.Variable(1.)
 # lenscale1 = 1.
 # lenscale2 = tf.Variable(1.)
-# lenscale2 = 1.
-# layers = [
-#     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale1))),
-#     ab.dense_var(output_dim=5, reg=reg, full=True),
-#     ab.randomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale2))),
-#     ab.dense_var(output_dim=1, reg=reg, full=True)
-# ]
+lenscale2 = 1.
 layers = [
-    ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
-    # ab.activation(tf.tanh),
-    ab.activation(tf.nn.relu),
-    ab.dropout(0.9),
-    ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
-    # ab.activation(tf.tanh),
-    ab.activation(tf.nn.relu),
-    ab.dropout(0.9),
-    ab.dense_map(output_dim=1, l1_reg=0, l2_reg=reg),
+    # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale1)),
+    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
+    ab.dense_var(output_dim=5, reg=reg, full=False),
+    # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale2)),
+    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale2))),
+    ab.dense_var(output_dim=1, reg=reg, full=False)
 ]
+# layers = [
+#     ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
+#     ab.activation(tf.nn.relu),
+#     ab.dropout(0.9),
+#     ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
+#     ab.activation(tf.nn.relu),
+#     ab.dropout(0.9),
+#     # ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
+#     # ab.activation(tf.nn.relu),
+#     # ab.dropout(0.9),
+#     ab.dense_map(output_dim=1, l1_reg=0, l2_reg=reg),
+# ]
 
 
 
