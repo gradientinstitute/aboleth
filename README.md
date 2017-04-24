@@ -1,10 +1,8 @@
 Aboleth
 =======
 
-<div style="text-align:center;display:block;">
 <img src="http://fc03.deviantart.net/fs71/i/2010/162/e/3/Aboleth__Sunken_Empires_by_butterfrog.jpg"
  alt="aboleth by Butterfrog" width=300>
-</div>
 
 A bare-bones tensorflow framework for supervised Bayesian deep learning with
 the stochastic gradient variational Bayes (SGVB, Kingma and Welling 2014).

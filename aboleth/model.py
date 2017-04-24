@@ -9,7 +9,29 @@ from aboleth.layer import compose_layers
 
 
 def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
-    """Make a supervised Bayesian deep network."""
+    """Make a supervised Bayesian deep network.
+
+    Parameters
+    ----------
+    X: ndarray, Tensor
+        the covariates of shape (samples, dimensions)
+    Y: ndarray, Tensor
+        the targets of shape (samples, tasks)
+    N: int, Tensor
+        the total size of the dataset (i.e. samples)
+    layers: sequence
+        a list (or sequence) of layers defining the neural net. See also the
+        ``layers`` module
+    n_samples: int
+        the number of samples to use for evaluating the expected log-likelihood
+        in the objective function. This replicates the whole network for each
+        sample
+    like_weights: callable, ndarray, Tensor
+        weights to apply to each sample in the expected log likelihood - the
+        result of this should sum up to N. This should be an array of shape
+        (samples, 1) or can be called as ``like_weights(Y)`` and should return
+        a (samples, 1) array
+    """
     Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
     Phi, KL = compose_layers(layers, Phi)
     loss = elbo(Phi, Y, N, KL, likelihood, like_weights)
