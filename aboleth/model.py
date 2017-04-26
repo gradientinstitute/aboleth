@@ -3,10 +3,10 @@ import tensorflow as tf
 
 from aboleth.layer import compose_layers
 
+
 #
 # Graph Building -- Models and Optimisation
 #
-
 
 def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     """Make a supervised Bayesian deep network.
@@ -14,23 +14,33 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     Parameters
     ----------
     X: ndarray, Tensor
-        the covariates of shape (samples, dimensions)
+        the covariates of shape (N, dimensions).
     Y: ndarray, Tensor
-        the targets of shape (samples, tasks)
+        the targets of shape (N, tasks).
     N: int, Tensor
-        the total size of the dataset (i.e. samples)
+        the total size of the dataset (i.e. number of observations).
     layers: sequence
         a list (or sequence) of layers defining the neural net. See also the
-        ``layers`` module
+        ``layers`` module.
+    likelihood: Tensor
+        the likelihood model to use on the output of the last layer of the
+        neural network, see the ``likelihood`` module.
     n_samples: int
         the number of samples to use for evaluating the expected log-likelihood
         in the objective function. This replicates the whole network for each
-        sample
+        sample.
     like_weights: callable, ndarray, Tensor
-        weights to apply to each sample in the expected log likelihood - the
-        result of this should sum up to N. This should be an array of shape
-        (samples, 1) or can be called as ``like_weights(Y)`` and should return
-        a (samples, 1) array
+        weights to apply to each sample in the expected log likelihood. This
+        should be an array of shape (samples, 1) or can be called as
+        ``like_weights(Y)`` and should return a (samples, 1) array.
+
+    Returns
+    -------
+    Phi: Tensor
+        the neural network Tensor. This may be replicated ``n_samples`` times
+        in the first dimension.
+    loss: Tensor
+        the loss function use to train the model.
     """
     Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
     Phi, KL = compose_layers(layers, Phi)
@@ -39,7 +49,29 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
 
 
 def elbo(Phi, Y, N, KL, likelihood, like_weights=None):
-    """Build the evidence lower bound loss."""
+    """Build the evidence lower bound loss.
+
+    Parameters
+    ----------
+    Phi: ndarray, Tensor
+        the neural net featues of shape (n_samples, N, output_dimensions).
+    Y: ndarray, Tensor
+        the targets of shape (N, tasks).
+    N: int, Tensor
+        the total size of the dataset (i.e. number of observations).
+    likelihood: Tensor
+        the likelihood model to use on the output of the last layer of the
+        neural network, see the ``likelihood`` module.
+    like_weights: callable, ndarray, Tensor
+        weights to apply to each sample in the expected log likelihood. This
+        should be an array of shape (samples, 1) or can be called as
+        ``like_weights(Y)`` and should return a (samples, 1) array.
+
+    Returns
+    -------
+    elbo: Tensor
+        the loss function of the Bayesian neural net.
+    """
     B = N / tf.to_float(tf.shape(Phi)[1])  # Batch amplification factor
     n_samples = tf.to_float(tf.shape(Phi)[0])
 
@@ -59,9 +91,18 @@ def elbo(Phi, Y, N, KL, likelihood, like_weights=None):
 # Graph Building -- Prediction and evaluation
 #
 
-
 def log_prob(Y, likelihood, Phi):
     """Build the log probability density of the model for each observation.
+
+    Parameters
+    ----------
+    Y: ndarray, Tensor
+        the targets of shape (N, tasks).
+    likelihood: Tensor
+        the likelihood model to use on the output of the last layer of the
+        neural network, see the ``likelihood`` module.
+    Phi: ndarray, Tensor
+        the neural net featues of shape (n_samples, N, output_dimensions).
 
     NOTE: This uses ``n_samples`` (from ``deepnet``) of the posterior to build
         up the log probability for each sample.
@@ -72,6 +113,16 @@ def log_prob(Y, likelihood, Phi):
 
 def average_log_prob(Y, likelihood, Phi):
     """Build the mean log probability of the model over the observations.
+
+    Parameters
+    ----------
+    Y: ndarray, Tensor
+        the targets of shape (N, tasks).
+    likelihood: Tensor
+        the likelihood model to use on the output of the last layer of the
+        neural network, see the ``likelihood`` module.
+    Phi: ndarray, Tensor
+        the neural net featues of shape (n_samples, N, output_dimensions).
 
     NOTE: This only returns one posterior sample of this log probability.
     """
