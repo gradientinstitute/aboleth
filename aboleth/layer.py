@@ -9,7 +9,7 @@ from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
 # Layer Composition
 #
 
-def compose_layers(layers, Phi):
+def compose_layers(Phi, layers):
     """Compose a list of layers into a network."""
     KL = 0.
     for l in layers:
@@ -44,7 +44,7 @@ def fork(join='cat', *layers):
         join = joinops[join]
 
     def build_fork(X):
-        Phis, KLs = zip(*map(lambda l: compose_layers(l, X), layers))
+        Phis, KLs = zip(*map(lambda l: compose_layers(X, l), layers))
         KL = sum(KLs)
         Phi = join(Phis)
         return Phi, KL

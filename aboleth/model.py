@@ -8,6 +8,21 @@ from aboleth.layer import compose_layers
 # Graph Building -- Models and Optimisation
 #
 
+
+def featurenet(features, Y, N, layers, likelihood, n_samples=10,
+               like_weights=None):
+    """TODO"""
+    # Constuct all input networks and concatenate outputs
+    Phi, KLs = zip(*map(lambda f: _tile_compose(*f, n_samples), features))
+    Phi = tf.concat(Phi, axis=2)
+
+    # Now construct the rest of the network and add all penalty terms
+    Phi, KL = compose_layers(Phi, layers)
+    KL += sum(KLs)
+    loss = elbo(Phi, Y, N, KL, likelihood, like_weights)
+    return Phi, loss
+
+
 def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     """Make a supervised Bayesian deep network.
 
@@ -42,8 +57,7 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     loss: Tensor
         the loss function use to train the model.
     """
-    Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
-    Phi, KL = compose_layers(layers, Phi)
+    Phi, KL = _tile_compose(X, layers, n_samples)
     loss = elbo(Phi, Y, N, KL, likelihood, like_weights)
     return Phi, loss
 
@@ -128,3 +142,14 @@ def average_log_prob(Y, likelihood, Phi):
     """
     lp = tf.reduce_mean(likelihood(Y, Phi[0]))
     return lp
+
+
+#
+# Private module utils
+#
+
+def _tile_compose(X, layers, n_samples):
+    """Tile X into seperate samples, then compose layers for each sample."""
+    Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
+    Phi, KL = compose_layers(Phi, layers)
+    return Phi, KL
