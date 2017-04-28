@@ -1,6 +1,8 @@
 Aboleth
 =======
 
+[![CircleCI](https://circleci.com/gh/determinant-io/aboleth/tree/develop.svg?style=svg&circle-token=f02db635cf3a7e998e17273c91f13ffae7dbf088)](https://circleci.com/gh/determinant-io/aboleth/tree/develop)
+
 <img src="http://fc03.deviantart.net/fs71/i/2010/162/e/3/Aboleth__Sunken_Empires_by_butterfrog.jpg"
  alt="aboleth by Butterfrog" width=300>
 
