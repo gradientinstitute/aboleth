@@ -6,4 +6,4 @@ jobs:
       - image: determinant/inference
     steps:
       - checkout
-      - run: pip install -e .[dev]
+      - run: pip3 install -e .[dev]
