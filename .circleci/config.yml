@@ -1,0 +1,10 @@
+version: 2
+jobs:
+  build:
+    working_directory: /usr/src
+    docker:
+      - image: determinant/inference
+    steps:
+      - checkout
+      - run: pip3 install -e .[dev]
+      - run: pytest . --cov=./
