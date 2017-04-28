@@ -9,7 +9,7 @@ jobs:
       - restore_cache:
           key: deps1-{{ .Branch }}-{{ checksum "setup.py" }}
       - run: 
-          name: Install Aboleth, along with all Python dev dependencies
+          name: Installing Aboleth and all other Python dev dependencies
           command: |
             python3 -m venv --system-site-packages /opt/envs/venv 
             . /opt/envs/venv/bin/activate
@@ -19,6 +19,12 @@ jobs:
           paths:
             - "venv"
       - run: 
+          name: Running tests
           command: |
             . /opt/envs/venv/bin/activate
-            pytest . --cov=./
+            pytest . --cov=./ --cov-report=html:test-reports/coverage --junit-xml=test-reports/pytest/results.xml
+      - store_artifacts:
+          path: test-reports/coverage
+          destination: coverage-report
+      - store_test_results:
+          path: test-reports/pytest
