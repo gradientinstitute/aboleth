@@ -73,6 +73,7 @@ def main():
 
     with tf.name_scope("Deepnet"):
         Phi, loss = ab.deepnet(X_, Y_, N, LAYERS, lkhood, n_samples=NSAMPLES)
+        tf.summary.scalar('loss', loss)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -81,15 +82,19 @@ def main():
     init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
 
-    with tf.Session(config=CONFIG):
-        init_op.run()
+    merged = tf.summary.merge_all()
+    summary_writer = tf.summary.FileWriter('./summary')
+
+    with tf.Session(config=CONFIG) as sess:
+        sess.run(init_op)
         coord = tf.train.Coordinator()
         threads = tf.train.start_queue_runners(coord=coord)
         try:
             step = 0
             time_inc = time()
             while not coord.should_stop():
-                train.run()
+                summary, _ = sess.run([merged, train])
+                summary_writer.add_summary(summary, step)
                 if step % 1000 == 0:
                     delta = step / (time() - time_inc)
                     l = loss.eval()
