@@ -1,0 +1,9 @@
+version: 2
+jobs:
+  build:
+    working_directory: /usr/src
+    docker:
+      - image: determinant/base
+    steps:
+      - checkout
+      - run: echo "hello world"
