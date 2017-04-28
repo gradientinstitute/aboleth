@@ -21,6 +21,27 @@ def test_deepnet_outputs(make_graph):
         assert np.isscalar(l)
 
 
+def test_featurenet_outputs(make_graph):
+    """Test for expected output dimensions from featurenet."""
+    x, y, N, X_, Y_, N_, like, layers = make_graph
+    features = [
+        (X_, [ab.dense_map(output_dim=10), ab.activation(tf.tanh)]),
+        (X_, [ab.dense_map(output_dim=10), ab.activation(tf.tanh)])
+    ]
+
+    Phi, loss = ab.featurenet(features, Y_, N_, layers, like)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+
+        P = Phi.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
+        l = loss.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
+
+        assert P.shape == (10, N, 1)
+        assert np.isscalar(l)
+
+
 def test_deepnet_likelihood_weights(make_graph):
     """Test for expected output dimensions from deepnet."""
     x, y, N, X_, Y_, N_, like, layers = make_graph

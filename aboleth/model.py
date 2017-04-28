@@ -9,22 +9,8 @@ from aboleth.layer import compose_layers
 #
 
 
-def featurenet(features, Y, N, layers, likelihood, n_samples=10,
-               like_weights=None):
-    """TODO"""
-    # Constuct all input networks and concatenate outputs
-    Phi, KLs = zip(*map(lambda f: _tile_compose(*f, n_samples), features))
-    Phi = tf.concat(Phi, axis=2)
-
-    # Now construct the rest of the network and add all penalty terms
-    Phi, KL = compose_layers(Phi, layers)
-    KL += sum(KLs)
-    loss = elbo(Phi, Y, N, KL, likelihood, like_weights)
-    return Phi, loss
-
-
 def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
-    """Make a supervised Bayesian deep network.
+    """Make a supervised Bayesian deep net.
 
     Parameters
     ----------
@@ -39,10 +25,10 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
         ``layers`` module.
     likelihood: Tensor
         the likelihood model to use on the output of the last layer of the
-        neural network, see the ``likelihood`` module.
+        neural net, see the ``likelihood`` module.
     n_samples: int
         the number of samples to use for evaluating the expected log-likelihood
-        in the objective function. This replicates the whole network for each
+        in the objective function. This replicates the whole net for each
         sample.
     like_weights: callable, ndarray, Tensor
         weights to apply to each sample in the expected log likelihood. This
@@ -52,8 +38,8 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     Returns
     -------
     Phi: Tensor
-        the neural network Tensor. This may be replicated ``n_samples`` times
-        in the first dimension.
+        the neural net Tensor. This may be replicated ``n_samples`` times in
+        the first dimension.
     loss: Tensor
         the loss function use to train the model.
     """
@@ -62,8 +48,57 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     return Phi, loss
 
 
+def featurenet(features, Y, N, layers, likelihood, n_samples=10,
+               like_weights=None):
+    """Make a supervised Bayesian deep net with multiple input nets.
+
+    Parameters
+    ----------
+    featues: list of (ndarray or Tensor, list) tuples
+        list of (``X``, ``layers``) pairs so the net can have different input
+        features of different type, e.g. categorical and continuous. The output
+        of these layers are concatenated before feeding into the rest of the
+        net.
+    Y: ndarray, Tensor
+        the targets of shape (N, tasks).
+    N: int, Tensor
+        the total size of the dataset (i.e. number of observations).
+    layers: sequence
+        a list (or sequence) of layers defining the neural net. See also the
+        ``layers`` module. This is applies after the ``features`` layers.
+    likelihood: Tensor
+        the likelihood model to use on the output of the last layer of the
+        neural net, see the ``likelihood`` module.
+    n_samples: int
+        the number of samples to use for evaluating the expected log-likelihood
+        in the objective function. This replicates the whole net for each
+        sample.
+    like_weights: callable, ndarray, Tensor
+        weights to apply to each sample in the expected log likelihood. This
+        should be an array of shape (samples, 1) or can be called as
+        ``like_weights(Y)`` and should return a (samples, 1) array.
+
+    Returns
+    -------
+    Phi: Tensor
+        the neural net Tensor. This may be replicated ``n_samples`` times in
+        the first dimension.
+    loss: Tensor
+        the loss function use to train the model.
+    """
+    # Constuct all input nets and concatenate outputs
+    Phi, KLs = zip(*map(lambda f: _tile_compose(*f, n_samples), features))
+    Phi = tf.concat(Phi, axis=2)
+
+    # Now construct the rest of the net and add all penalty terms
+    Phi, KL = compose_layers(Phi, layers)
+    KL += sum(KLs)
+    loss = elbo(Phi, Y, N, KL, likelihood, like_weights)
+    return Phi, loss
+
+
 def elbo(Phi, Y, N, KL, likelihood, like_weights=None):
-    """Build the evidence lower bound loss.
+    """Build the evidence lower bound loss for a neural net.
 
     Parameters
     ----------
@@ -75,7 +110,7 @@ def elbo(Phi, Y, N, KL, likelihood, like_weights=None):
         the total size of the dataset (i.e. number of observations).
     likelihood: Tensor
         the likelihood model to use on the output of the last layer of the
-        neural network, see the ``likelihood`` module.
+        neural net, see the ``likelihood`` module.
     like_weights: callable, ndarray, Tensor
         weights to apply to each sample in the expected log likelihood. This
         should be an array of shape (samples, 1) or can be called as
@@ -114,7 +149,7 @@ def log_prob(Y, likelihood, Phi):
         the targets of shape (N, tasks).
     likelihood: Tensor
         the likelihood model to use on the output of the last layer of the
-        neural network, see the ``likelihood`` module.
+        neural net, see the ``likelihood`` module.
     Phi: ndarray, Tensor
         the neural net featues of shape (n_samples, N, output_dimensions).
 
@@ -134,7 +169,7 @@ def average_log_prob(Y, likelihood, Phi):
         the targets of shape (N, tasks).
     likelihood: Tensor
         the likelihood model to use on the output of the last layer of the
-        neural network, see the ``likelihood`` module.
+        neural net, see the ``likelihood`` module.
     Phi: ndarray, Tensor
         the neural net featues of shape (n_samples, N, output_dimensions).
 
