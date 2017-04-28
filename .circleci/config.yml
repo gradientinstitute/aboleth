@@ -21,4 +21,6 @@ jobs:
       - run: 
           command: |
             . venv/bin/activate
+            pip freeze
+            pip3 freeze
             pytest . --cov=./
