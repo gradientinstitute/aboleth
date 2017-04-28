@@ -22,7 +22,9 @@ jobs:
           name: Running tests
           command: |
             . /opt/envs/venv/bin/activate
-            pytest . --cov=./ --cov-report=html:test-reports/coverage
+            pytest . --cov=./ --cov-report=html:test-reports/coverage --junit-xml=test-reports/pytest/results.xml
       - store_artifacts:
           path: test-reports/coverage
           destination: coverage-report
+      - store_test_results:
+          path: test-reports/pytest
