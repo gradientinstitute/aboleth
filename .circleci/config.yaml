@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: /usr/src
     docker:
-      - image: determinant/base
+      - image: determinant/inference
     steps:
       - checkout
       - run: echo "hello world"
