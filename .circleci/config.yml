@@ -7,3 +7,4 @@ jobs:
     steps:
       - checkout
       - run: pip3 install -e .[dev]
+      - run: pytest . --cov=./
