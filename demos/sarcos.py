@@ -82,19 +82,21 @@ def main():
     init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
 
-    merged = tf.summary.merge_all()
-    summary_writer = tf.summary.FileWriter('./summary')
+    sv = tf.train.Supervisor(logdir="./sarcos/")
 
-    with tf.Session(config=CONFIG) as sess:
+    print('Got here')
+
+    with sv.managed_session(config=CONFIG) as sess:
         sess.run(init_op)
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(coord=coord)
+        threads = sv.start_queue_runners(sess)
+        print('Got here inside the session')
         try:
             step = 0
             time_inc = time()
-            while not coord.should_stop():
-                summary, _ = sess.run([merged, train])
-                summary_writer.add_summary(summary, step)
+            print('this might be the issue: Should stop {}'.format(sv.should_stop()))
+            while not sv.should_stop():
+                print('Running training op now')
+                sess.run(train)
                 if step % 1000 == 0:
                     delta = step / (time() - time_inc)
                     l = loss.eval()
@@ -104,13 +106,15 @@ def main():
         except tf.errors.OutOfRangeError:
             pass
         finally:
-            coord.request_stop()
-        coord.join(threads)
+            sv.request_stop()
+        sv.stop(threads)
 
         # Prediction
         Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
                         for _ in range(NPREDICTSAMPLES)])
         sigma2 = (1. * var).eval()
+
+    print('Got here too')
 
     # Score
     Eymean = Ey.mean(axis=1)
