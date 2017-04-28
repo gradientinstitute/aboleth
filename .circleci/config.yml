@@ -21,4 +21,7 @@ jobs:
       - run: 
           command: |
             . /opt/envs/venv/bin/activate
-            pytest . --cov=./
+            pytest . --cov=./ --cov-report=html:test_output/coverage
+      - store_artifacts:
+          path: test-reports/coverage
+          destination: coverage-report
