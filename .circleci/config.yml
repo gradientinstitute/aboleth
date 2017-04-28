@@ -13,7 +13,7 @@ jobs:
           command: |
             python3 -m venv --system-site-packages venv 
             . venv/bin/activate
-            pip install -e .[dev]
+            pip3 install -e .[dev]
       - save_cache:
           key: deps1-{{ .Branch }}-{{ checksum "setup.py" }}
           paths:
@@ -21,6 +21,4 @@ jobs:
       - run: 
           command: |
             . venv/bin/activate
-            pip freeze
-            pip3 freeze
             pytest . --cov=./
