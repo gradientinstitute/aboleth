@@ -38,7 +38,7 @@ To install in develop mode with packages required for development:
 Examples
 --------
 
-See the (demos)[https://github.com/determinant-io/aboleth/tree/develop/demos]
+See the [demos](https://github.com/determinant-io/aboleth/tree/develop/demos)
 folder for some examples of creating and training algorithms with Aboleth.
 
 
