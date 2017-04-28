@@ -11,8 +11,8 @@ jobs:
       - run: 
           name: Install Aboleth, along with all Python dev dependencies
           command: |
-            python3 -m venv --system-site-packages venv 
-            . venv/bin/activate
+            python3 -m venv --system-site-packages /opt/envs/venv 
+            . /opt/envs/venv/bin/activate
             pip3 install -e .[dev]
       - save_cache:
           key: deps1-{{ .Branch }}-{{ checksum "setup.py" }}
@@ -20,5 +20,5 @@ jobs:
             - "venv"
       - run: 
           command: |
-            . venv/bin/activate
+            . /opt/envs/venv/bin/activate
             pytest . --cov=./
