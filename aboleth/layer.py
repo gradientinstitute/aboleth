@@ -153,8 +153,20 @@ def randomFourier(n_features, kernel=None, seed=None):
     return build_randomFF
 
 
-def randomArcCosine(n_features, lenscale=1.0, seed=None):
-    """Random Arc-Cosine kernel layer (with p=1)."""
+def randomArcCosine(n_features, lenscale=1.0, p=1, seed=None):
+    """Random Arc-Cosine kernel layer."""
+    if p < 0:
+        raise ValueError("p must be a positive integer!")
+    elif p == 0:
+        def pfunc(x):
+            return tf.sign(x)
+    elif p == 1:
+        def pfunc(x):
+            return x
+    else:
+        def pfunc(x):
+            return tf.pow(x, p)
+
     def build_randomAC(X):
         n_samples, input_dim = _get_dims(X)
 
@@ -165,7 +177,7 @@ def randomArcCosine(n_features, lenscale=1.0, seed=None):
 
         # Random features
         XP = tf.matmul(X, Ps)
-        Phi = np.sqrt(2. / n_features) * tf.maximum(XP, 0.)
+        Phi = np.sqrt(2. / n_features) * tf.nn.relu(pfunc(XP))
         KL = 0.
 
         return Phi, KL
