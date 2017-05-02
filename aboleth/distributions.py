@@ -34,6 +34,7 @@ class Normal:
         return x
 
     def KL(self, p):
+        """KL between self and univariate prior, p."""
         KL = 0.5 * (tf.log(p.var) - tf.log(self.var) + self.var / p.var - 1. +
                     (self.mu - p.mu)**2 / p.var)
         return KL
@@ -77,9 +78,9 @@ class Gaussian:
 # Streamlined interfaces for initialising the priors and posteriors
 #
 
-def norm_prior(dim, var, learn_var):
+def norm_prior(dim, var):
     mu = np.zeros(dim, dtype=np.float32)
-    var = pos(tf.Variable(var)) if learn_var else var
+    var = pos(tf.Variable(var))
     P = Normal(mu, var)
     return P
 

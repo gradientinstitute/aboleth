@@ -35,13 +35,15 @@ def activation(h=lambda X: X):
 
 def fork(join='cat', *layers):
     """Fork into multiple layer-pipelines, then join the outputs."""
-    joinops = {
-        'cat': lambda Xs: tf.concat(Xs, axis=2),
-        'add': lambda Xs: tf.add_n(Xs),
-    }
-
     if not callable(join):
-        join = joinops[join]
+        if join == 'add':
+            def join(P):
+                return tf.add_n(P)
+        elif join == 'cat':
+            def join(P):
+                return tf.concat(P, axis=2)
+        else:
+            raise ValueError("join must be a callable, 'cat' or 'add'")
 
     def build_fork(X):
         Phis, KLs = zip(*map(lambda l: compose_layers(X, l), layers))
@@ -63,17 +65,16 @@ def dropout(keep_prob, seed=None):
     return build_dropout
 
 
-def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
-              bias=True):
+def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
-        """X is a rank 3 tensor, [n_samples, N, D]."""
+        # X is a rank 3 tensor, [n_samples, N, D]
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
         # Layer weights
-        pW = norm_prior(dim=Wdim, var=reg, learn_var=learn_prior)
+        pW = norm_prior(dim=Wdim, var=reg)
         qW = (gaus_posterior(dim=Wdim, var0=reg, seed=seed) if full else
               norm_posterior(dim=Wdim, var0=reg, seed=seed))
         Wsamples = _sample(qW, n_samples)
@@ -85,24 +86,22 @@ def dense_var(output_dim, reg=1., learn_prior=True, full=False, seed=None,
         KL = tf.reduce_sum(qW.KL(pW))
 
         # Optional bias
-        if bias:
-            if bias is True:
-                qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
-                pb = norm_prior(dim=bdim, var=reg, learn_var=learn_prior)
-                bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
-                Phi += bsamples
-                KL += tf.reduce_sum(qb.KL(pb))
-            else:  # Bias is set value
-                Phi += bias
+        if use_bias is True:
+            qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
+            pb = norm_prior(dim=bdim, var=reg)
+            bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
+            Phi += bsamples
+            KL += tf.reduce_sum(qb.KL(pb))
 
         return Phi, KL
 
     return build_dense
 
 
-def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None, bias=True):
+def dense_map(output_dim, l1_reg=0., l2_reg=1., use_bias=True, seed=None):
     """Dense (fully connected) linear layer, with MAP inference."""
     def build_dense_map(X):
+        # X is a rank 3 tensor, [n_samples, N, D]
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
         bdim = output_dim
@@ -110,20 +109,17 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None, bias=True):
 
         W = tf.Variable(rand.randn(*Wdim).astype(np.float32))
 
-        # Linear layer, don't want to copy Variable, (W) so map over X
+        # We don't want to copy tf.Variable W so map over X
         Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)
 
         # Regularizers
         pen = l2_reg * tf.nn.l2_loss(W) + l1_reg * _l1_loss(W)
 
         # Optional Bias
-        if bias:
-            if bias is True:
-                b = tf.Variable(rand.randn(bdim).astype(np.float32))
-                Phi += b
-                pen += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
-            else:
-                Phi += bias
+        if use_bias is True:
+            b = tf.Variable(np.zeros(bdim, dtype=np.float32))
+            Phi += b
+            pen += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
 
         return Phi, pen
 
