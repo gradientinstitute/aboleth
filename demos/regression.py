@@ -36,10 +36,10 @@ lenscale2 = 1.
 layers = [
     # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale1)),
     ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
-    ab.dense_var(output_dim=5, reg=reg, full=False),
+    # ab.dense_var(output_dim=5, reg=reg, full=True),
     # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale2)),
-    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale2))),
-    ab.dense_var(output_dim=1, reg=reg, full=False)
+    # ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale2))),
+    ab.dense_var(output_dim=1, reg=reg, full=True)
 ]
 # layers = [
 #     ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
@@ -53,7 +53,6 @@ layers = [
 #     # ab.dropout(0.9),
 #     ab.dense_map(output_dim=1, l1_reg=0, l2_reg=reg),
 # ]
-
 
 
 def main():

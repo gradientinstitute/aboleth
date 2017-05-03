@@ -13,11 +13,12 @@ class Normal:
     """
     Normal (IID) prior/posterior.
 
-    Parameters:
-        mu : Tensor
-            mean, shape [d_i, d_o]
-        var : Tensor
-            variance, shape [d_i, d_o]
+    Parameters
+    ----------
+    mu : Tensor
+        mean, shape [d_i, d_o]
+    var : Tensor
+        variance, shape [d_i, d_o]
     """
 
     def __init__(self, mu=0., var=1., seed=None):
@@ -44,11 +45,12 @@ class Gaussian:
     """
     Gaussian prior/posterior.
 
-    Parameters:
-        mu : Tensor
-            mean, shape [d_i, d_o]
-        L : Tensor
-            Cholesky, shape [d_o, d_i, d_i]
+    Parameters
+    ----------
+    mu : Tensor
+        mean, shape [d_i, d_o]
+    L : Tensor
+        Cholesky, shape [d_o, d_i, d_i]
     """
 
     def __init__(self, mu, L, seed=None):
@@ -79,18 +81,15 @@ class Gaussian:
 #
 
 def norm_prior(dim, var):
-    mu = np.zeros(dim, dtype=np.float32)
+    mu = tf.zeros(dim)
     var = pos(tf.Variable(var))
     P = Normal(mu, var)
     return P
 
 
 def norm_posterior(dim, var0, seed=None):
-    rand = np.random.RandomState(seed)
-    mu = np.sqrt(var0) * rand.randn(*dim)
-    mu = tf.Variable((mu.astype(np.float32)))
-    var = var0 * rand.randn(*dim)
-    var = pos(tf.Variable(var.astype(np.float32)))
+    mu = tf.Variable(tf.random_normal(dim, stddev=np.sqrt(var0), seed=seed))
+    var = pos(tf.Variable(tf.random_gamma(alpha=var0, shape=dim, seed=seed)))
     Q = Normal(mu, var, seed=seed)
     return Q
 
@@ -98,19 +97,17 @@ def norm_posterior(dim, var0, seed=None):
 def gaus_posterior(dim, var0, seed=None):
     I, O = dim
     sig0 = np.sqrt(var0)
-    rand = np.random.RandomState(seed)
 
     # Optimize only values in lower triangular
     u, v = np.tril_indices(I)
     indices = (u * I + v)[:, np.newaxis]
-    g = np.minimum(rand.gamma(shape=sig0, size=(O, I, 1)), 1e-1)  # Numer. stab
-    l = (np.tile(np.eye(I), [O, 1, 1]) * g)[:, u, v].T
-    l = tf.Variable(l.astype(np.float32))
+    l = np.tile(np.eye(I), [O, 1, 1])[:, u, v].T
+    l = tf.Variable(l * tf.random_gamma(alpha=sig0, shape=l.shape, seed=seed))
     L = tf.scatter_nd(indices, l, shape=(I * I, O))
     L = tf.transpose(L)
     L = tf.reshape(L, (O, I, I))
 
-    mu = tf.Variable((rand.randn(I, O) * sig0).astype(np.float32))
+    mu = tf.Variable(tf.random_normal((I, O), stddev=sig0, seed=seed))
     Q = Gaussian(mu, L, seed=seed)
     return Q
 

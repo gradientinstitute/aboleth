@@ -104,24 +104,22 @@ def dense_map(output_dim, l1_reg=0., l2_reg=1., use_bias=True, seed=None):
         # X is a rank 3 tensor, [n_samples, N, D]
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
-        bdim = output_dim
-        rand = np.random.RandomState(seed)
 
-        W = tf.Variable(rand.randn(*Wdim).astype(np.float32))
+        W = tf.Variable(tf.random_normal(shape=Wdim, seed=seed))
 
         # We don't want to copy tf.Variable W so map over X
         Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)
 
         # Regularizers
-        pen = l2_reg * tf.nn.l2_loss(W) + l1_reg * _l1_loss(W)
+        penalty = l2_reg * tf.nn.l2_loss(W) + l1_reg * _l1_loss(W)
 
         # Optional Bias
         if use_bias is True:
-            b = tf.Variable(np.zeros(bdim, dtype=np.float32))
+            b = tf.Variable(tf.zeros(output_dim))
             Phi += b
-            pen += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
+            penalty += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
 
-        return Phi, pen
+        return Phi, penalty
 
     return build_dense_map
 
@@ -142,7 +140,7 @@ def randomFourier(n_features, kernel=None, seed=None):
         real = tf.cos(XP)
         imag = tf.sin(XP)
         Phi = tf.concat([real, imag], axis=2) / np.sqrt(n_features)
-        KL = 0.0
+        KL = 0.
 
         return Phi, KL
 
@@ -234,8 +232,8 @@ def _l1_loss(X):
 
 
 def _get_dims(X):
-        n_samples, input_dim = X.shape[0], X.shape[2]
-        return int(n_samples), int(input_dim)
+    n_samples, input_dim = X.shape[0], X.shape[2]
+    return int(n_samples), int(input_dim)
 
 
 def _sample(dist, n_samples):
