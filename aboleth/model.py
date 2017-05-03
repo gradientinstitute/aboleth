@@ -88,7 +88,7 @@ def featurenet(features, Y, N, layers, likelihood, n_samples=10,
     """
     # Constuct all input nets and concatenate outputs
     Phi, KLs = zip(*map(lambda f: _tile_compose(*f, n_samples), features))
-    Phi = tf.concat(Phi, axis=2)
+    Phi = tf.concat(Phi, axis=-1)
 
     # Now construct the rest of the net and add all penalty terms
     Phi, KL = compose_layers(Phi, layers)

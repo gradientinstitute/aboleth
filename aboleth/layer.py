@@ -41,7 +41,7 @@ def fork(join='cat', *layers):
                 return tf.add_n(P)
         elif join == 'cat':
             def join(P):
-                return tf.concat(P, axis=2)
+                return tf.concat(P, axis=-1)
         else:
             raise ValueError("join must be a callable, 'cat' or 'add'")
 
@@ -139,7 +139,7 @@ def randomFourier(n_features, kernel=None, seed=None):
         XP = tf.matmul(X, Ps)
         real = tf.cos(XP)
         imag = tf.sin(XP)
-        Phi = tf.concat([real, imag], axis=2) / np.sqrt(n_features)
+        Phi = tf.concat([real, imag], axis=-1) / np.sqrt(n_features)
         KL = 0.
 
         return Phi, KL
