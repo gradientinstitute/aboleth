@@ -83,6 +83,8 @@ def main():
     init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
 
+    Phi_0 = Phi[0]
+
     sv = tf.train.Supervisor(logdir="./sarcos/",
                              global_step=global_step,
                              save_summaries_secs=20,
@@ -97,18 +99,18 @@ def main():
                 sess.run(train)
                 if local_step % 1000 == 0:
                     delta = local_step / (time() - time_inc)
-                    l = sess.run(loss)
+                    l, step = sess.run([loss, sv.global_step])
                     print("Iteration {}, loss = {}, speed = {}, Global step {}"
-                          .format(local_step, l, delta, sv.global_step.eval(sess)))
+                          .format(local_step, l, delta, step))
                 local_step += 1
         except tf.errors.OutOfRangeError:
             print('Input queues have been exhausted!')
             pass
-        finally:
-            # Prediction
-            # Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
-                            # for _ in range(NPREDICTSAMPLES)])
-            sigma2 = (1. * var).eval()
+
+        # Prediction
+        Ey = np.hstack([Phi_0.eval(feed_dict={X_: Xs}, session=sess)
+                        for _ in range(NPREDICTSAMPLES)])
+        sigma2 = var.eval(session=sess)
 
     # Score
     Eymean = Ey.mean(axis=1)
