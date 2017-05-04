@@ -77,44 +77,38 @@ def main():
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
-        train = optimizer.minimize(loss)
+        global_step = tf.Variable(0, name='global_step', trainable=False)
+        train = optimizer.minimize(loss, global_step=global_step)
 
     init_op = tf.group(tf.global_variables_initializer(),
                        tf.local_variables_initializer())
 
-    sv = tf.train.Supervisor(logdir="./sarcos/")
-
-    print('Got here')
+    sv = tf.train.Supervisor(logdir="./sarcos/",
+                             global_step=global_step,
+                             save_summaries_secs=20,
+                             save_model_secs=60)
 
     with sv.managed_session(config=CONFIG) as sess:
-        sess.run(init_op)
-        threads = sv.start_queue_runners(sess)
-        print('Got here inside the session')
+
         try:
-            step = 0
+            local_step = 0
             time_inc = time()
-            print('this might be the issue: Should stop {}'.format(sv.should_stop()))
             while not sv.should_stop():
-                print('Running training op now')
                 sess.run(train)
-                if step % 1000 == 0:
-                    delta = step / (time() - time_inc)
-                    l = loss.eval()
-                    print("Iteration {}, loss = {}, speed = {}"
-                          .format(step, l, delta))
-                step += 1
+                if local_step % 1000 == 0:
+                    delta = local_step / (time() - time_inc)
+                    l = sess.run(loss)
+                    print("Iteration {}, loss = {}, speed = {}, Global step {}"
+                          .format(local_step, l, delta, sv.global_step.eval(sess)))
+                local_step += 1
         except tf.errors.OutOfRangeError:
+            print('Input queues have been exhausted!')
             pass
         finally:
-            sv.request_stop()
-        sv.stop(threads)
-
-        # Prediction
-        Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
-                        for _ in range(NPREDICTSAMPLES)])
-        sigma2 = (1. * var).eval()
-
-    print('Got here too')
+            # Prediction
+            Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
+                            for _ in range(NPREDICTSAMPLES)])
+            sigma2 = (1. * var).eval()
 
     # Score
     Eymean = Ey.mean(axis=1)
