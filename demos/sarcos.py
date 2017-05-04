@@ -106,8 +106,8 @@ def main():
             pass
         finally:
             # Prediction
-            Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
-                            for _ in range(NPREDICTSAMPLES)])
+            # Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
+                            # for _ in range(NPREDICTSAMPLES)])
             sigma2 = (1. * var).eval()
 
     # Score
