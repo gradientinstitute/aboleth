@@ -120,6 +120,19 @@ def test_arc_cosine(make_data):
         assert KL == 0
 
 
+
+def test_dense_embeddings(make_categories):
+    x = make_categories
+    x_ = tf.placeholder(tf.int32, x.shape)
+    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
+    output, KL = ab.embedding_var(output_dim=10)(X_)
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        d = output.eval(feed_dict={x_: x})
+
+    assert False
+
+
 @pytest.mark.parametrize('dense', [ab.dense_map, ab.dense_var])
 def test_dense_outputs(dense, make_data):
     """Make sure the dense layers output expected dimensions."""
