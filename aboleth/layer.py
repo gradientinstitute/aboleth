@@ -98,23 +98,22 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
     return build_dense
 
 
-
-def embedding_var(output_dim, reg=1., full=False, seed=None):
+def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
     """Dense (fully connected) embedding layer, with variational inference."""
     def build_embedding(X):
         # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = _get_dims(X)
-        Wdim = (input_dim, output_dim)
-        bdim = (output_dim,)
+        Wdim = (n_categories, output_dim)
+        n_samples = X.shape[0]
 
         # Layer weights
         pW = norm_prior(dim=Wdim, var=reg)
         qW = (gaus_posterior(dim=Wdim, var0=reg, seed=seed) if full else
               norm_posterior(dim=Wdim, var0=reg, seed=seed))
-        Wsamples = _sample(qW, n_samples)
+        Wsamples = tf.transpose(_sample(qW, n_samples), [1, 2, 0])
 
-        # Linear layer
-        Phi = tf.gather(Wsamples, X)
+        # Embedding layer
+        embedding = tf.gather(Wsamples, X[0, :, 0])  # works only on 1st dim
+        Phi = tf.transpose(embedding, [2, 0, 1])  # reshape after index 1st dim
 
         # Regularizers
         KL = tf.reduce_sum(qW.KL(pW))
@@ -124,7 +123,7 @@ def embedding_var(output_dim, reg=1., full=False, seed=None):
     return build_embedding
 
 
-def dense_map(output_dim, l1_reg=1., l2_reg=1., seed=None, bias=True):
+def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True, seed=None):
     """Dense (fully connected) linear layer, with MAP inference."""
     def build_dense_map(X):
         # X is a rank 3 tensor, [n_samples, N, D]

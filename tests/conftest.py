@@ -18,15 +18,17 @@ def make_data():
     X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
     return x, Y, X
 
+
 @pytest.fixture
 def make_categories():
     """Make some simple categorical data."""
     N = 100
-    x1 = np.random.randint(0, 5, size=N)
-    x2 = np.random.randint(0, 10, size=N)
-    x = np.vstack((x1, x2)).T
+    K = 5
+    x = np.random.randint(0, K, size=N)[:, np.newaxis]
+    # x2 = np.random.randint(0, 10, size=N)
+    # x = np.vstack((x1, x2)).T
     x = x.astype(np.int32)
-    return x
+    return x, K
 
 
 @pytest.fixture

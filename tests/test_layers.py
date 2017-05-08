@@ -120,17 +120,28 @@ def test_arc_cosine(make_data):
         assert KL == 0
 
 
-
 def test_dense_embeddings(make_categories):
-    x = make_categories
+    """Test the embedding layer."""
+    x, K = make_categories
+    N = len(x)
+    S = 3
+    D = 4
     x_ = tf.placeholder(tf.int32, x.shape)
-    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
-    output, KL = ab.embedding_var(output_dim=10)(X_)
+    X_ = tf.tile(tf.expand_dims(x_, 0), [S, 1, 1])
+    output, KL = ab.embedding_var(output_dim=D, n_categories=K)(X_)
+
+    init = tf.global_variables_initializer()
     tc = tf.test.TestCase()
     with tc.test_session():
-        d = output.eval(feed_dict={x_: x})
+        init.run()
+        kl = KL.eval(feed_dict={x_: x})
 
-    assert False
+        assert np.isscalar(kl)
+        assert kl > 0
+
+        Phi = output.eval(feed_dict={x_: x})
+
+        assert Phi.shape == (S, N, D)
 
 
 @pytest.mark.parametrize('dense', [ab.dense_map, ab.dense_var])

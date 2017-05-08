@@ -185,6 +185,6 @@ def average_log_prob(Y, likelihood, Phi):
 
 def _tile_compose(X, layers, n_samples):
     """Tile X into seperate samples, then compose layers for each sample."""
-    Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])
+    Phi = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])  # (n_samples, N, D)
     Phi, KL = compose_layers(Phi, layers)
     return Phi, KL
