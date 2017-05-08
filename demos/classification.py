@@ -67,6 +67,9 @@ def main():
     with tf.name_scope("Deepnet"):
         Phi, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples=LSAMPLES)
 
+    with tf.name_scope("Predict"):
+        pred = ab.predict(Phi)
+
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
         train = optimizer.minimize(loss)
@@ -99,7 +102,7 @@ def main():
                     print("Iteration {}, loss = {}".format(i, loss_val))
 
             # Predict
-            Eys = [Phi[0].eval(feed_dict={X_: Xs}) for _ in range(PSAMPLES)]
+            Eys = [pred.eval(feed_dict={X_: Xs}) for _ in range(PSAMPLES)]
             Ey = np.hstack(Eys).mean(axis=1)
 
             print("Fold {}:".format(k))

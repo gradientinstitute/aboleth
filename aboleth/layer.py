@@ -115,7 +115,7 @@ def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
         Wsamples = tf.transpose(_sample(qW, n_samples), [1, 2, 0])
 
         # Embedding layer -- gather only works on the first dim hence transpose
-        embedding = tf.gather(Wsamples, X[0, :, 0])  # X is just replicated
+        embedding = tf.gather(Wsamples, X[0, :, 0])  # X ind is just replicated
         Phi = tf.transpose(embedding, [2, 0, 1])  # reshape after index 1st dim
 
         # Regularizers
@@ -152,11 +152,11 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True, seed=None):
     return build_dense_map
 
 
-def randomFourier(n_features, kernel=None, seed=None):
+def random_fourier(n_features, kernel=None, seed=None):
     """Random fourier feature layer."""
     kernel = kernel if kernel else RBF()
 
-    def build_randomFF(X):
+    def build_random_ff(X):
         n_samples, input_dim = _get_dims(X)
 
         # Random weights, copy faster than map here
@@ -172,12 +172,12 @@ def randomFourier(n_features, kernel=None, seed=None):
 
         return Phi, KL
 
-    return build_randomFF
+    return build_random_ff
 
 
-def randomArcCosine(n_features, lenscale=1.0, p=1, seed=None):
+def random_arccosine(n_features, lenscale=1.0, p=1, seed=None):
     """Random Arc-Cosine kernel layer."""
-    if p < 0:
+    if p < 0 or not isinstance(p, int):
         raise ValueError("p must be a positive integer!")
     elif p == 0:
         def pfunc(x):
@@ -189,7 +189,7 @@ def randomArcCosine(n_features, lenscale=1.0, p=1, seed=None):
         def pfunc(x):
             return tf.pow(x, p)
 
-    def build_randomAC(X):
+    def build_random_ac(X):
         n_samples, input_dim = _get_dims(X)
 
         # Random weights
@@ -204,7 +204,7 @@ def randomArcCosine(n_features, lenscale=1.0, p=1, seed=None):
 
         return Phi, KL
 
-    return build_randomAC
+    return build_random_ac
 
 
 #

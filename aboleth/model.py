@@ -140,6 +140,23 @@ def elbo(Phi, Y, N, KL, likelihood, like_weights=None):
 # Graph Building -- Prediction and evaluation
 #
 
+
+def predict(Phi):
+    """Build the prediction graph for the expected value of the network.
+
+    Parameters
+    ----------
+    Phi: ndarray, Tensor
+        the neural net featues of shape (n_samples, N, output_dimensions).
+
+    Note
+    ----
+    This just returns *one* sample of the expected value output from the last
+    layer of the network.
+    """
+    return Phi[0]
+
+
 def log_prob(Y, likelihood, Phi):
     """Build the log probability density of the model for each observation.
 

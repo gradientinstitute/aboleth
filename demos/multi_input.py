@@ -28,10 +28,11 @@ CON_LAYERS = [
     ab.dense_var(output_dim=5, full=True, seed=RSEED)
 ]
 LAYERS = [
-    ab.randomArcCosine(100, 1., RSEED),
+    ab.random_arccosine(100, 1., seed=RSEED),
     ab.dense_var(output_dim=1, full=True, seed=RSEED),
     ab.activation(tf.sigmoid)
 ]
+EMBED_DIMS = 5
 BSIZE = 50
 NITER = 60000
 T_SAMPLES = 10
@@ -40,47 +41,42 @@ P_SAMPLES = 50
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 
-def make_cat_layer(cats):
-    cat_layers = [
-        ab.embedding_var(output_dim=5, n_categories=cats, full=False,
-                         seed=RSEED)
-    ]
-    return cat_layers
-
-
 def main():
 
+    # Get Continuous and categorical data
     df_train, df_test = fetch_data()
     df = pd.concat((df_train, df_test))
     X_con, X_cat, Y = input_fn(df)
+
+    # Split data into training and testing
     Xt_con, Xs_con = np.split(X_con, [len(df_train)], axis=0)
-    # Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=0)
-    Xt_cat, Xs_cat = split_cats(X_cat, len(df_train))
+    Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=1)
     D_cat = len(X_cat)
     Yt, Ys = np.split(Y, [len(df_train)], axis=0)
 
-    # import IPython; IPython.embed(); exit()
-
+    # Graph place holders
     X_con_ = tf.placeholder(tf.float32, [None, Xt_con.shape[1]])
-    # X_cat_ = tf.placeholder(tf.float32, [None, Xt_cat.shape[1]])
-    X_cat_ = [tf.placeholder(tf.int32, [None, 1]) for _ in range(D_cat)]
     Y_ = tf.placeholder(tf.float32, [None, 1])
     N_ = tf.placeholder(tf.float32)
 
+    # Create the categorical embedding inputs
+    K = X_cat.max(axis=1).flatten() + 1
+    D_out = [EMBED_DIMS] * D_cat
+    X_cat_, catfeat = embedding_layers(D_out, K, full=False, seed=RSEED)
+
+    # Feed dicts
     train_dict = {X_con_: Xt_con, Y_: Yt}
     train_dict.update(dict(zip(X_cat_, Xt_cat)))
     test_dict = {X_con_: Xs_con}
     test_dict.update(dict(zip(X_cat_, Xs_cat)))
 
     # Make model
-    features = [(X_con_, CON_LAYERS)]
-    features += [
-        (X_cat_[d], make_cat_layer(x.max() + 1)) for d, x in enumerate(X_cat)
-    ]
+    features = [(X_con_, CON_LAYERS)] + catfeat
     likelihood = ab.bernoulli()
     Phi, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
+    pred = ab.predict(Phi)
     init = tf.global_variables_initializer()
 
     with tf.Session(config=CONFIG):
@@ -100,8 +96,7 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Eps = [Phi[0].eval(feed_dict=test_dict)
-               for _ in range(P_SAMPLES)]
+        Eps = [pred.eval(feed_dict=test_dict) for _ in range(P_SAMPLES)]
 
     Ep = np.hstack(Eps).mean(axis=1)
     Ey = Ep > 0.5
@@ -143,8 +138,9 @@ def input_fn(df):
     X_con /= X_con.std(axis=0)
 
     # Creates a dictionary mapping from each categorical feature column name
-    X_cat = [np.where(pd.get_dummies(df[k]).values)[1][:, np.newaxis]
-             for k in CATEGORICAL_COLUMNS]
+    categ_cols = [np.where(pd.get_dummies(df[k]).values)[1][:, np.newaxis]
+                  for k in CATEGORICAL_COLUMNS]
+    X_cat = np.array(categ_cols)
 
     # Converts the label column into a constant Tensor.
     label = df[LABEL_COLUMN].values[:, np.newaxis]
@@ -153,14 +149,16 @@ def input_fn(df):
     return X_con, X_cat, label
 
 
-def split_cats(X_cat, Ntest):
-    Xt_cat, Xs_cat = [], []
-    for x in X_cat:
-        Xt, Xs = np.split(x, [Ntest], axis=0)
-        Xt_cat.append(Xt)
-        Xs_cat.append(Xs)
+def embedding_layers(output_dims, n_categories, *args, **kwargs):
 
-    return Xt_cat, Xs_cat
+    X_, features = [], []
+    for o, k in zip(output_dims, n_categories):
+        x_ = tf.placeholder(tf.int32, [None, 1])
+        layer = [ab.embedding_var(o, k, *args, **kwargs)]
+        features.append((x_, layer))
+        X_.append(x_)
+
+    return X_, features
 
 
 if __name__ == "__main__":

@@ -34,11 +34,9 @@ lenscale1 = tf.Variable(1.)
 # lenscale2 = tf.Variable(1.)
 lenscale2 = 1.
 layers = [
-    # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale1)),
-    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
+    # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
+    ab.random_fourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
     # ab.dense_var(output_dim=5, reg=reg, full=True),
-    # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale2)),
-    # ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale2))),
     ab.dense_var(output_dim=1, reg=reg, full=True)
 ]
 # layers = [
@@ -88,6 +86,9 @@ def main():
     with tf.name_scope("Deepnet"):
         Phi, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
 
+    with tf.name_scope("Predict"):
+        pred = ab.predict(Phi)
+
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
@@ -120,7 +121,7 @@ def main():
         coord.join(threads)
 
         # Prediction
-        Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
+        Ey = [pred.eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
         Eymean = sum(Ey) / n_pred_samples
         logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
 

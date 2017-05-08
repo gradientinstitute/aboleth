@@ -16,7 +16,7 @@ VARIANCE = 10.0
 #     lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
 # )
 # LAYERS = [
-#     ab.randomFourier(n_features=1000, kernel=KERN),
+#     ab.random_fourier(n_features=1000, kernel=KERN),
 #     ab.dense_var(output_dim=1, full=True)
 # ]
 # LAYERS = [
