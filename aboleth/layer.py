@@ -100,6 +100,9 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
 
 def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
     """Dense (fully connected) embedding layer, with variational inference."""
+    if n_categories < 2:
+        raise ValueError("There must be more than 2 categories for embedding!")
+
     def build_embedding(X):
         # X is a rank 3 tensor, [n_samples, N, D]
         Wdim = (n_categories, output_dim)
@@ -111,8 +114,8 @@ def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
               norm_posterior(dim=Wdim, var0=reg, seed=seed))
         Wsamples = tf.transpose(_sample(qW, n_samples), [1, 2, 0])
 
-        # Embedding layer
-        embedding = tf.gather(Wsamples, X[0, :, 0])  # works only on 1st dim
+        # Embedding layer -- gather only works on the first dim hence transpose
+        embedding = tf.gather(Wsamples, X[0, :, 0])  # X is just replicated
         Phi = tf.transpose(embedding, [2, 0, 1])  # reshape after index 1st dim
 
         # Regularizers

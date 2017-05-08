@@ -24,9 +24,6 @@ LABEL_COLUMN = "label"
 
 # Algorithm properties
 RSEED = 17
-CAT_LAYERS = [
-    ab.dense_var(output_dim=50, full=False, seed=RSEED)
-]
 CON_LAYERS = [
     ab.dense_var(output_dim=5, full=True, seed=RSEED)
 ]
@@ -43,22 +40,43 @@ P_SAMPLES = 50
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 
+def make_cat_layer(cats):
+    cat_layers = [
+        ab.embedding_var(output_dim=5, n_categories=cats, full=False,
+                         seed=RSEED)
+    ]
+    return cat_layers
+
+
 def main():
 
     df_train, df_test = fetch_data()
     df = pd.concat((df_train, df_test))
     X_con, X_cat, Y = input_fn(df)
     Xt_con, Xs_con = np.split(X_con, [len(df_train)], axis=0)
-    Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=0)
+    # Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=0)
+    Xt_cat, Xs_cat = split_cats(X_cat, len(df_train))
+    D_cat = len(X_cat)
     Yt, Ys = np.split(Y, [len(df_train)], axis=0)
 
+    # import IPython; IPython.embed(); exit()
+
     X_con_ = tf.placeholder(tf.float32, [None, Xt_con.shape[1]])
-    X_cat_ = tf.placeholder(tf.float32, [None, Xt_cat.shape[1]])
+    # X_cat_ = tf.placeholder(tf.float32, [None, Xt_cat.shape[1]])
+    X_cat_ = [tf.placeholder(tf.int32, [None, 1]) for _ in range(D_cat)]
     Y_ = tf.placeholder(tf.float32, [None, 1])
     N_ = tf.placeholder(tf.float32)
 
+    train_dict = {X_con_: Xt_con, Y_: Yt}
+    train_dict.update(dict(zip(X_cat_, Xt_cat)))
+    test_dict = {X_con_: Xs_con}
+    test_dict.update(dict(zip(X_cat_, Xs_cat)))
+
     # Make model
-    features = [(X_con_, CON_LAYERS), (X_cat_, CAT_LAYERS)]
+    features = [(X_con_, CON_LAYERS)]
+    features += [
+        (X_cat_[d], make_cat_layer(x.max() + 1)) for d, x in enumerate(X_cat)
+    ]
     likelihood = ab.bernoulli()
     Phi, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
     optimizer = tf.train.AdamOptimizer()
@@ -69,7 +87,7 @@ def main():
         init.run()
 
         batches = ab.batch(
-            {X_con_: Xt_con, X_cat_: Xt_cat, Y_: Yt},
+            train_dict,
             N_,
             batch_size=BSIZE,
             n_iter=NITER,
@@ -82,7 +100,7 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Eps = [Phi[0].eval(feed_dict={X_con_: Xs_con, X_cat_: Xs_cat})
+        Eps = [Phi[0].eval(feed_dict=test_dict)
                for _ in range(P_SAMPLES)]
 
     Ep = np.hstack(Eps).mean(axis=1)
@@ -125,15 +143,24 @@ def input_fn(df):
     X_con /= X_con.std(axis=0)
 
     # Creates a dictionary mapping from each categorical feature column name
-    categorical_cols = [pd.get_dummies(df[k]).values for k in
-                        CATEGORICAL_COLUMNS]
-    X_cat = np.hstack(categorical_cols)
+    X_cat = [np.where(pd.get_dummies(df[k]).values)[1][:, np.newaxis]
+             for k in CATEGORICAL_COLUMNS]
 
     # Converts the label column into a constant Tensor.
     label = df[LABEL_COLUMN].values[:, np.newaxis]
 
     # Returns the feature columns and the label.
     return X_con, X_cat, label
+
+
+def split_cats(X_cat, Ntest):
+    Xt_cat, Xs_cat = [], []
+    for x in X_cat:
+        Xt, Xs = np.split(x, [Ntest], axis=0)
+        Xt_cat.append(Xt)
+        Xs_cat.append(Xs)
+
+    return Xt_cat, Xs_cat
 
 
 if __name__ == "__main__":
