@@ -104,7 +104,10 @@ def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
         raise ValueError("There must be more than 2 categories for embedding!")
 
     def build_embedding(X):
-        # X is a rank 3 tensor, [n_samples, N, D]
+        # X is a rank 3 tensor, [n_samples, N, 1]
+        if X.shape[2] > 1:
+            raise ValueError("X must be a *column* of indices!")
+
         Wdim = (n_categories, output_dim)
         n_samples = X.shape[0]
 

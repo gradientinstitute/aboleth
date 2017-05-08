@@ -32,7 +32,7 @@ LAYERS = [
     ab.dense_var(output_dim=1, full=True, seed=RSEED),
     ab.activation(tf.sigmoid)
 ]
-EMBED_DIMS = 5
+EMBED_DIMS = 3
 BSIZE = 50
 NITER = 60000
 T_SAMPLES = 10
