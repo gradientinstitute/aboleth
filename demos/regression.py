@@ -84,15 +84,15 @@ def main():
         lkhood = ab.normal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
+        Net, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
 
     with tf.name_scope("Predict"):
-        pred = ab.predict(Phi)
+        pred = ab.predict(Net)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
-        logprob = ab.log_prob(Y_, lkhood, Phi)
+        logprob = ab.log_prob(Y_, lkhood, Net)
 
     # saver = tf.train.Saver()
     init_op = tf.group(tf.global_variables_initializer(),

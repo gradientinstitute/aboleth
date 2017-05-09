@@ -73,10 +73,10 @@ def main():
     # Make model
     features = [(X_con_, CON_LAYERS)] + catfeat
     likelihood = ab.bernoulli()
-    Phi, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
+    Net, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
-    pred = ab.predict(Phi)
+    pred = ab.predict(Net)
     init = tf.global_variables_initializer()
 
     with tf.Session(config=CONFIG):

@@ -72,7 +72,7 @@ def main():
         lkhood = ab.normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N, LAYERS, lkhood, n_samples=NSAMPLES)
+        Net, loss = ab.deepnet(X_, Y_, N, LAYERS, lkhood, n_samples=NSAMPLES)
         tf.summary.scalar('loss', loss)
 
     with tf.name_scope("Train"):
@@ -108,7 +108,7 @@ def main():
         coord.join(threads)
 
         # Prediction
-        Ey = np.hstack([Phi[0].eval(feed_dict={X_: Xs})
+        Ey = np.hstack([Net[0].eval(feed_dict={X_: Xs})
                         for _ in range(NPREDICTSAMPLES)])
         sigma2 = (1. * var).eval()
 

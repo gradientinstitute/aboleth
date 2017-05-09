@@ -65,10 +65,10 @@ def main():
         lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples=LSAMPLES)
+        Net, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples=LSAMPLES)
 
     with tf.name_scope("Predict"):
-        pred = ab.predict(Phi)
+        pred = ab.predict(Net)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
