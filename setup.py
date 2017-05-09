@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 exec(open('aboleth/version.py').read())
-readme = open('README.md').read()
+readme = open('README.rst').read()
 
 setup(
     name='aboleth',
