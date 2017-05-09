@@ -2,11 +2,12 @@
 
 from setuptools import setup, find_packages
 
+exec(open('aboleth/version.py').read())
 readme = open('README.md').read()
 
 setup(
     name='aboleth',
-    version='0.1.0',
+    version=__version__,
     description='Bayesian supervised deep learning with tensorflow',
     long_description=readme,
     author='Determinant',

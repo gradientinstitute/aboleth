@@ -1,4 +1,4 @@
-"""Neural Net Layer tools."""
+"""Network layers and utilities."""
 import numpy as np
 import tensorflow as tf
 
@@ -10,7 +10,11 @@ from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
 #
 
 def compose_layers(Phi, layers):
-    """Compose a list of layers into a network."""
+    """Compose a list of layers into a network.
+
+    Parameters
+    ----------
+    """
     KL = 0.
     for l in layers:
         Phi, kl = l(Phi)

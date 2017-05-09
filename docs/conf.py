@@ -17,6 +17,8 @@ import sys
 import os
 import shlex
 
+import aboleth
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -42,7 +44,6 @@ extensions = [
 extensions.extend(
     ['sphinx.ext.napoleon',
      'sphinx.ext.autosummary',
-     'matplotlib.sphinxext.plot_directive',
      'IPython.sphinxext.ipython_console_highlighting',
      'IPython.sphinxext.ipython_directive']
 )
@@ -128,7 +129,7 @@ todo_include_todos = True
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'pyramid'
+html_theme = 'alabaster'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -174,6 +175,15 @@ html_static_path = ['_static']
 
 # Custom sidebar templates, maps document names to template names.
 #html_sidebars = {}
+html_sidebars = {
+    '**': [
+        'about.html',
+        'navigation.html',
+        'relations.html',
+        'sourcelink.html',
+        'searchbox.html'
+    ]
+}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
