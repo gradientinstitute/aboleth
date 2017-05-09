@@ -7,7 +7,7 @@ Aboleth
     :alt: circleCI
 
 .. image:: http://fc03.deviantart.net/fs71/i/2010/162/e/3/Aboleth__Sunken_Empires_by_butterfrog.jpg
-    :width: 400px
+    :width: 50%
     :alt: aboleth
     :align: center
 
