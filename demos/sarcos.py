@@ -108,7 +108,7 @@ def main():
         coord.join(threads)
 
         # Prediction
-        Ey = np.hstack([Net[0].eval(feed_dict={X_: Xs})
+        Ey = np.hstack([Net.eval(feed_dict={X_: Xs})
                         for _ in range(NPREDICTSAMPLES)])
         sigma2 = (1. * var).eval()
 

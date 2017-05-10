@@ -76,7 +76,6 @@ def main():
     Net, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
-    pred = ab.predict(Net)
     init = tf.global_variables_initializer()
 
     with tf.Session(config=CONFIG):
@@ -96,7 +95,7 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Eps = [pred.eval(feed_dict=test_dict) for _ in range(P_SAMPLES)]
+        Eps = [Net.eval(feed_dict=test_dict) for _ in range(P_SAMPLES)]
 
     Ep = np.hstack(Eps).mean(axis=1)
     Ey = Ep > 0.5

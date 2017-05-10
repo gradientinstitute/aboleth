@@ -86,9 +86,6 @@ def main():
     with tf.name_scope("Deepnet"):
         Net, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
 
-    with tf.name_scope("Predict"):
-        pred = ab.predict(Net)
-
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
@@ -121,9 +118,11 @@ def main():
         coord.join(threads)
 
         # Prediction
-        Ey = [pred.eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
+        Ey = [Net.eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
         Eymean = sum(Ey) / n_pred_samples
-        logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
+        logPY = 0
+        for _ in range(n_pred_samples):
+            logPY += logprob.eval(feed_dict={Y_: Yi, X_: Xi}) / n_pred_samples
 
     Py = np.exp(logPY.reshape(Ns, Ns))
 

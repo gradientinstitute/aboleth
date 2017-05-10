@@ -195,7 +195,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True, seed=None):
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
 
-        W = tf.Variable(tf.random_normal(shape=Wdim, seed=seed))
+        W = tf.Variable(tf.random_normal(shape=Wdim, seed=seed), name="W_map")
 
         # We don't want to copy tf.Variable W so map over X
         Net = tf.map_fn(lambda x: tf.matmul(x, W), X)
@@ -205,7 +205,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True, seed=None):
 
         # Optional Bias
         if use_bias is True:
-            b = tf.Variable(tf.zeros(output_dim))
+            b = tf.Variable(tf.zeros(output_dim), name="b_map")
             Net += b
             penalty += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
 

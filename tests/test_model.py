@@ -17,7 +17,7 @@ def test_deepnet_outputs(make_graph):
         P = Net.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
         l = loss.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
 
-        assert P.shape == (10, N, 1)
+        assert P.shape == (N, 1)
         assert np.isscalar(l)
 
 
@@ -38,7 +38,7 @@ def test_featurenet_outputs(make_graph):
         P = Net.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
         l = loss.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
 
-        assert P.shape == (10, N, 1)
+        assert P.shape == (N, 1)
         assert np.isscalar(l)
 
 
@@ -60,13 +60,13 @@ def test_deepnet_likelihood_weights(make_graph):
         P = Netw.eval(feed_dict={X_: x, Y_: y, N_: float(N), lw_: lw})
         l = lossw.eval(feed_dict={X_: x, Y_: y, N_: float(N), lw_: lw})
 
-        assert P.shape == (10, N, 1)
+        assert P.shape == (N, 1)
         assert np.isscalar(l)
 
         P = Netf.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
         l = lossf.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
 
-        assert P.shape == (10, N, 1)
+        assert P.shape == (N, 1)
         assert np.isscalar(l)
 
 

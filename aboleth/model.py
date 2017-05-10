@@ -38,14 +38,15 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     Returns
     -------
     Net : Tensor
-        the neural net Tensor. This may be replicated ``n_samples`` times in
-        the first dimension.
+        the neural net Tensor that can be used for prediction. This may be only
+        using *one* sample from the posterior over the model parameters.
     loss : Tensor
         the loss function use to train the model.
     """
     Net, KL = _tile_compose(X, layers, n_samples)
     loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    return Net, loss
+    samplenet = tf.identity(Net[0], name="Net")
+    return samplenet, loss
 
 
 def featurenet(features, Y, N, layers, likelihood, n_samples=10,
@@ -81,8 +82,8 @@ def featurenet(features, Y, N, layers, likelihood, n_samples=10,
     Returns
     -------
     Net : Tensor
-        the neural net Tensor. This may be replicated ``n_samples`` times in
-        the first dimension.
+        the neural net Tensor that can be used for prediction. This may be only
+        using *one* sample from the posterior over the model parameters.
     loss : Tensor
         the loss function use to train the model.
     """
@@ -94,7 +95,8 @@ def featurenet(features, Y, N, layers, likelihood, n_samples=10,
     Net, KL = compose_layers(Net, layers)
     KL += sum(KLs)
     loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    return Net, loss
+    samplenet = tf.identity(Net[0], name="Net")
+    return samplenet, loss
 
 
 def elbo(Net, Y, N, KL, likelihood, like_weights=None):
@@ -133,34 +135,12 @@ def elbo(Net, Y, N, KL, likelihood, like_weights=None):
         ELL = tf.reduce_sum(likelihood(Y, Net) * like_weights) / n_samples
 
     l = - B * ELL + KL
-    return l
+    return tf.identity(l, name="loss")
 
 
 #
 # Graph Building -- Prediction and evaluation
 #
-
-
-def predict(Net):
-    """Build the prediction graph for the expected value of the network.
-
-    Parameters
-    ----------
-    Net : Tensor
-        the neural net featues of shape (n_samples, N, output_dimensions).
-
-    Returns
-    -------
-    Ey : Tensor
-        a *single* sample of the expected value of the output of the last layer
-        of the network.
-
-    Note
-    ----
-    This just returns *one* sample of the expected value output from the last
-    layer of the network.
-    """
-    return Net[0]
 
 
 def log_prob(Y, likelihood, Net):
@@ -174,48 +154,16 @@ def log_prob(Y, likelihood, Net):
         the likelihood model to use on the output of the last layer of the
         neural net, see the ``likelihood`` module.
     Net: Tensor
-        the neural net featues of shape (n_samples, N, output_dimensions).
+        the neural net featues of shape (N, output_dimensions).
 
     Returns
     -------
     logp : Tensor
-        the expected log probability of each ``Y`` under the model. This is of
-        shape (N,).
-
-    Note
-    ----
-    This uses ``n_samples`` (from ``deepnet``) of the posterior to build up the
-    log probability for each sample.
+        a *sample* of the log probability of each ``Y`` under the model. This
+        is of shape (N,).
     """
-    log_prob = tf.reduce_mean(likelihood(Y, Net), axis=0)
+    log_prob = tf.identity(likelihood(Y, Net), name="log_prob")
     return log_prob
-
-
-def average_log_prob(Y, likelihood, Net):
-    """Build the mean log probability of the model over the observations.
-
-    Parameters
-    ----------
-    Y: ndarray, Tensor
-        the targets of shape (N, tasks).
-    likelihood: Tensor
-        the likelihood model to use on the output of the last layer of the
-        neural net, see the ``likelihood`` module.
-    Net: Tensor
-        the neural net featues of shape (n_samples, N, output_dimensions).
-
-    Returns
-    -------
-    mean_logp : Tensor
-        the expected log probability of all ``Y`` under the model. This is a
-        *scalar* output.
-
-    Note
-    ----
-    This only returns one posterior sample of this log probability.
-    """
-    lp = tf.reduce_mean(likelihood(Y, Net[0]))
-    return lp
 
 
 #
