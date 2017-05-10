@@ -45,7 +45,7 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     """
     Net, KL = _tile_compose(X, layers, n_samples)
     loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    samplenet = tf.identity(Net[0], name="Net")
+    samplenet = tf.gather(Net, 0, name="Net")
     return samplenet, loss
 
 
@@ -95,7 +95,7 @@ def featurenet(features, Y, N, layers, likelihood, n_samples=10,
     Net, KL = compose_layers(Net, layers)
     KL += sum(KLs)
     loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    samplenet = tf.identity(Net[0], name="Net")
+    samplenet = tf.gather(Net, 0, name="Net")
     return samplenet, loss
 
 
@@ -135,7 +135,7 @@ def elbo(Net, Y, N, KL, likelihood, like_weights=None):
         ELL = tf.reduce_sum(likelihood(Y, Net) * like_weights) / n_samples
 
     l = - B * ELL + KL
-    return tf.identity(l, name="loss")
+    return l
 
 
 #
