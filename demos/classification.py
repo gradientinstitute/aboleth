@@ -19,7 +19,7 @@ NITER = 20000
 BSIZE = 10
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 LSAMPLES = 10
-PSAMPLES = 50
+PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
 REG = 0.1
 
 # Network structure
@@ -99,11 +99,10 @@ def main():
                     print("Iteration {}, loss = {}".format(i, loss_val))
 
             # Predict
-            Eys = [Net.eval(feed_dict={X_: Xs}) for _ in range(PSAMPLES)]
-            Ey = np.hstack(Eys).mean(axis=1)
+            Ey = ab.predict_expected(Net, {X_: Xs}, PSAMPLES)
 
             print("Fold {}:".format(k))
-            Ep = np.vstack((1. - Ey, Ey)).T
+            Ep = np.hstack((1. - Ey, Ey))
 
             print_k_result(Ys, Ep, ll, acc, "BNN")
 

@@ -38,15 +38,15 @@ def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
     Returns
     -------
     Net : Tensor
-        the neural net Tensor that can be used for prediction. This may be only
-        using *one* sample from the posterior over the model parameters.
+        the neural net Tensor that can be used for prediction. This will return
+        ``n_samples`` predicted values, i.e. if it is queried with ``X``
+        having shape (N, D), it will return (n_samples, N, tasks).
     loss : Tensor
         the loss function use to train the model.
     """
     Net, KL = _tile_compose(X, layers, n_samples)
     loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    samplenet = tf.gather(Net, 0, name="Net")
-    return samplenet, loss
+    return Net, loss
 
 
 def featurenet(features, Y, N, layers, likelihood, n_samples=10,
@@ -82,8 +82,9 @@ def featurenet(features, Y, N, layers, likelihood, n_samples=10,
     Returns
     -------
     Net : Tensor
-        the neural net Tensor that can be used for prediction. This may be only
-        using *one* sample from the posterior over the model parameters.
+        the neural net Tensor that can be used for prediction. This will return
+        ``n_samples`` predicted values, i.e. if it is queried with ``X``
+        having shape (N, D), it will return (n_samples, N, tasks).
     loss : Tensor
         the loss function use to train the model.
     """
@@ -95,8 +96,7 @@ def featurenet(features, Y, N, layers, likelihood, n_samples=10,
     Net, KL = compose_layers(Net, layers)
     KL += sum(KLs)
     loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    samplenet = tf.gather(Net, 0, name="Net")
-    return samplenet, loss
+    return Net, loss
 
 
 def elbo(Net, Y, N, KL, likelihood, like_weights=None):
@@ -105,7 +105,7 @@ def elbo(Net, Y, N, KL, likelihood, like_weights=None):
     Parameters
     ----------
     Net : ndarray, Tensor
-        the neural net featues of shape (n_samples, N, output_dimensions).
+        the neural net featues of shape (n_samples, N, tasks).
     Y : ndarray, Tensor
         the targets of shape (N, tasks).
     N : int, Tensor
@@ -154,15 +154,15 @@ def log_prob(Y, likelihood, Net):
         the likelihood model to use on the output of the last layer of the
         neural net, see the ``likelihood`` module.
     Net: Tensor
-        the neural net featues of shape (N, output_dimensions).
+        the neural net featues of shape (n_samples, N, tasks).
 
     Returns
     -------
     logp : Tensor
-        a *sample* of the log probability of each ``Y`` under the model. This
-        is of shape (N,).
+        ``n_samples`` of the log probability of each ``Y`` under the model.
+        This is of shape (n_samples, N).
     """
-    log_prob = tf.identity(likelihood(Y, Net), name="log_prob")
+    log_prob = likelihood(Y, Net)
     return log_prob
 
 

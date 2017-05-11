@@ -21,8 +21,8 @@ true_noise = 0.1
 
 # Model settings
 n_samples = 5
-n_pred_samples = 100
-n_epochs = 300
+n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
+n_epochs = 100
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
@@ -118,11 +118,9 @@ def main():
         coord.join(threads)
 
         # Prediction
-        Ey = [Net.eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
-        Eymean = sum(Ey) / n_pred_samples
-        logPY = 0
-        for _ in range(n_pred_samples):
-            logPY += logprob.eval(feed_dict={Y_: Yi, X_: Xi}) / n_pred_samples
+        Ey = ab.predict_samples(Net, {X_: Xq}, n_pred_samples)
+        Eymean = Ey.mean(axis=0)
+        logPY = ab.predict_expected(logprob, {Y_: Yi, X_: Xi}, n_pred_samples)
 
     Py = np.exp(logPY.reshape(Ns, Ns))
 

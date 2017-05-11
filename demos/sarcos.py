@@ -36,7 +36,7 @@ LAYERS = [
 NSAMPLES = 10
 BATCH_SIZE = 10
 NEPOCHS = 10
-NPREDICTSAMPLES = 100
+NPREDICTSAMPLES = 10  # results in NSAMPLES * NPREDICTSAMPLES samples
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
 
@@ -108,13 +108,12 @@ def main():
         coord.join(threads)
 
         # Prediction
-        Ey = np.hstack([Net.eval(feed_dict={X_: Xs})
-                        for _ in range(NPREDICTSAMPLES)])
+        Ey = ab.predict_samples(Net, {X_: Xs}, NPREDICTSAMPLES)
         sigma2 = (1. * var).eval()
 
     # Score
-    Eymean = Ey.mean(axis=1)
-    Eyvar = Ey.var(axis=1) + sigma2
+    Eymean = Ey.mean(axis=0)
+    Eyvar = Ey.var(axis=0) + sigma2
     r2 = r2_score(Ys.flatten(), Eymean)
     snlp = msll(Ys.flatten(), Eymean, Eyvar, Yr.flatten())
     smse = 1 - r2

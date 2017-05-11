@@ -36,7 +36,7 @@ EMBED_DIMS = 3
 BSIZE = 50
 NITER = 60000
 T_SAMPLES = 10
-P_SAMPLES = 50
+P_SAMPLES = 5  # results in T_SAMPLES * P_SAMPLES predcitions
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
@@ -95,13 +95,12 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Eps = [Net.eval(feed_dict=test_dict) for _ in range(P_SAMPLES)]
+        Ep = ab.predict_expected(Net, test_dict, P_SAMPLES)
 
-    Ep = np.hstack(Eps).mean(axis=1)
     Ey = Ep > 0.5
 
-    acc = accuracy_score(Ys.flatten(), Ey)
-    logloss = log_loss(Ys.flatten(), np.stack((1 - Ep, Ep)).T)
+    acc = accuracy_score(Ys.flatten(), Ey.flatten())
+    logloss = log_loss(Ys.flatten(), np.hstack((1 - Ep, Ep)))
 
     print("Accuracy = {}, log loss = {}".format(acc, logloss))
 
