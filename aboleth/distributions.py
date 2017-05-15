@@ -82,14 +82,18 @@ class Gaussian:
 
 def norm_prior(dim, var):
     mu = tf.zeros(dim)
-    var = pos(tf.Variable(var))
+    var = pos(tf.Variable(var, name="W_mu_p"))
     P = Normal(mu, var)
     return P
 
 
 def norm_posterior(dim, var0, seed=None):
-    mu = tf.Variable(tf.random_normal(dim, stddev=np.sqrt(var0), seed=seed))
-    var = pos(tf.Variable(tf.random_gamma(alpha=var0, shape=dim, seed=seed)))
+    mu_0 = tf.random_normal(dim, stddev=np.sqrt(var0), seed=seed)
+    mu = tf.Variable(mu_0, name="W_mu_q")
+
+    var_0 = tf.random_gamma(alpha=var0, shape=dim, seed=seed)
+    var = pos(tf.Variable(var_0, name="W_var_q"))
+
     Q = Normal(mu, var, seed=seed)
     return Q
 
@@ -101,13 +105,15 @@ def gaus_posterior(dim, var0, seed=None):
     # Optimize only values in lower triangular
     u, v = np.tril_indices(I)
     indices = (u * I + v)[:, np.newaxis]
-    l = np.tile(np.eye(I), [O, 1, 1])[:, u, v].T
-    l = tf.Variable(l * tf.random_gamma(alpha=sig0, shape=l.shape, seed=seed))
+    l_0 = np.tile(np.eye(I), [O, 1, 1])[:, u, v].T
+    l_0 = l_0 * tf.random_gamma(alpha=sig0, shape=l_0.shape, seed=seed)
+    l = tf.Variable(l_0, name="W_cov_q")
     L = tf.scatter_nd(indices, l, shape=(I * I, O))
     L = tf.transpose(L)
     L = tf.reshape(L, (O, I, I))
 
-    mu = tf.Variable(tf.random_normal((I, O), stddev=sig0, seed=seed))
+    mu_0 = tf.random_normal((I, O), stddev=sig0, seed=seed)
+    mu = tf.Variable(mu_0, name="W_mu_q")
     Q = Gaussian(mu, L, seed=seed)
     return Q
 

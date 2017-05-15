@@ -20,8 +20,20 @@ def make_data():
 
 
 @pytest.fixture
-def make_graph():
+def make_categories():
+    """Make some simple categorical data."""
+    N = 100
+    K = 5
+    x = np.random.randint(0, K, size=N)[:, np.newaxis]
+    # x2 = np.random.randint(0, 10, size=N)
+    # x = np.vstack((x1, x2)).T
+    x = x.astype(np.int32)
+    return x, K
 
+
+@pytest.fixture
+def make_graph():
+    """Make the requirements for making a simple tf graph."""
     x, Y, X = make_data()
 
     like = ab.normal(variance=1.)

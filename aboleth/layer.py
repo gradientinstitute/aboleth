@@ -1,4 +1,4 @@
-"""Neural Net Layer tools."""
+"""Network layers and utilities."""
 import numpy as np
 import tensorflow as tf
 
@@ -9,14 +9,30 @@ from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
 # Layer Composition
 #
 
-def compose_layers(Phi, layers):
-    """Compose a list of layers into a network."""
+def compose_layers(Net, layers):
+    """Compose a list of layers into a network.
+
+    Parameters
+    ----------
+    Net : ndarray, Tensor
+        the neural net featues of shape (n_samples, N, output_dimensions).
+    layers : sequence
+        a list (or sequence) of layers defining the neural net.
+
+    Returns
+    -------
+    Net : Tensor
+        the neural net Tensor with ``layer`` applied.
+    KL : float, Tensor
+        the Kullback-Leibler divergence regularizer of the model parameters (or
+        just the weight Regularizers).
+    """
     KL = 0.
     for l in layers:
-        Phi, kl = l(Phi)
+        Net, kl = l(Net)
         KL += kl
 
-    return Phi, KL
+    return Net, KL
 
 
 #
@@ -24,17 +40,43 @@ def compose_layers(Phi, layers):
 #
 
 def activation(h=lambda X: X):
-    """Activation function layer."""
+    """Activation function layer.
+
+    Parameters
+    ----------
+    h : callable
+        the *element-wise* activation function.
+
+    Returns
+    -------
+    build_activation : callable
+        a function that builds the activation layer.
+    """
     def build_activation(X):
-        Phi = h(X)
+        Net = h(X)
         KL = 0.
-        return Phi, KL
+        return Net, KL
 
     return build_activation
 
 
 def fork(join='cat', *layers):
-    """Fork into multiple layer-pipelines, then join the outputs."""
+    """Fork into multiple layer-pipelines, then join the outputs.
+
+    Parameters
+    ----------
+    join : str, callable
+        the operation used to join the forked layers, this can be 'cat' to
+        concatenate, 'add' to add them (they must have the same shape) or a
+        callable.
+    *layers : args
+        layers-sequences to fork the input into.
+
+    Returns
+    -------
+    build_fork : callable
+        a function that builds the fork layer.
+    """
     if not callable(join):
         if join == 'add':
             def join(P):
@@ -46,21 +88,38 @@ def fork(join='cat', *layers):
             raise ValueError("join must be a callable, 'cat' or 'add'")
 
     def build_fork(X):
-        Phis, KLs = zip(*map(lambda l: compose_layers(X, l), layers))
+        Nets, KLs = zip(*map(lambda l: compose_layers(X, l), layers))
         KL = sum(KLs)
-        Phi = join(Phis)
-        return Phi, KL
+        Net = join(Nets)
+        return Net, KL
 
     return build_fork
 
 
 def dropout(keep_prob, seed=None):
-    """Dropout layer, Bernoulli probability of not setting an input to zero."""
+    """Dropout layer, Bernoulli probability of not setting an input to zero.
+
+    This is just a thin wrapper around `tf.dropout
+    <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_
+
+    Parameters
+    ----------
+    keep_prob : float, Tensor
+        the probability of keeping an input. See `tf.dropout
+        <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
+    seed : int
+        used to create random seeds.
+
+    Returns
+    -------
+    build_dropout : callable
+        a function that builds the dropout layer.
+    """
     def build_dropout(X):
         noise_shape = None  # equivalent to different samples from posterior
-        Phi = tf.nn.dropout(X, keep_prob, noise_shape, seed)
+        Net = tf.nn.dropout(X, keep_prob, noise_shape, seed)
         KL = 0.
-        return Phi, KL
+        return Net, KL
 
     return build_dropout
 
@@ -80,7 +139,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
         Wsamples = _sample(qW, n_samples)
 
         # Linear layer
-        Phi = tf.matmul(X, Wsamples)
+        Net = tf.matmul(X, Wsamples)
 
         # Regularizers
         KL = tf.reduce_sum(qW.KL(pW))
@@ -90,45 +149,76 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
             qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
             pb = norm_prior(dim=bdim, var=reg)
             bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
-            Phi += bsamples
+            Net += bsamples
             KL += tf.reduce_sum(qb.KL(pb))
 
-        return Phi, KL
+        return Net, KL
 
     return build_dense
 
 
-def dense_map(output_dim, l1_reg=0., l2_reg=1., use_bias=True, seed=None):
+def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
+    """Dense (fully connected) embedding layer, with variational inference."""
+    if n_categories < 2:
+        raise ValueError("There must be more than 2 categories for embedding!")
+
+    def build_embedding(X):
+        # X is a rank 3 tensor, [n_samples, N, 1]
+        if X.shape[2] > 1:
+            raise ValueError("X must be a *column* of indices!")
+
+        Wdim = (n_categories, output_dim)
+        n_samples = X.shape[0]
+
+        # Layer weights
+        pW = norm_prior(dim=Wdim, var=reg)
+        qW = (gaus_posterior(dim=Wdim, var0=reg, seed=seed) if full else
+              norm_posterior(dim=Wdim, var0=reg, seed=seed))
+        Wsamples = tf.transpose(_sample(qW, n_samples), [1, 2, 0])
+
+        # Embedding layer -- gather only works on the first dim hence transpose
+        embedding = tf.gather(Wsamples, X[0, :, 0])  # X ind is just replicated
+        Net = tf.transpose(embedding, [2, 0, 1])  # reshape after index 1st dim
+
+        # Regularizers
+        KL = tf.reduce_sum(qW.KL(pW))
+
+        return Net, KL
+
+    return build_embedding
+
+
+def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True, seed=None):
     """Dense (fully connected) linear layer, with MAP inference."""
     def build_dense_map(X):
         # X is a rank 3 tensor, [n_samples, N, D]
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
 
-        W = tf.Variable(tf.random_normal(shape=Wdim, seed=seed))
+        W = tf.Variable(tf.random_normal(shape=Wdim, seed=seed), name="W_map")
 
         # We don't want to copy tf.Variable W so map over X
-        Phi = tf.map_fn(lambda x: tf.matmul(x, W), X)
+        Net = tf.map_fn(lambda x: tf.matmul(x, W), X)
 
         # Regularizers
         penalty = l2_reg * tf.nn.l2_loss(W) + l1_reg * _l1_loss(W)
 
         # Optional Bias
         if use_bias is True:
-            b = tf.Variable(tf.zeros(output_dim))
-            Phi += b
+            b = tf.Variable(tf.zeros(output_dim), name="b_map")
+            Net += b
             penalty += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
 
-        return Phi, penalty
+        return Net, penalty
 
     return build_dense_map
 
 
-def randomFourier(n_features, kernel=None, seed=None):
+def random_fourier(n_features, kernel=None, seed=None):
     """Random fourier feature layer."""
     kernel = kernel if kernel else RBF()
 
-    def build_randomFF(X):
+    def build_random_ff(X):
         n_samples, input_dim = _get_dims(X)
 
         # Random weights, copy faster than map here
@@ -139,17 +229,17 @@ def randomFourier(n_features, kernel=None, seed=None):
         XP = tf.matmul(X, Ps)
         real = tf.cos(XP)
         imag = tf.sin(XP)
-        Phi = tf.concat([real, imag], axis=-1) / np.sqrt(n_features)
+        Net = tf.concat([real, imag], axis=-1) / np.sqrt(n_features)
         KL = 0.
 
-        return Phi, KL
+        return Net, KL
 
-    return build_randomFF
+    return build_random_ff
 
 
-def randomArcCosine(n_features, lenscale=1.0, p=1, seed=None):
+def random_arccosine(n_features, lenscale=1.0, p=1, seed=None):
     """Random Arc-Cosine kernel layer."""
-    if p < 0:
+    if p < 0 or not isinstance(p, int):
         raise ValueError("p must be a positive integer!")
     elif p == 0:
         def pfunc(x):
@@ -161,7 +251,7 @@ def randomArcCosine(n_features, lenscale=1.0, p=1, seed=None):
         def pfunc(x):
             return tf.pow(x, p)
 
-    def build_randomAC(X):
+    def build_random_ac(X):
         n_samples, input_dim = _get_dims(X)
 
         # Random weights
@@ -171,12 +261,12 @@ def randomArcCosine(n_features, lenscale=1.0, p=1, seed=None):
 
         # Random features
         XP = tf.matmul(X, Ps)
-        Phi = np.sqrt(2. / n_features) * tf.nn.relu(pfunc(XP))
+        Net = np.sqrt(2. / n_features) * tf.nn.relu(pfunc(XP))
         KL = 0.
 
-        return Phi, KL
+        return Net, KL
 
-    return build_randomAC
+    return build_random_ac
 
 
 #

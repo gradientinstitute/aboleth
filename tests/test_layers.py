@@ -91,7 +91,7 @@ def test_kernels(kernels, make_data):
     X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
     N = x.shape[0]
 
-    Phi, KL = ab.randomFourier(D, kernel=k)(X_)
+    Phi, KL = ab.random_fourier(D, kernel=k)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -110,7 +110,7 @@ def test_arc_cosine(make_data):
     x_ = tf.placeholder(tf.float32, x.shape)
     X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
 
-    F, KL = ab.randomArcCosine(n_features=10)(X_)
+    F, KL = ab.random_arccosine(n_features=10)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -118,6 +118,30 @@ def test_arc_cosine(make_data):
 
         assert f.shape == (3, x.shape[0], 10)
         assert KL == 0
+
+
+def test_dense_embeddings(make_categories):
+    """Test the embedding layer."""
+    x, K = make_categories
+    N = len(x)
+    S = 3
+    D = 4
+    x_ = tf.placeholder(tf.int32, x.shape)
+    X_ = tf.tile(tf.expand_dims(x_, 0), [S, 1, 1])
+    output, KL = ab.embedding_var(output_dim=D, n_categories=K)(X_)
+
+    init = tf.global_variables_initializer()
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        init.run()
+        kl = KL.eval(feed_dict={x_: x})
+
+        assert np.isscalar(kl)
+        assert kl > 0
+
+        Phi = output.eval(feed_dict={x_: x})
+
+        assert Phi.shape == (S, N, D)
 
 
 @pytest.mark.parametrize('dense', [ab.dense_map, ab.dense_var])

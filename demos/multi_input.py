@@ -24,43 +24,56 @@ LABEL_COLUMN = "label"
 
 # Algorithm properties
 RSEED = 17
-CAT_LAYERS = [
-    ab.dense_var(output_dim=50, full=False, seed=RSEED)
-]
 CON_LAYERS = [
     ab.dense_var(output_dim=5, full=True, seed=RSEED)
 ]
 LAYERS = [
-    ab.randomArcCosine(100, 1., RSEED),
+    ab.random_arccosine(100, 1., seed=RSEED),
     ab.dense_var(output_dim=1, full=True, seed=RSEED),
     ab.activation(tf.sigmoid)
 ]
+EMBED_DIMS = 3
 BSIZE = 50
 NITER = 60000
 T_SAMPLES = 10
-P_SAMPLES = 50
+P_SAMPLES = 5  # results in T_SAMPLES * P_SAMPLES predcitions
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 
 def main():
 
+    # Get Continuous and categorical data
     df_train, df_test = fetch_data()
     df = pd.concat((df_train, df_test))
     X_con, X_cat, Y = input_fn(df)
+
+    # Split data into training and testing
     Xt_con, Xs_con = np.split(X_con, [len(df_train)], axis=0)
-    Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=0)
+    Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=1)
+    D_cat = len(X_cat)
     Yt, Ys = np.split(Y, [len(df_train)], axis=0)
 
+    # Graph place holders
     X_con_ = tf.placeholder(tf.float32, [None, Xt_con.shape[1]])
-    X_cat_ = tf.placeholder(tf.float32, [None, Xt_cat.shape[1]])
     Y_ = tf.placeholder(tf.float32, [None, 1])
     N_ = tf.placeholder(tf.float32)
 
+    # Create the categorical embedding inputs
+    K = X_cat.max(axis=1).flatten() + 1
+    D_out = [EMBED_DIMS] * D_cat
+    X_cat_, catfeat = embedding_layers(D_out, K, full=False, seed=RSEED)
+
+    # Feed dicts
+    train_dict = {X_con_: Xt_con, Y_: Yt}
+    train_dict.update(dict(zip(X_cat_, Xt_cat)))
+    test_dict = {X_con_: Xs_con}
+    test_dict.update(dict(zip(X_cat_, Xs_cat)))
+
     # Make model
-    features = [(X_con_, CON_LAYERS), (X_cat_, CAT_LAYERS)]
+    features = [(X_con_, CON_LAYERS)] + catfeat
     likelihood = ab.bernoulli()
-    Phi, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
+    Net, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
@@ -69,7 +82,7 @@ def main():
         init.run()
 
         batches = ab.batch(
-            {X_con_: Xt_con, X_cat_: Xt_cat, Y_: Yt},
+            train_dict,
             N_,
             batch_size=BSIZE,
             n_iter=NITER,
@@ -82,14 +95,12 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Eps = [Phi[0].eval(feed_dict={X_con_: Xs_con, X_cat_: Xs_cat})
-               for _ in range(P_SAMPLES)]
+        Ep = ab.predict_expected(Net, test_dict, P_SAMPLES)
 
-    Ep = np.hstack(Eps).mean(axis=1)
     Ey = Ep > 0.5
 
-    acc = accuracy_score(Ys.flatten(), Ey)
-    logloss = log_loss(Ys.flatten(), np.stack((1 - Ep, Ep)).T)
+    acc = accuracy_score(Ys.flatten(), Ey.flatten())
+    logloss = log_loss(Ys.flatten(), np.hstack((1 - Ep, Ep)))
 
     print("Accuracy = {}, log loss = {}".format(acc, logloss))
 
@@ -125,15 +136,27 @@ def input_fn(df):
     X_con /= X_con.std(axis=0)
 
     # Creates a dictionary mapping from each categorical feature column name
-    categorical_cols = [pd.get_dummies(df[k]).values for k in
-                        CATEGORICAL_COLUMNS]
-    X_cat = np.hstack(categorical_cols)
+    categ_cols = [np.where(pd.get_dummies(df[k]).values)[1][:, np.newaxis]
+                  for k in CATEGORICAL_COLUMNS]
+    X_cat = np.array(categ_cols)
 
     # Converts the label column into a constant Tensor.
     label = df[LABEL_COLUMN].values[:, np.newaxis]
 
     # Returns the feature columns and the label.
     return X_con, X_cat, label
+
+
+def embedding_layers(output_dims, n_categories, *args, **kwargs):
+
+    X_, features = [], []
+    for o, k in zip(output_dims, n_categories):
+        x_ = tf.placeholder(tf.int32, [None, 1])
+        layer = [ab.embedding_var(o, k, *args, **kwargs)]
+        features.append((x_, layer))
+        X_.append(x_)
+
+    return X_, features
 
 
 if __name__ == "__main__":

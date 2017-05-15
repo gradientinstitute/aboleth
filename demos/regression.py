@@ -21,8 +21,8 @@ true_noise = 0.1
 
 # Model settings
 n_samples = 5
-n_pred_samples = 100
-n_epochs = 300
+n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
+n_epochs = 100
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
@@ -34,11 +34,9 @@ lenscale1 = tf.Variable(1.)
 # lenscale2 = tf.Variable(1.)
 lenscale2 = 1.
 layers = [
-    # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale1)),
-    ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
+    # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
+    ab.random_fourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
     # ab.dense_var(output_dim=5, reg=reg, full=True),
-    # ab.randomArcCosine(n_features=100, lenscale=ab.pos(lenscale2)),
-    # ab.randomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale2))),
     ab.dense_var(output_dim=1, reg=reg, full=True)
 ]
 # layers = [
@@ -86,12 +84,12 @@ def main():
         lkhood = ab.normal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
+        Net, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         train = optimizer.minimize(loss)
-        logprob = ab.log_prob(Y_, lkhood, Phi)
+        logprob = ab.log_prob(Y_, lkhood, Net)
 
     # saver = tf.train.Saver()
     init_op = tf.group(tf.global_variables_initializer(),
@@ -120,9 +118,9 @@ def main():
         coord.join(threads)
 
         # Prediction
-        Ey = [Phi[0].eval(feed_dict={X_: Xq}) for _ in range(n_pred_samples)]
-        Eymean = sum(Ey) / n_pred_samples
-        logPY = logprob.eval(feed_dict={Y_: Yi, X_: Xi})
+        Ey = ab.predict_samples(Net, {X_: Xq}, n_pred_samples)
+        Eymean = Ey.mean(axis=0)
+        logPY = ab.predict_expected(logprob, {Y_: Yi, X_: Xi}, n_pred_samples)
 
     Py = np.exp(logPY.reshape(Ns, Ns))
 
