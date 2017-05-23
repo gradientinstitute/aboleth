@@ -1,5 +1,5 @@
 """Sarcos regression demo."""
-from time import time
+import logging
 
 import numpy as np
 import tensorflow as tf
@@ -11,30 +11,20 @@ import aboleth as ab
 from aboleth.datasets import fetch_gpml_sarcos_data
 
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+
 VARIANCE = 10.0
-# KERN = ab.RBF(
-#     lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
-# )
-# LAYERS = [
-#     ab.random_fourier(n_features=1000, kernel=KERN),
-#     ab.dense_var(output_dim=1, full=True)
-# ]
-# LAYERS = [
-#     ab.dense_var(output_dim=100, full=True),
-#     ab.activation(tf.tanh),
-#     ab.dense_var(output_dim=100, full=True),
-#     ab.activation(tf.tanh),
-#     ab.dense_var(output_dim=1, full=True)
-# ]
+KERN = ab.RBF(
+    lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
+)
 LAYERS = [
-    ab.dense_var(output_dim=200, full=True),
-    ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
-    # ab.dense_var(output_dim=10, full=True),
-    # ab.activation(lambda x: tf.concat([tf.cos(x), tf.sin(x)], axis=2)),
+    ab.random_fourier(n_features=1000, kernel=KERN),
     ab.dense_var(output_dim=1, full=True)
 ]
 NSAMPLES = 10
-BATCH_SIZE = 10
+BATCH_SIZE = 100
 NEPOCHS = 10
 NPREDICTSAMPLES = 10  # results in NSAMPLES * NPREDICTSAMPLES samples
 
@@ -77,41 +67,38 @@ def main():
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
-        global_step = tf.Variable(0, name='global_step', trainable=False)
+        global_step = tf.train.create_global_step()
         train = optimizer.minimize(loss, global_step=global_step)
 
-    Phi_0 = Phi[0]
+    # Logging
+    log = tf.train.LoggingTensorHook(
+        {'step': global_step, 'loss': loss},
+        every_n_iter=1000
+    )
 
-    sv = tf.train.Supervisor(logdir="./sarcos/",
-                             global_step=global_step,
-                             save_summaries_secs=20,
-                             save_model_secs=60)
-
-    with sv.managed_session(config=CONFIG) as sess:
-
+    with tf.train.MonitoredTrainingSession(
+            config=CONFIG,
+            checkpoint_dir="./sarcos/",
+            save_summaries_steps=None,
+            save_checkpoint_secs=60,
+            save_summaries_secs=20,
+            hooks=[log]
+    ) as sess:
         try:
-            local_step = 0
-            time_inc = time()
-            while not sv.should_stop():
+            while not sess.should_stop():
                 sess.run(train)
-                if local_step % 1000 == 0:
-                    delta = local_step / (time() - time_inc)
-                    l, step = sess.run([loss, sv.global_step])
-                    print("Iteration {}, loss = {}, speed = {}, Global step {}"
-                          .format(local_step, l, delta, step))
-                local_step += 1
         except tf.errors.OutOfRangeError:
             print('Input queues have been exhausted!')
             pass
 
         # Prediction
-        Ey = np.hstack([Phi_0.eval(feed_dict={X_: Xs}, session=sess)
-                        for _ in range(NPREDICTSAMPLES)])
+        Ey = ab.predict_samples(Phi, feed_dict={X_: Xs, Y_: np.zeros_like(Ys)},
+                                n_groups=NPREDICTSAMPLES, session=sess)
         sigma2 = var.eval(session=sess)
 
     # Score
-    Eymean = Ey.mean(axis=1)
-    Eyvar = Ey.var(axis=1) + sigma2
+    Eymean = Ey.mean(axis=0)
+    Eyvar = Ey.var(axis=0) + sigma2
     r2 = r2_score(Ys.flatten(), Eymean)
     snlp = msll(Ys.flatten(), Eymean, Eyvar, Yr.flatten())
     smse = 1 - r2
@@ -129,11 +116,11 @@ def msll(Y_true, Y_pred, V_pred, Y_train):
     return msll
 
 
-def batch_training(X, Y, batch_size, n_epochs, num_threads=4):
-    samples = tf.train.slice_input_producer([X, Y], num_epochs=n_epochs,
-                                            shuffle=True, capacity=100)
-    X_batch, Y_batch = tf.train.batch(samples, batch_size=batch_size,
-                                      num_threads=num_threads, capacity=100)
+def batch_training(X, Y, batch_size, n_epochs):
+    X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
+    Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
+    X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 1000, 1,
+                                              enqueue_many=True)
     return X_batch, Y_batch
 
 

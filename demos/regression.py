@@ -61,8 +61,10 @@ def main():
 
     # Data
     with tf.name_scope("Input"):
-        X_ = tf.placeholder(tf.float32, shape=(None, D))
-        Y_ = tf.placeholder(tf.float32, shape=(None, 1))
+        Xb, Yb = batch_training(Xr, Yr, n_epochs=n_epochs,
+                                batch_size=batch_size)
+        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
+        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
 
     with tf.name_scope("Likelihood"):
         lkhood = ab.normal(variance=ab.pos(variance))
@@ -88,10 +90,12 @@ def main():
             save_checkpoint_secs=None,
             hooks=[log]
     ) as sess:
-        for d in ab.batch({X_: Xr, Y_: Yr}, batch_size, n_iters):
-            if sess.should_stop():
-                break
-            sess.run(train, feed_dict=d)
+        try:
+            while not sess.should_stop():
+                sess.run(train)
+        except tf.errors.OutOfRangeError:
+            print('Input queues have been exhausted!')
+            pass
 
         # Prediction
         Ey = ab.predict_samples(Net, feed_dict={X_: Xq, Y_: np.zeros_like(Yq)},
@@ -116,6 +120,14 @@ def main():
                alpha=0.2)
     f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
     bk.show(f)
+
+
+def batch_training(X, Y, batch_size, n_epochs):
+    X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
+    Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
+    X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 1000, 1,
+                                              enqueue_many=True)
+    return X_batch, Y_batch
 
 
 if __name__ == "__main__":
