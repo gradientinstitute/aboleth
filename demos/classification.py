@@ -87,9 +87,9 @@ def main():
 
             batches = ab.batch(
                 {X_: Xr, Y_: Yr},
-                N_,
                 batch_size=BSIZE,
                 n_iter=NITER,
+                N_=N_,
                 seed=RSEED
             )
             for i, data in enumerate(batches):

@@ -10,7 +10,7 @@ def pos(X, minval=1e-10):
     return tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
 
 
-def batch(feed_dict, N_, batch_size, n_iter=10000, seed=None):
+def batch(feed_dict, batch_size, n_iter=10000, N_=None, seed=None):
     """
     Create random batches for Stochastic gradients.
 
@@ -24,13 +24,13 @@ def batch(feed_dict, N_, batch_size, n_iter=10000, seed=None):
     feed_dict : dict of ndarrays
         The data with ``{tf.placeholder: data}`` entries. This assumes all
         items have the *same* length!
-    N_ : tf.placeholder (int)
-        Place holder for the size of the dataset. This will be fed to an
-        algorithm.
     batch_size : int
         number of data points in each batch.
     n_iter : int, optional
         The number of iterations
+    N_ : tf.placeholder (int), optional
+        Place holder for the size of the dataset. This will be fed to an
+        algorithm.
     seed : None, int or RandomState, optional
         random seed
 
@@ -49,7 +49,8 @@ def batch(feed_dict, N_, batch_size, n_iter=10000, seed=None):
         i += 1
         ind = np.array([next(perms) for _ in range(batch_size)])
         batch_dict = {k: v[ind] for k, v in feed_dict.items()}
-        batch_dict[N_] = N
+        if N_:
+            batch_dict[N_] = N
         yield batch_dict
 
 

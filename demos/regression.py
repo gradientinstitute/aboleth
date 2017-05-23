@@ -1,16 +1,18 @@
 """Demo using aboleth for regression."""
-from time import time
+import logging
 
 import numpy as np
 import bokeh.plotting as bk
 import bokeh.palettes as bp
 import tensorflow as tf
 from sklearn.gaussian_process.kernels import Matern as kern
-
 # from sklearn.gaussian_process.kernels import RBF as kern
 
 import aboleth as ab
 from aboleth.datasets import gp_draws
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 # Data settings
@@ -30,33 +32,18 @@ variance = tf.Variable(1.)
 reg = 1.
 
 lenscale1 = tf.Variable(1.)
-# lenscale1 = 1.
-# lenscale2 = tf.Variable(1.)
-lenscale2 = 1.
 layers = [
     # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
     ab.random_fourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
-    # ab.dense_var(output_dim=5, reg=reg, full=True),
     ab.dense_var(output_dim=1, reg=reg, full=True)
 ]
-# layers = [
-#     ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
-#     ab.activation(tf.nn.relu),
-#     ab.dropout(0.9),
-#     ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
-#     ab.activation(tf.nn.relu),
-#     ab.dropout(0.9),
-#     # ab.dense_map(output_dim=200, l1_reg=0, l2_reg=reg),
-#     # ab.activation(tf.nn.relu),
-#     # ab.dropout(0.9),
-#     ab.dense_map(output_dim=1, l1_reg=0, l2_reg=reg),
-# ]
 
 
 def main():
 
     np.random.seed(100)
-    print("Iterations = {}".format(int(round(n_epochs * N / batch_size))))
+    n_iters = int(round(n_epochs * N / batch_size))
+    print("Iterations = {}".format(n_iters))
 
     # Get training and testing data
     Xr, Yr, Xs, Ys = gp_draws(N, Ns, kern=kernel, noise=true_noise)
@@ -74,11 +61,8 @@ def main():
 
     # Data
     with tf.name_scope("Input"):
-
-        Xb, Yb = batch_training(Xr, Yr, n_epochs=n_epochs,
-                                batch_size=batch_size)
-        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
-        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
+        X_ = tf.placeholder(tf.float32, shape=(None, D))
+        Y_ = tf.placeholder(tf.float32, shape=(None, 1))
 
     with tf.name_scope("Likelihood"):
         lkhood = ab.normal(variance=ab.pos(variance))
@@ -88,40 +72,34 @@ def main():
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
-        train = optimizer.minimize(loss)
+        global_step = tf.train.create_global_step()
+        train = optimizer.minimize(loss, global_step=global_step)
         logprob = ab.log_prob(Y_, lkhood, Net)
 
-    # saver = tf.train.Saver()
-    init_op = tf.group(tf.global_variables_initializer(),
-                       tf.local_variables_initializer())
+    # Logging
+    log = tf.train.LoggingTensorHook(
+        {'step': global_step, 'loss': loss},
+        every_n_iter=1000
+    )
 
-    with tf.Session(config=config):
-        init_op.run()
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(coord=coord)
-        try:
-            step = 0
-            time_inc = time()
-            while not coord.should_stop():
-                train.run()
-                if step % 500 == 0:
-                    delta = step / (time() - time_inc)
-                    l = loss.eval()
-                    print("Iteration {}, loss = {}, speed = {}"
-                          .format(step, l, delta))
-                step += 1
-        except tf.errors.OutOfRangeError:
-            pass
-        finally:
-            coord.request_stop()
-
-        coord.join(threads)
+    with tf.train.MonitoredTrainingSession(
+            config=config,
+            save_summaries_steps=None,
+            save_checkpoint_secs=None,
+            hooks=[log]
+    ) as sess:
+        for d in ab.batch({X_: Xr, Y_: Yr}, batch_size, n_iters):
+            if sess.should_stop():
+                break
+            sess.run(train, feed_dict=d)
 
         # Prediction
-        Ey = ab.predict_samples(Net, {X_: Xq}, n_pred_samples)
-        Eymean = Ey.mean(axis=0)
-        logPY = ab.predict_expected(logprob, {Y_: Yi, X_: Xi}, n_pred_samples)
+        Ey = ab.predict_samples(Net, feed_dict={X_: Xq, Y_: np.zeros_like(Yq)},
+                                n_groups=n_pred_samples, session=sess)
+        logPY = ab.predict_expected(logprob, feed_dict={Y_: Yi, X_: Xi},
+                                    n_groups=n_pred_samples, session=sess)
 
+    Eymean = Ey.mean(axis=0)
     Py = np.exp(logPY.reshape(Ns, Ns))
 
     # Plot
@@ -138,14 +116,6 @@ def main():
                alpha=0.2)
     f.line(Xq.flatten(), Eymean.flatten(), line_color='green', legend='Mean')
     bk.show(f)
-
-
-def batch_training(X, Y, batch_size, n_epochs, num_threads=4):
-    samples = tf.train.slice_input_producer([X, Y], num_epochs=n_epochs,
-                                            shuffle=True, capacity=100)
-    X_batch, Y_batch = tf.train.batch(samples, batch_size=batch_size,
-                                      num_threads=num_threads, capacity=100)
-    return X_batch, Y_batch
 
 
 if __name__ == "__main__":

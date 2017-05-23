@@ -80,9 +80,6 @@ def main():
         global_step = tf.Variable(0, name='global_step', trainable=False)
         train = optimizer.minimize(loss, global_step=global_step)
 
-    init_op = tf.group(tf.global_variables_initializer(),
-                       tf.local_variables_initializer())
-
     Phi_0 = Phi[0]
 
     sv = tf.train.Supervisor(logdir="./sarcos/",

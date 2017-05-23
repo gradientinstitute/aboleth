@@ -57,7 +57,6 @@ def main():
     # Graph place holders
     X_con_ = tf.placeholder(tf.float32, [None, Xt_con.shape[1]])
     Y_ = tf.placeholder(tf.float32, [None, 1])
-    N_ = tf.placeholder(tf.float32)
 
     # Create the categorical embedding inputs
     K = X_cat.max(axis=1).flatten() + 1
@@ -71,9 +70,10 @@ def main():
     test_dict.update(dict(zip(X_cat_, Xs_cat)))
 
     # Make model
+    N = len(Xt_con)
     features = [(X_con_, CON_LAYERS)] + catfeat
     likelihood = ab.bernoulli()
-    Net, loss = ab.featurenet(features, Y_, N_, LAYERS, likelihood, T_SAMPLES)
+    Net, loss = ab.featurenet(features, Y_, N, LAYERS, likelihood, T_SAMPLES)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
@@ -83,7 +83,6 @@ def main():
 
         batches = ab.batch(
             train_dict,
-            N_,
             batch_size=BSIZE,
             n_iter=NITER,
             seed=RSEED
