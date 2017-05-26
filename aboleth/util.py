@@ -2,6 +2,8 @@
 import tensorflow as tf
 import numpy as np
 
+from aboleth.random import seedgen
+
 
 def pos(X, minval=1e-10):
     """Constrain a ``tf.Variable`` to be positive only."""
@@ -10,7 +12,7 @@ def pos(X, minval=1e-10):
     return tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
 
 
-def batch(feed_dict, batch_size, n_iter=10000, N_=None, seed=None):
+def batch(feed_dict, batch_size, n_iter=10000, N_=None):
     """
     Create random batches for Stochastic gradients.
 
@@ -31,8 +33,6 @@ def batch(feed_dict, batch_size, n_iter=10000, N_=None, seed=None):
     N_ : tf.placeholder (int), optional
         Place holder for the size of the dataset. This will be fed to an
         algorithm.
-    seed : None, int or RandomState, optional
-        random seed
 
     Yields
     ------
@@ -42,14 +42,14 @@ def batch(feed_dict, batch_size, n_iter=10000, N_=None, seed=None):
         evaluating a loss, training, etc.
     """
     N = __data_len(feed_dict)
-    perms = endless_permutations(N, seed)
+    perms = endless_permutations(N)
 
     i = 0
     while i < n_iter:
         i += 1
         ind = np.array([next(perms) for _ in range(batch_size)])
         batch_dict = {k: v[ind] for k, v in feed_dict.items()}
-        if N_:
+        if N_ is not None:
             batch_dict[N_] = N
         yield batch_dict
 
@@ -90,7 +90,7 @@ def batch_prediction(feed_dict, batch_size):
         yield ind, batch_dict
 
 
-def endless_permutations(N, seed=None):
+def endless_permutations(N):
     """
     Generate an endless sequence of permutations of the set [0, ..., N).
 
@@ -101,18 +101,13 @@ def endless_permutations(N, seed=None):
     ----------
     N: int
         the length of the set
-    seed: None, int or RandomState, optional
-        random seed
 
     Yields
     ------
     int:
         a random int from the set [0, ..., N)
     """
-    if isinstance(seed, np.random.RandomState):
-        generator = seed
-    else:
-        generator = np.random.RandomState(seed)
+    generator = np.random.RandomState(next(seedgen))
 
     while True:
         batch_inds = generator.permutation(N)

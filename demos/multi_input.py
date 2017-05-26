@@ -24,12 +24,13 @@ LABEL_COLUMN = "label"
 
 # Algorithm properties
 RSEED = 17
+ab.set_hyperseed(RSEED)
 CON_LAYERS = [
-    ab.dense_var(output_dim=5, full=True, seed=RSEED)
+    ab.dense_var(output_dim=5, full=True)
 ]
 LAYERS = [
-    ab.random_arccosine(100, 1., seed=RSEED),
-    ab.dense_var(output_dim=1, full=True, seed=RSEED),
+    ab.random_arccosine(100, 1.),
+    ab.dense_var(output_dim=1, full=True),
     ab.activation(tf.sigmoid)
 ]
 EMBED_DIMS = 3
@@ -61,7 +62,7 @@ def main():
     # Create the categorical embedding inputs
     K = X_cat.max(axis=1).flatten() + 1
     D_out = [EMBED_DIMS] * D_cat
-    X_cat_, catfeat = embedding_layers(D_out, K, full=False, seed=RSEED)
+    X_cat_, catfeat = embedding_layers(D_out, K, full=False)
 
     # Feed dicts
     train_dict = {X_con_: Xt_con, Y_: Yt}
@@ -84,9 +85,7 @@ def main():
         batches = ab.batch(
             train_dict,
             batch_size=BSIZE,
-            n_iter=NITER,
-            seed=RSEED
-        )
+            n_iter=NITER)
         for i, data in enumerate(batches):
             train.run(feed_dict=data)
             if i % 1000 == 0:
