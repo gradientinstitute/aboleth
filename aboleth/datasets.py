@@ -7,6 +7,7 @@ from sklearn.gaussian_process.kernels import RBF
 from sklearn.datasets.base import Bunch
 from six.moves import urllib
 
+from aboleth.random import seedgen
 
 DEFAULT_DATA_PATH = os.path.join(os.path.dirname(__file__), '../data/')
 
@@ -14,16 +15,18 @@ DEFAULT_DATA_PATH = os.path.join(os.path.dirname(__file__), '../data/')
 def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, scale=1.,
              xmin=-10, xmax=10):
     """Generate a random (noisy) draw from a Gaussian Process."""
-    Xtrain = np.random.rand(ntrain)[:, np.newaxis] * (xmin - xmax) - xmin
+    randgen = np.random.RandomState(next(seedgen))
+
+    Xtrain = randgen.rand(ntrain)[:, np.newaxis] * (xmin - xmax) - xmin
     Xtest = np.linspace(xmin, xmax, ntest)[:, np.newaxis]
     Xcat = np.vstack((Xtrain, Xtest))
 
     K = kern(Xcat, Xcat)
     U, S, V = np.linalg.svd(K)
     L = U.dot(np.diag(np.sqrt(S))).dot(V)
-    f = np.random.randn(ntrain + ntest).dot(L)
+    f = randgen.randn(ntrain + ntest).dot(L)
 
-    Ytrain = f[0:ntrain] + np.random.randn(ntrain) * noise
+    Ytrain = f[0:ntrain] + randgen.randn(ntrain) * noise
     ftest = f[ntrain:]
 
     Xtrain = Xtrain.astype(np.float32)

@@ -7,6 +7,7 @@ from .layer import (activation, fork, dropout, dense_var, dense_map,
 from .likelihood import normal, bernoulli, binomial
 from .util import (batch, pos, predict_expected, predict_samples,
                    batch_prediction)
+from .random import set_hyperseed
 
 __all__ = [
     '__version__',
@@ -31,5 +32,6 @@ __all__ = [
     'pos',
     'predict_expected',
     'predict_samples',
-    'batch_prediction'
+    'batch_prediction',
+    'set_hyperseed'
 ]

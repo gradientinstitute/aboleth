@@ -13,6 +13,7 @@ import aboleth as ab
 
 FOLDS = 5
 RSEED = 100
+ab.set_hyperseed(RSEED)
 
 # Optimization
 NITER = 20000
@@ -89,9 +90,7 @@ def main():
                 {X_: Xr, Y_: Yr},
                 batch_size=BSIZE,
                 n_iter=NITER,
-                N_=N_,
-                seed=RSEED
-            )
+                N_=N_)
             for i, data in enumerate(batches):
                 train.run(feed_dict=data)
                 if i % 1000 == 0:

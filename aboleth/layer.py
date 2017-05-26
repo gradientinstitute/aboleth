@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
+from aboleth.random import seedgen
 
 
 #
@@ -96,7 +97,7 @@ def fork(join='cat', *layers):
     return build_fork
 
 
-def dropout(keep_prob, seed=None):
+def dropout(keep_prob):
     """Dropout layer, Bernoulli probability of not setting an input to zero.
 
     This is just a thin wrapper around `tf.dropout
@@ -107,8 +108,6 @@ def dropout(keep_prob, seed=None):
     keep_prob : float, Tensor
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
-    seed : int
-        used to create random seeds.
 
     Returns
     -------
@@ -117,14 +116,14 @@ def dropout(keep_prob, seed=None):
     """
     def build_dropout(X):
         noise_shape = None  # equivalent to different samples from posterior
-        Net = tf.nn.dropout(X, keep_prob, noise_shape, seed)
+        Net = tf.nn.dropout(X, keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
 
     return build_dropout
 
 
-def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
+def dense_var(output_dim, reg=1., full=False, use_bias=True):
     """Dense (fully connected) linear layer, with variational inference."""
     def build_dense(X):
         # X is a rank 3 tensor, [n_samples, N, D]
@@ -134,8 +133,8 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
 
         # Layer weights
         pW = norm_prior(dim=Wdim, var=reg)
-        qW = (gaus_posterior(dim=Wdim, var0=reg, seed=seed) if full else
-              norm_posterior(dim=Wdim, var0=reg, seed=seed))
+        qW = (gaus_posterior(dim=Wdim, var0=reg) if full else
+              norm_posterior(dim=Wdim, var0=reg))
         Wsamples = _sample(qW, n_samples)
 
         # Linear layer
@@ -146,7 +145,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
 
         # Optional bias
         if use_bias is True:
-            qb = norm_posterior(dim=bdim, var0=reg, seed=seed)
+            qb = norm_posterior(dim=bdim, var0=reg)
             pb = norm_prior(dim=bdim, var=reg)
             bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
             Net += bsamples
@@ -157,7 +156,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, seed=None):
     return build_dense
 
 
-def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
+def embedding_var(output_dim, n_categories, reg=1., full=False):
     """Dense (fully connected) embedding layer, with variational inference."""
     if n_categories < 2:
         raise ValueError("There must be more than 2 categories for embedding!")
@@ -172,8 +171,8 @@ def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
 
         # Layer weights
         pW = norm_prior(dim=Wdim, var=reg)
-        qW = (gaus_posterior(dim=Wdim, var0=reg, seed=seed) if full else
-              norm_posterior(dim=Wdim, var0=reg, seed=seed))
+        qW = (gaus_posterior(dim=Wdim, var0=reg) if full else
+              norm_posterior(dim=Wdim, var0=reg))
         Wsamples = tf.transpose(_sample(qW, n_samples), [1, 2, 0])
 
         # Embedding layer -- gather only works on the first dim hence transpose
@@ -188,14 +187,15 @@ def embedding_var(output_dim, n_categories, reg=1., full=False, seed=None):
     return build_embedding
 
 
-def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True, seed=None):
+def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
     """Dense (fully connected) linear layer, with MAP inference."""
     def build_dense_map(X):
         # X is a rank 3 tensor, [n_samples, N, D]
         n_samples, input_dim = _get_dims(X)
         Wdim = (input_dim, output_dim)
 
-        W = tf.Variable(tf.random_normal(shape=Wdim, seed=seed), name="W_map")
+        W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
+                        name="W_map")
 
         # We don't want to copy tf.Variable W so map over X
         Net = tf.map_fn(lambda x: tf.matmul(x, W), X)
@@ -214,7 +214,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True, seed=None):
     return build_dense_map
 
 
-def random_fourier(n_features, kernel=None, seed=None):
+def random_fourier(n_features, kernel=None):
     """Random fourier feature layer."""
     kernel = kernel if kernel else RBF()
 
@@ -222,7 +222,7 @@ def random_fourier(n_features, kernel=None, seed=None):
         n_samples, input_dim = _get_dims(X)
 
         # Random weights, copy faster than map here
-        P = kernel.weights(input_dim, n_features, seed)
+        P = kernel.weights(input_dim, n_features)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
@@ -237,7 +237,7 @@ def random_fourier(n_features, kernel=None, seed=None):
     return build_random_ff
 
 
-def random_arccosine(n_features, lenscale=1.0, p=1, seed=None):
+def random_arccosine(n_features, lenscale=1.0, p=1):
     """Random Arc-Cosine kernel layer."""
     if p < 0 or not isinstance(p, int):
         raise ValueError("p must be a positive integer!")
@@ -255,7 +255,7 @@ def random_arccosine(n_features, lenscale=1.0, p=1, seed=None):
         n_samples, input_dim = _get_dims(X)
 
         # Random weights
-        rand = np.random.RandomState(seed)
+        rand = np.random.RandomState(next(seedgen))
         P = rand.randn(input_dim, n_features).astype(np.float32) / lenscale
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
@@ -279,8 +279,8 @@ class RBF:
     def __init__(self, lenscale=1.0):
         self.lenscale = lenscale
 
-    def weights(self, input_dim, n_features, seed=None):
-        rand = np.random.RandomState(seed)
+    def weights(self, input_dim, n_features):
+        rand = np.random.RandomState(next(seedgen))
         P = rand.randn(input_dim, n_features).astype(np.float32)
         return P / self.lenscale
 
@@ -292,7 +292,7 @@ class Matern(RBF):
         super().__init__(lenscale)
         self.p = p
 
-    def weights(self, input_dim, n_features, seed=None):
+    def weights(self, input_dim, n_features):
         # p is the matern number (v = p + .5) and the two is a transformation
         # of variables between Rasmussen 2006 p84 and the CF of a Multivariate
         # Student t (see wikipedia). Also see "A Note on the Characteristic
@@ -303,7 +303,7 @@ class Matern(RBF):
         # from wikipedia, x = y * np.sqrt(df / u) where y ~ norm(0, I),
         # u ~ chi2(df), then x ~ mvt(0, I, df)
         df = 2 * (self.p + 0.5)
-        rand = np.random.RandomState(seed)
+        rand = np.random.RandomState(next(seedgen))
         y = rand.randn(input_dim, n_features)
         u = rand.chisquare(df, size=(n_features,))
         P = y * np.sqrt(df / u)

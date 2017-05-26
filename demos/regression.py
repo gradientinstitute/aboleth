@@ -14,6 +14,8 @@ from aboleth.datasets import gp_draws
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+RSEED = 666
+ab.set_hyperseed(RSEED)
 
 # Data settings
 N = 2000
@@ -41,7 +43,6 @@ layers = [
 
 def main():
 
-    np.random.seed(100)
     n_iters = int(round(n_epochs * N / batch_size))
     print("Iterations = {}".format(n_iters))
 
@@ -126,7 +127,8 @@ def batch_training(X, Y, batch_size, n_epochs):
     X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
     Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
     X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 1000, 1,
-                                              enqueue_many=True)
+                                              enqueue_many=True,
+                                              seed=RSEED)
     return X_batch, Y_batch
 
 

@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from aboleth.util import pos
+from aboleth.random import seedgen
 
 
 #
@@ -21,16 +22,15 @@ class Normal:
         variance, shape [d_i, d_o]
     """
 
-    def __init__(self, mu=0., var=1., seed=None):
+    def __init__(self, mu=0., var=1.):
         self.mu = mu
         self.var = var
         self.sigma = tf.sqrt(var)
         self.D = tf.shape(mu)
-        self.seed = seed
 
     def sample(self):
         # Reparameterisation trick
-        e = tf.random_normal(self.D, seed=self.seed)
+        e = tf.random_normal(self.D, seed=next(seedgen))
         x = self.mu + e * self.sigma
         return x
 
@@ -53,16 +53,15 @@ class Gaussian:
         Cholesky, shape [d_o, d_i, d_i]
     """
 
-    def __init__(self, mu, L, seed=None):
+    def __init__(self, mu, L):
         self.mu = tf.expand_dims(tf.transpose(mu), 2)  # O x I x 1
         self.L = L  # O x I x I
         self.d = tf.shape(mu)
         self.D = tf.shape(self.mu)
-        self.seed = seed
 
     def sample(self):
         # Reparameterisation trick
-        e = tf.random_normal(self.D, seed=self.seed)
+        e = tf.random_normal(self.D, seed=next(seedgen))
         x = tf.reshape(self.mu + tf.matmul(self.L, e), self.d)
         return x
 
@@ -87,18 +86,18 @@ def norm_prior(dim, var):
     return P
 
 
-def norm_posterior(dim, var0, seed=None):
-    mu_0 = tf.random_normal(dim, stddev=np.sqrt(var0), seed=seed)
+def norm_posterior(dim, var0):
+    mu_0 = tf.random_normal(dim, stddev=np.sqrt(var0), seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
 
-    var_0 = tf.random_gamma(alpha=var0, shape=dim, seed=seed)
+    var_0 = tf.random_gamma(alpha=var0, shape=dim, seed=next(seedgen))
     var = pos(tf.Variable(var_0, name="W_var_q"))
 
-    Q = Normal(mu, var, seed=seed)
+    Q = Normal(mu, var)
     return Q
 
 
-def gaus_posterior(dim, var0, seed=None):
+def gaus_posterior(dim, var0):
     I, O = dim
     sig0 = np.sqrt(var0)
 
@@ -106,15 +105,15 @@ def gaus_posterior(dim, var0, seed=None):
     u, v = np.tril_indices(I)
     indices = (u * I + v)[:, np.newaxis]
     l_0 = np.tile(np.eye(I), [O, 1, 1])[:, u, v].T
-    l_0 = l_0 * tf.random_gamma(alpha=sig0, shape=l_0.shape, seed=seed)
+    l_0 = l_0 * tf.random_gamma(alpha=sig0, shape=l_0.shape, seed=next(seedgen))
     l = tf.Variable(l_0, name="W_cov_q")
     L = tf.scatter_nd(indices, l, shape=(I * I, O))
     L = tf.transpose(L)
     L = tf.reshape(L, (O, I, I))
 
-    mu_0 = tf.random_normal((I, O), stddev=sig0, seed=seed)
+    mu_0 = tf.random_normal((I, O), stddev=sig0, seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
-    Q = Gaussian(mu, L, seed=seed)
+    Q = Gaussian(mu, L)
     return Q
 
 
