@@ -5,8 +5,8 @@ import numpy as np
 import bokeh.plotting as bk
 import bokeh.palettes as bp
 import tensorflow as tf
-from sklearn.gaussian_process.kernels import Matern as kern
-# from sklearn.gaussian_process.kernels import RBF as kern
+# from sklearn.gaussian_process.kernels import Matern as kern
+from sklearn.gaussian_process.kernels import RBF as kern
 
 import aboleth as ab
 from aboleth.datasets import gp_draws
@@ -26,7 +26,7 @@ true_noise = 0.1
 # Model settings
 n_samples = 5
 n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
-n_epochs = 100
+n_epochs = 150
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 

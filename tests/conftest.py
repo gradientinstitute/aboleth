@@ -25,8 +25,6 @@ def make_categories():
     N = 100
     K = 5
     x = np.random.randint(0, K, size=N)[:, np.newaxis]
-    # x2 = np.random.randint(0, 10, size=N)
-    # x = np.vstack((x1, x2)).T
     x = x.astype(np.int32)
     return x, K
 

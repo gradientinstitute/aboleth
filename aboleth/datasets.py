@@ -37,7 +37,8 @@ def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, scale=1.,
 
 
 def fetch_gpml_sarcos_data(transpose_data=True):
-    """
+    """Fetch SARCOS dataset.
+
     Fetch the SARCOS dataset from the internet and parse appropriately into
     python arrays
 

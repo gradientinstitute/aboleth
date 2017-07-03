@@ -23,15 +23,13 @@ clean-pyc:
 	find . -name '*~' -exec rm -f {} +
 
 lint:
-	flake8 aboleth tests
+	py.test -s --junit-xml=test_output/flake8/results.xml --flake8 ./aboleth -p no:regtest --cache-clear
 
 test:
-	py.test
+	py.test -s --junit-xml=test_output/pytest/results.xml --cache-clear .
 
 coverage:
-	coverage run --source aboleth setup.py test
-	coverage report -m
-	coverage html
+	py.test -s --junit-xml=test_output/pytest/results.xml --cov=./aboleth --cov-report=html:test_output/coverage --cache-clear --cov-fail-under=80 .
 
 docs:
 	rm -f docs/aboleth.rst

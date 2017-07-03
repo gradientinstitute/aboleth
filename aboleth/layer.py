@@ -2,8 +2,9 @@
 import numpy as np
 import tensorflow as tf
 
-from aboleth.distributions import norm_prior, norm_posterior, gaus_posterior
 from aboleth.random import seedgen
+from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
+                                   kl_qp)
 
 
 #
@@ -141,7 +142,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True):
         Net = tf.matmul(X, Wsamples)
 
         # Regularizers
-        KL = tf.reduce_sum(qW.KL(pW))
+        KL = kl_qp(qW, pW)
 
         # Optional bias
         if use_bias is True:
@@ -149,7 +150,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True):
             pb = norm_prior(dim=bdim, var=reg)
             bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
             Net += bsamples
-            KL += tf.reduce_sum(qb.KL(pb))
+            KL += kl_qp(qb, pb)
 
         return Net, KL
 
@@ -180,7 +181,7 @@ def embedding_var(output_dim, n_categories, reg=1., full=False):
         Net = tf.transpose(embedding, [2, 0, 1])  # reshape after index 1st dim
 
         # Regularizers
-        KL = tf.reduce_sum(qW.KL(pW))
+        KL = kl_qp(qW, pW)
 
         return Net, KL
 

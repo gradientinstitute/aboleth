@@ -5,7 +5,7 @@ import numpy as np
 from aboleth.random import seedgen
 
 
-def pos(X, minval=1e-10):
+def pos(X, minval=1e-15):
     """Constrain a ``tf.Variable`` to be positive only."""
     # return tf.exp(X)  # Medium speed, but gradients tend to explode
     # return tf.nn.softplus(X)  # Slow but well behaved!
