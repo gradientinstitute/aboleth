@@ -234,6 +234,6 @@ def kl_gaussian_normal(q, p):
 
 def _chollogdet(L):
     """Log det of a cholesky, where L is [..., D, D]."""
-    l = tf.maximum(tf.matrix_diag_part(L), 1e-15)  # Make sure we don't go to 0
+    l = tf.maximum(tf.matrix_diag_part(L), 1e-10)  # Make sure we don't go to 0
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet

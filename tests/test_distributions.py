@@ -1,11 +1,12 @@
 """Test distributions.py functionality."""
+import pytest
 import numpy as np
 import tensorflow as tf
-from scipy.linalg import solve
+from scipy.linalg import cho_solve
 from scipy.stats import wishart
 
 from aboleth.distributions import (Normal, Gaussian, kl_normal_normal,
-                                   kl_gaussian_normal)
+                                   kl_gaussian_normal, kl_qp, _chollogdet)
 
 
 def test_kl_normal_normal():
@@ -45,40 +46,86 @@ def test_kl_gaussian_normal():
     Dim = (5, 10, 10)
 
     mu0 = np.random.randn(*dim).astype(np.float32)
-    L0, C0 = random_chol(Dim)
+    L0 = random_chol(Dim)
     q = Gaussian(mu0, L0)
 
     mu1 = np.random.randn(*dim).astype(np.float32)
     var1 = 1.0
-    C1 = [var1 * np.eye(dim[0]) for _ in range(dim[1])]
+    L1 = [(np.sqrt(var1) * np.eye(dim[0])).astype(np.float32)
+          for _ in range(dim[1])]
     p = Normal(mu1, var1)
 
     KL = kl_gaussian_normal(q, p)
-    KLr = KLdiv(mu0, C0, mu1, C1)
-
-    # import IPython; IPython.embed()
+    KLr = KLdiv(mu0, L0, mu1, L1)
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        assert np.allclose(KL.eval(), KLr)
+        assert np.abs(KL.eval() - KLr) < 0.02 * KLr  # 2% numerical slop
+
+
+def test_kl_qp():
+    """Test the validity of the results coming back from kl_qp."""
+    dim = (10, 5)
+    Dim = (5, 10, 10)
+
+    mu = np.zeros(dim).astype(np.float32)
+    var = 1.0
+    L = random_chol(Dim)
+
+    qn = Normal(mu, var)
+    qg = Gaussian(mu, L)
+    p = Normal(mu, var)
+    kl_nn = kl_qp(qn, p)
+    kl_gn = kl_qp(qg, p)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        nn = kl_nn.eval()
+        assert nn >= 0
+        assert np.isscalar(nn)
+
+        gn = kl_gn.eval()
+        assert gn >= 0
+        assert np.isscalar(gn)
+
+    # This is not implemented and should error
+    with pytest.raises(ValueError):
+        kl_qp(p, qg)
+
+
+def test_chollogdet():
+    """Test log det with cholesky matrices."""
+    Dim = (5, 10, 10)
+    L = random_chol(Dim)
+    rlogdet = np.sum([logdet(l) for l in L])
+    tlogdet = _chollogdet(L)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        assert np.allclose(tlogdet.eval(), rlogdet)
 
 
 def random_chol(dim):
     """Generate random pos def matrices."""
     D = dim[1]
     n = dim[0]
-    C = wishart.rvs(df=D, scale=np.eye(D), size=n).astype(np.float32)
-    L = np.array([np.linalg.cholesky(c) for c in C])
-    return L, C
+    C = wishart.rvs(df=D, scale=10 * np.eye(D), size=n)
+    L = np.array([np.linalg.cholesky(c).astype(np.float32) for c in C])
+    return L
 
 
-def KLdiv(mu0, Cov0, mu1, Cov1):
+def KLdiv(mu0, Lcov0, mu1, Lcov1):
     """Numpy KL calculation."""
     KL = 0
     D, _ = mu0.shape
-    for m0, m1, C0, C1 in zip(mu0.T, mu1.T, Cov0, Cov1):
-        KL += 0.5 * (np.trace(solve(C1, C0, sym_pos=True))
-                     + (m1 - m0).dot(solve(C1, (m1 - m0), sym_pos=True))
-                     - D
-                     + np.linalg.slogdet(C1)[1] - np.linalg.slogdet(C0)[1])
+    for m0, m1, L0, L1 in zip(mu0.T, mu1.T, Lcov0, Lcov1):
+        md = m1 - m0
+        KL += 0.5 * (np.trace(cho_solve((L1, True), L0.dot(L0.T)))
+                     + md.dot(cho_solve((L1, True), md))
+                     - D + logdet(L1) - logdet(L0))
     return KL
+
+
+def logdet(L):
+    """Log Determinant from Cholesky."""
+    return 2 * np.log(L.diagonal()).sum()
