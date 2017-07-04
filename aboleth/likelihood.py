@@ -6,7 +6,7 @@ from aboleth.util import pos
 
 
 def normal(variance):
-    """The Normal distribution log-likelihood."""
+    """Normal log-likelihood."""
     def loglike(x, f):
         ll = -0.5 * (tf.log(2 * variance * np.pi) + (x - f)**2 / variance)
         return ll
