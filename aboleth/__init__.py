@@ -9,7 +9,7 @@ from .util import (batch, pos, predict_expected, predict_samples,
                    batch_prediction)
 from .random import set_hyperseed
 
-__all__ = [
+__all__ = (
     '__version__',
     'deepnet',
     'featurenet',
@@ -34,4 +34,4 @@ __all__ = [
     'predict_samples',
     'batch_prediction',
     'set_hyperseed'
-]
+)
