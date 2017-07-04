@@ -156,7 +156,7 @@ def gaus_posterior(dim, var0):
 #
 
 def kl_qp(q, p):
-    """Generic Kullback Leibler divergence calculation.
+    """Generic Kullback Leibler divergence wrapper.
 
     Parameters
     ----------

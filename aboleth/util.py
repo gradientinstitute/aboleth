@@ -136,8 +136,8 @@ def endless_permutations(N):
 
     Yields
     ------
-    generator:
-        which yeilds a random int from the set [0, ..., N)
+    int :
+        yeilds a random int from the set [0, ..., N)
 
     Examples
     -------
@@ -160,7 +160,7 @@ def endless_permutations(N):
 
 
 def predict_samples(predictor, feed_dict, n_groups=1, session=None):
-    """Helper for getting samples from a predictor.
+    """A helper for getting samples from a predictor.
 
     Parameters
     ----------
@@ -193,7 +193,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
 
 
 def predict_expected(predictor, feed_dict, n_groups=1, session=None):
-    """Helper for getting the expected value from a predictor.
+    """A helper for getting the expected value from a predictor.
 
     Parameters
     ----------

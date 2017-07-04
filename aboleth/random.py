@@ -36,6 +36,7 @@ class SeedGenerator:
         """Next generator."""
         return self.next()
 
+
 # Dont judge me -- most RNGs are global vars
 seedgen = SeedGenerator()
 
