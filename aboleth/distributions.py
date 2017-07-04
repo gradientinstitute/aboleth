@@ -20,6 +20,7 @@ class Normal:
         mean, shape [d_i, d_o]
     var : Tensor
         variance, shape [d_i, d_o]
+
     """
 
     def __init__(self, mu=0., var=1.):
@@ -47,6 +48,7 @@ class Gaussian:
         mean, shape [d_i, d_o]
     L : Tensor
         Cholesky, shape [d_o, d_i, d_i]
+
     """
 
     def __init__(self, mu, L):
@@ -82,6 +84,7 @@ def norm_prior(dim, var):
     -------
     Q : Normal
         the initialised prior Normal object.
+
     """
     mu = tf.zeros(dim)
     var = pos(tf.Variable(var, name="W_mu_p"))

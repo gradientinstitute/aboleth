@@ -22,21 +22,15 @@ setup(
         'scikit-learn>=0.18.1',
         'six>=1.10.0',
         'bokeh>=0.12.4',
-        # 'tensorflow-gpu>=1.0.0',
+        # 'tensorflow-gpu>=1.2.0',
     ],
     extras_require={
         'dev': [
             'sphinx>=1.4.8',
-            # 'sphinxcontrib-programoutput>=0.8',
-            'pytest>=3.0.3',
-            'pytest-cov>=2.4.0',
-            # 'pytest-regtest>=0.15.0',
-            'flake8>=3.0.4',
-            'flake8-docstrings>=1.0.2',
-            'pydocstyle>=1.1.1',
-            'pyflakes>=1.2.3',
-            'mccabe>=0.5.2',
-            'pytest-flake8>=0.8.1'
+            'pytest>=3.1.0',
+            'pytest-cov>=2.5.1',
+            'pytest-flake8>=0.8.1',
+            'flake8-docstrings>=1.1.0',
         ]
     },
     license="All Right Reserved",
