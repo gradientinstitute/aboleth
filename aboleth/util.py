@@ -6,10 +6,42 @@ from aboleth.random import seedgen
 
 
 def pos(X, minval=1e-15):
-    """Constrain a ``tf.Variable`` to be positive only."""
-    # return tf.exp(X)  # Medium speed, but gradients tend to explode
-    # return tf.nn.softplus(X)  # Slow but well behaved!
-    return tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
+    """Constrain a ``tf.Variable`` to be positive only.
+
+    At the moment this is implemented as:
+
+        :math:`max(|X|, minval)`
+
+    This is fast and does not result in vanishing gradients, but will lead to
+    non-smooth gradients and more local minima. In practice we haven't noticed
+    this being a problem.
+
+    Parameters
+    ----------
+    X : Tensor
+        any Tensor in which all elements will be made positive.
+    minval : float
+        the minimum "positive" value the resulting tensor will have.
+
+    Returns
+    -------
+    X : Tensor
+        a tensor the same shape as the input ``X`` but positively constrained.
+
+    Examples
+    --------
+    >>> X = tf.constant(np.array([1.0, -1.0, 0.0]))
+    >>> Xp = pos(X)
+    >>> with tf.Session():
+    ...     xp = Xp.eval()
+    >>> xp
+    array([  1.00000000e+00,   1.00000000e+00,   1.00000000e-15])
+    """
+    # Other alternatives could be:
+    # Xp = tf.exp(X)  # Medium speed, but gradients tend to explode
+    # Xp = tf.nn.softplus(X)  # Slow but well behaved!
+    Xp = tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
+    return Xp
 
 
 def batch(feed_dict, batch_size, n_iter=10000, N_=None):
@@ -104,8 +136,20 @@ def endless_permutations(N):
 
     Yields
     ------
-    int:
-        a random int from the set [0, ..., N)
+    generator:
+        which yeilds a random int from the set [0, ..., N)
+
+    Examples
+    -------
+    >>> perm = endless_permutations(5)
+    >>> type(perm)
+    <class 'generator'>
+    >>> p = next(perm)
+    >>> p < 5
+    True
+    >>> p2 = next(perm)
+    >>> p2 != p
+    True
     """
     generator = np.random.RandomState(next(seedgen))
 

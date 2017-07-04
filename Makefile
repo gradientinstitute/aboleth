@@ -29,7 +29,7 @@ test:
 	py.test -s --junit-xml=test_output/pytest/results.xml --cache-clear .
 
 coverage:
-	py.test -s --junit-xml=test_output/pytest/results.xml --cov=./aboleth --cov-report=html:test_output/coverage --cache-clear --cov-fail-under=75 .
+	py.test -s --junit-xml=test_output/pytest/results.xml --cov=./aboleth --cov-report=html:test_output/coverage --cache-clear --cov-fail-under=80 .
 
 docs:
 	rm -f docs/aboleth.rst

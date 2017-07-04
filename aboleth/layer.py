@@ -275,25 +275,75 @@ def random_arccosine(n_features, lenscale=1.0, p=1):
 #
 
 class RBF:
-    """RBF kernel approximation."""
+    """Radial basis kernel approximation.
+
+    Parameters
+    ----------
+    lenscale : float, ndarray, Tensor
+        the lenght scales of the radial basis kernel, this can be a scalar for
+        an isotropic kernel, or a vector for an automatic relevance detection
+        (ARD) kernel.
+    """
 
     def __init__(self, lenscale=1.0):
+        """Constuct an RBF kernel object."""
         self.lenscale = lenscale
 
     def weights(self, input_dim, n_features):
+        """Generate the random fourier weights for this kernel.
+
+        Parameters
+        ----------
+        input_dim : int
+            the input dimension to this layer.
+        n_features : int
+            the number of unique random features, the actual output dimension
+            of this layer will be ``2 * n_features``.
+
+        Returns
+        -------
+        P : ndarray
+            the random weights of the fourier features of shape
+            ``(input_dim, n_features)``.
+        """
         rand = np.random.RandomState(next(seedgen))
         P = rand.randn(input_dim, n_features).astype(np.float32)
         return P / self.lenscale
 
 
 class Matern(RBF):
-    """Matern kernel approximation."""
+    """Matern kernel approximation.
+
+    Parameters
+    ----------
+    lenscale : float, ndarray, Tensor
+        the lenght scales of the Matern kernel, this can be a scalar for an
+        isotropic kernel, or a vector for an automatic relevance detection
+        (ARD) kernel.
+    """
 
     def __init__(self, lenscale=1.0, p=1):
+        """Constuct a Matern kernel object."""
         super().__init__(lenscale)
         self.p = p
 
     def weights(self, input_dim, n_features):
+        """Generate the random fourier weights for this kernel.
+
+        Parameters
+        ----------
+        input_dim : int
+            the input dimension to this layer.
+        n_features : int
+            the number of unique random features, the actual output dimension
+            of this layer will be ``2 * n_features``.
+
+        Returns
+        -------
+        P : ndarray
+            the random weights of the fourier features of shape
+            ``(input_dim, n_features)``.
+        """
         # p is the matern number (v = p + .5) and the two is a transformation
         # of variables between Rasmussen 2006 p84 and the CF of a Multivariate
         # Student t (see wikipedia). Also see "A Note on the Characteristic
