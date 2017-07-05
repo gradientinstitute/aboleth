@@ -12,9 +12,36 @@ from aboleth.random import seedgen
 DEFAULT_DATA_PATH = os.path.join(os.path.dirname(__file__), '../data/')
 
 
-def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, scale=1.,
-             xmin=-10, xmax=10):
-    """Generate a random (noisy) draw from a Gaussian Process."""
+def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, xmin=-10,
+             xmax=10):
+    """Generate a random (noisy) draw from a Gaussian Process.
+
+    Parameters
+    ----------
+    ntrain : int
+        number of training points to generate
+    ntest : int
+        number of testing points to generate
+    kern : scikit.gaussian_process.kernels
+        kernel to generate data from
+    noise : float
+        Gaussian noise (standard deviation) to add to GP draws
+    xmin : float
+        minimum extent of inputs, X
+    xmax : float
+        maximum extent of inputs, X
+
+    Returns
+    -------
+    Xtrain : ndarray
+        of shape (ntrain, 1) of training inputs
+    Ytrain : ndarray
+        of shape (ntrain, 1) of training targets
+    Xtest : ndarray
+        of shape (ntrain, 1) of testing inputs
+    Ytest : ndarray
+        of shape (ntrain, 1) of testing targets
+    """
     randgen = np.random.RandomState(next(seedgen))
 
     Xtrain = randgen.rand(ntrain)[:, np.newaxis] * (xmin - xmax) - xmin
@@ -36,12 +63,19 @@ def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, scale=1.,
     return Xtrain, Ytrain, Xtest, ftest
 
 
-def fetch_gpml_sarcos_data(transpose_data=True):
-    """Fetch SARCOS dataset.
+def fetch_gpml_sarcos_data():
+    """Fetch the SARCOS dataset.
 
     Fetch the SARCOS dataset from the internet and parse appropriately into
     python arrays
 
+    Returns
+    -------
+    data : sklearn.datasets.Bunch
+        Bunch object that contrains the dataset
+
+    Examples
+    --------
     >>> gpml_sarcos = fetch_gpml_sarcos_data()
 
     >>> gpml_sarcos.train.data.shape

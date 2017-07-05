@@ -11,7 +11,6 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
 # Layer Composition
 #
 
-
 def compose_layers(Net, layers):
     """Compose a list of layers into a network.
 
@@ -39,9 +38,8 @@ def compose_layers(Net, layers):
 
 
 #
-# Layers
+# Activation Layers
 #
-
 
 def activation(h=lambda X: X):
     """Activation function layer.
@@ -126,8 +124,138 @@ def dropout(keep_prob):
     return build_dropout
 
 
+def random_fourier(n_features, kernel=None):
+    """Random fourier feature layer.
+
+    NOTE: This should be followed by a dense layer to properly implement a
+        kernel approximation.
+
+    Parameters
+    ----------
+    n_features : int
+        the number of unique random features, the actual output dimension of
+        this layer will be ``2 * n_features``.
+    kernel : object
+        the object that yeilds the random samples from the fourier spectrum of
+        a particular kernel to approximate. See ``RBF`` and ``Matern`` etc.
+
+    Returns
+    -------
+    build_random_ff : callable
+        a function that builds the random fourier feature layer.
+    """
+    kernel = kernel if kernel else RBF()
+
+    def build_random_ff(X):
+        n_samples, input_dim = _get_dims(X)
+
+        # Random weights, copy faster than map here
+        P = kernel.weights(input_dim, n_features)
+        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
+
+        # Random features
+        XP = tf.matmul(X, Ps)
+        real = tf.cos(XP)
+        imag = tf.sin(XP)
+        Net = tf.concat([real, imag], axis=-1) / np.sqrt(n_features)
+        KL = 0.
+
+        return Net, KL
+
+    return build_random_ff
+
+
+def random_arccosine(n_features, lenscale=1.0, p=1):
+    """Random arc-cosine kernel layer.
+
+    NOTE: This should be followed by a dense layer to properly implement a
+        kernel approximation.
+
+    Parameters
+    ----------
+    n_features : int
+        the number of unique random features, the actual output dimension of
+        this layer will be ``2 * n_features``.
+    lenscale : float, ndarray, Tensor
+        the lenght scales of the ar-cosine kernel, this can be a scalar for
+        an isotropic kernel, or a vector for an automatic relevance detection
+        (ARD) kernel.
+    p : int
+        The order of the arc-cosine kernel, this must be an integer greater
+        than zero. 0 will lead to sigmoid-like kernels, 1 will lead to
+        relu-like kernels, 2 quadratic-relu kernels etc.
+
+    Returns
+    -------
+    build_random_ac: callable
+        a function that builds the random arc-cosine feature layer.
+
+    See Also
+    --------
+    [1] Cho, Youngmin, and Lawrence K. Saul. "Analysis and extension of
+        arc-cosine kernels for large margin classification." arXiv preprint
+        arXiv:1112.3712 (2011).
+    [2] Cutajar, Kurt, Edwin V. Bonilla, Pietro Michiardi, and Maurizio
+        Filippone. "Accelerating Deep Gaussian Processes Inference with
+        Arc-Cosine Kernels." Bayesian Deep Learning Workshop, Advances in
+        Neural Information Processing Systems, NIPS 2016, Barcelona
+    """
+    if p < 0 or not isinstance(p, int):
+        raise ValueError("p must be a positive integer!")
+    elif p == 0:
+        def pfunc(x):
+            return tf.sign(x)
+    elif p == 1:
+        def pfunc(x):
+            return x
+    else:
+        def pfunc(x):
+            return tf.pow(x, p)
+
+    def build_random_ac(X):
+        n_samples, input_dim = _get_dims(X)
+
+        # Random weights
+        rand = np.random.RandomState(next(seedgen))
+        P = rand.randn(input_dim, n_features).astype(np.float32) / lenscale
+        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
+
+        # Random features
+        XP = tf.matmul(X, Ps)
+        Net = np.sqrt(2. / n_features) * tf.nn.relu(pfunc(XP))
+        KL = 0.
+
+        return Net, KL
+
+    return build_random_ac
+
+
+#
+# Weight layers
+#
+
 def dense_var(output_dim, reg=1., full=False, use_bias=True):
-    """Dense (fully connected) linear layer, with variational inference."""
+    """Dense (fully connected) linear layer, with variational inference.
+
+    Parameters
+    ----------
+    output_dim : int
+        the dimension of the output of this layer
+    reg : float
+        the initial value of the weight prior, w ~ N(0, reg * I), this is
+        optimized (a la maximum likelihood type II)
+    full : bool
+        If true, use a full covariance Gaussian posterior for *each* of the
+        output weight columns, otherwise use an independent (diagonal) Normal
+        posterior.
+    use_bias : bool
+        If true, also learn a bias weight, e.g. a constant offset weight.
+
+    Returns
+    -------
+    build_dense : callable
+        a function that builds the dense variational layer.
+    """
     def build_dense(X):
         # X is a rank 3 tensor, [n_samples, N, D]
         n_samples, input_dim = _get_dims(X)
@@ -160,7 +288,30 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True):
 
 
 def embedding_var(output_dim, n_categories, reg=1., full=False):
-    """Dense (fully connected) embedding layer, with variational inference."""
+    """Dense (fully connected) embedding layer, with variational inference.
+
+    This layer works directly on shape (N, 1) inputs of category *indices*
+    rather than one-hot representations, for efficiency.
+
+    Parameters
+    ----------
+    output_dim : int
+        the dimension of the output (embedding) of this layer
+    n_categories,
+        the number of categories in the input variable
+    reg : float
+        the initial value of the weight prior, w ~ N(0, reg * I), this is
+        optimized (a la maximum likelihood type II)
+    full : bool
+        If true, use a full covariance Gaussian posterior for *each* of the
+        output weight columns, otherwise use an independent (diagonal) Normal
+        posterior.
+
+    Returns
+    -------
+    build_embedding : callable
+        a function that builds the embedding variational layer.
+    """
     if n_categories < 2:
         raise ValueError("There must be more than 2 categories for embedding!")
 
@@ -191,7 +342,24 @@ def embedding_var(output_dim, n_categories, reg=1., full=False):
 
 
 def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
-    """Dense (fully connected) linear layer, with MAP inference."""
+    """Dense (fully connected) linear layer, with MAP inference.
+
+    Parameters
+    ----------
+    output_dim : int
+        the dimension of the output of this layer
+    l1_reg : float
+        the value of the l1 weight regularizer, reg * ||w||_1
+    l2_reg : float
+        the value of the l2 weight regularizer, reg * ||w||^2_2
+    use_bias : bool
+        If true, also learn a bias weight, e.g. a constant offset weight.
+
+    Returns
+    -------
+    build_dense_map : callable
+        a function that builds the dense MAP layer.
+    """
     def build_dense_map(X):
         # X is a rank 3 tensor, [n_samples, N, D]
         n_samples, input_dim = _get_dims(X)
@@ -215,61 +383,6 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
         return Net, penalty
 
     return build_dense_map
-
-
-def random_fourier(n_features, kernel=None):
-    """Random fourier feature layer."""
-    kernel = kernel if kernel else RBF()
-
-    def build_random_ff(X):
-        n_samples, input_dim = _get_dims(X)
-
-        # Random weights, copy faster than map here
-        P = kernel.weights(input_dim, n_features)
-        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
-
-        # Random features
-        XP = tf.matmul(X, Ps)
-        real = tf.cos(XP)
-        imag = tf.sin(XP)
-        Net = tf.concat([real, imag], axis=-1) / np.sqrt(n_features)
-        KL = 0.
-
-        return Net, KL
-
-    return build_random_ff
-
-
-def random_arccosine(n_features, lenscale=1.0, p=1):
-    """Random Arc-Cosine kernel layer."""
-    if p < 0 or not isinstance(p, int):
-        raise ValueError("p must be a positive integer!")
-    elif p == 0:
-        def pfunc(x):
-            return tf.sign(x)
-    elif p == 1:
-        def pfunc(x):
-            return x
-    else:
-        def pfunc(x):
-            return tf.pow(x, p)
-
-    def build_random_ac(X):
-        n_samples, input_dim = _get_dims(X)
-
-        # Random weights
-        rand = np.random.RandomState(next(seedgen))
-        P = rand.randn(input_dim, n_features).astype(np.float32) / lenscale
-        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
-
-        # Random features
-        XP = tf.matmul(X, Ps)
-        Net = np.sqrt(2. / n_features) * tf.nn.relu(pfunc(XP))
-        KL = 0.
-
-        return Net, KL
-
-    return build_random_ac
 
 
 #
