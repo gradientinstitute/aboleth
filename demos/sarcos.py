@@ -25,7 +25,7 @@ LAYERS = [
 ]
 NSAMPLES = 10
 BATCH_SIZE = 100
-NEPOCHS = 10
+NEPOCHS = 50
 NPREDICTSAMPLES = 10  # results in NSAMPLES * NPREDICTSAMPLES samples
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?

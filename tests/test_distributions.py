@@ -6,7 +6,8 @@ from scipy.linalg import cho_solve
 from scipy.stats import wishart
 
 from aboleth.distributions import (Normal, Gaussian, kl_normal_normal,
-                                   kl_gaussian_normal, kl_qp, _chollogdet)
+                                   kl_gaussian_normal, kl_gaussian_gaussian,
+                                   kl_qp, _chollogdet)
 
 
 def test_kl_normal_normal():
@@ -60,7 +61,31 @@ def test_kl_gaussian_normal():
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        assert np.abs(KL.eval() - KLr) < 0.02 * KLr  # 2% numerical slop
+        # assert np.abs(KL.eval() - KLr) < 0.02 * KLr  # 2% numerical slop
+        diff = KL.eval() - KLr
+        assert diff == 0
+
+
+def test_kl_gaussian_gaussian():
+    """Test Gaussian/Gaussian KL."""
+    dim = (10, 5)
+    Dim = (5, 10, 10)
+
+    mu0 = np.random.randn(*dim).astype(np.float32)
+    L0 = random_chol(Dim)
+    q = Gaussian(mu0, L0)
+
+    mu1 = np.random.randn(*dim).astype(np.float32)
+    L1 = random_chol(Dim)
+    p = Gaussian(mu1, L1)
+
+    KL = kl_gaussian_gaussian(q, p)
+    KLr = KLdiv(mu0, L0, mu1, L1)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        # assert np.abs(KL.eval() - KLr) < 0.02 * KLr  # 2% numerical slop
+        assert np.allclose(KL.eval(), KLr)
 
 
 def test_kl_qp():
@@ -116,7 +141,7 @@ def random_chol(dim):
 
 def KLdiv(mu0, Lcov0, mu1, Lcov1):
     """Numpy KL calculation."""
-    KL = 0
+    KL = 0.
     D, _ = mu0.shape
     for m0, m1, L0, L1 in zip(mu0.T, mu1.T, Lcov0, Lcov1):
         md = m1 - m0
@@ -128,4 +153,4 @@ def KLdiv(mu0, Lcov0, mu1, Lcov1):
 
 def logdet(L):
     """Log Determinant from Cholesky."""
-    return 2 * np.log(L.diagonal()).sum()
+    return 2. * np.log(L.diagonal()).sum()

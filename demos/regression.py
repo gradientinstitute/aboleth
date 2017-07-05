@@ -26,7 +26,7 @@ true_noise = 0.1
 # Model settings
 n_samples = 5
 n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
-n_epochs = 150
+n_epochs = 500
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
@@ -36,7 +36,13 @@ reg = 1.
 lenscale1 = tf.Variable(1.)
 layers = [
     # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
-    ab.random_fourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
+    # ab.random_fourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale1))),
+    ab.dense_var(output_dim=20, reg=reg, full=True),
+    ab.activation(tf.nn.relu),
+    ab.dense_var(output_dim=20, reg=reg, full=True),
+    ab.activation(tf.nn.relu),
+    ab.dense_var(output_dim=10, reg=reg, full=True),
+    ab.activation(tf.tanh),
     ab.dense_var(output_dim=1, reg=reg, full=True)
 ]
 

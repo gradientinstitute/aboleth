@@ -220,11 +220,36 @@ def kl_gaussian_normal(q, p):
     KL : Tensor
         the result of KL[q||p].
     """
-    D = tf.to_float(q.d[0])  # D is the input dimension
+    D, n = tf.to_float(q.d[0]), tf.to_float(q.d[1])
     tr = tf.reduce_sum(q.L * q.L) / p.var
     dist = tf.nn.l2_loss(p.mu - tf.reshape(q.mu, q.d)) / p.var
-    logdet = D * tf.log(p.var) - _chollogdet(q.L)
-    KL = 0.5 * (tr + dist + logdet - D)
+    logdet = n * D * tf.log(p.var) - _chollogdet(q.L)
+    KL = 0.5 * (tr + dist + logdet - n * D)
+    return KL
+
+
+def kl_gaussian_gaussian(q, p):
+    """Gaussian-Gaussian Kullback Leibler divergence calculation.
+
+    Parameters
+    ----------
+    q : Gaussian
+        the approximating 'q' distribution.
+    p : Gaussian
+        the prior 'p' distribution.
+
+    Returns
+    -------
+    KL : Tensor
+        the result of KL[q||p].
+    """
+    D = tf.to_float(q.d[0])  # D is the input dimension
+    qCipC = tf.cholesky_solve(p.L, tf.matmul(q.L, q.L, transpose_b=True))
+    tr = tf.trace(qCipC)
+    md = p.mu - tf.reshape(q.mu, q.d)
+    dist = tf.matmul(md, tf.cholesky_solve(p.L, md), transpose_a=True)
+    logdet = _chollogdet(p.L) - _chollogdet(q.L)
+    KL = 0.5 * (tf.reduce_sum(tr + dist - D) + logdet)
     return KL
 
 
@@ -234,6 +259,6 @@ def kl_gaussian_normal(q, p):
 
 def _chollogdet(L):
     """Log det of a cholesky, where L is [..., D, D]."""
-    l = tf.maximum(tf.matrix_diag_part(L), 1e-10)  # Make sure we don't go to 0
+    l = tf.maximum(tf.matrix_diag_part(L), 1e-15)  # Make sure we don't go to 0
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet
