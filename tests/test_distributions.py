@@ -61,9 +61,7 @@ def test_kl_gaussian_normal():
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        # assert np.abs(KL.eval() - KLr) < 0.02 * KLr  # 2% numerical slop
-        diff = KL.eval() - KLr
-        assert diff == 0
+        assert np.allclose(KL.eval(), KLr)
 
 
 def test_kl_gaussian_gaussian():
@@ -84,7 +82,6 @@ def test_kl_gaussian_gaussian():
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        # assert np.abs(KL.eval() - KLr) < 0.02 * KLr  # 2% numerical slop
         assert np.allclose(KL.eval(), KLr)
 
 
@@ -141,13 +138,15 @@ def random_chol(dim):
 
 def KLdiv(mu0, Lcov0, mu1, Lcov1):
     """Numpy KL calculation."""
-    KL = 0.
-    D, _ = mu0.shape
+    tr, dist, ldet = 0., 0., 0.
+    D, n = mu0.shape
     for m0, m1, L0, L1 in zip(mu0.T, mu1.T, Lcov0, Lcov1):
+        tr += np.trace(cho_solve((L1, True), L0.dot(L0.T)))
         md = m1 - m0
-        KL += 0.5 * (np.trace(cho_solve((L1, True), L0.dot(L0.T)))
-                     + md.dot(cho_solve((L1, True), md))
-                     - D + logdet(L1) - logdet(L0))
+        dist += md.dot(cho_solve((L1, True), md))
+        ldet += logdet(L1) - logdet(L0)
+
+    KL = 0.5 * (tr + dist + ldet - D * n)
     return KL
 
 

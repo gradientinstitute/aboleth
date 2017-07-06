@@ -51,17 +51,29 @@ class Gaussian:
 
     def __init__(self, mu, L):
         """Construct a Normal distribution object."""
-        self.mu = tf.expand_dims(tf.transpose(mu), 2)  # O x I x 1
+        self.mu = mu
         self.L = L  # O x I x I
         self.d = tf.shape(mu)
-        self.D = tf.shape(self.mu)
 
     def sample(self):
         """Construct a Normal distribution object."""
         # Reparameterisation trick
-        e = tf.random_normal(self.D, seed=next(seedgen))
-        x = tf.reshape(self.mu + tf.matmul(self.L, e), self.d)
+        mu = self.transform_w(self.mu)
+        e = tf.random_normal(tf.shape(mu), seed=next(seedgen))
+        x = self.itransform_w(mu + tf.matmul(self.L, e))
         return x
+
+    @staticmethod
+    def transform_w(w):
+        """Transform a weight matrix, [d_i, d_o] -> [d_o, d_i, 1]."""
+        wt = tf.expand_dims(tf.transpose(w), 2)  # O x I x 1
+        return wt
+
+    @staticmethod
+    def itransform_w(wt):
+        """Un-transform a weight matrix, [d_o, d_i, 1] -> [d_i, d_o]."""
+        w = tf.transpose(wt[:, :, 0])
+        return w
 
 
 #
@@ -222,7 +234,7 @@ def kl_gaussian_normal(q, p):
     """
     D, n = tf.to_float(q.d[0]), tf.to_float(q.d[1])
     tr = tf.reduce_sum(q.L * q.L) / p.var
-    dist = tf.nn.l2_loss(p.mu - tf.reshape(q.mu, q.d)) / p.var
+    dist = tf.reduce_sum((p.mu - q.mu)**2) / p.var
     logdet = n * D * tf.log(p.var) - _chollogdet(q.L)
     KL = 0.5 * (tr + dist + logdet - n * D)
     return KL
@@ -243,13 +255,13 @@ def kl_gaussian_gaussian(q, p):
     KL : Tensor
         the result of KL[q||p].
     """
-    D = tf.to_float(q.d[0])  # D is the input dimension
+    D, n = tf.to_float(q.d[0]), tf.to_float(q.d[1])
     qCipC = tf.cholesky_solve(p.L, tf.matmul(q.L, q.L, transpose_b=True))
-    tr = tf.trace(qCipC)
-    md = p.mu - tf.reshape(q.mu, q.d)
-    dist = tf.matmul(md, tf.cholesky_solve(p.L, md), transpose_a=True)
+    tr = tf.reduce_sum(tf.trace(qCipC))
+    md = q.transform_w(p.mu - q.mu)
+    dist = tf.reduce_sum(md * tf.cholesky_solve(p.L, md))
     logdet = _chollogdet(p.L) - _chollogdet(q.L)
-    KL = 0.5 * (tf.reduce_sum(tr + dist - D) + logdet)
+    KL = 0.5 * (tr + dist + logdet - n * D)
     return KL
 
 
