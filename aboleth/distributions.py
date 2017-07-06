@@ -27,12 +27,12 @@ class Normal:
         self.mu = mu
         self.var = var
         self.sigma = tf.sqrt(var)
-        self.D = tf.shape(mu)
+        self.d = tf.shape(mu)
 
     def sample(self):
         """Draw a random sample from this object."""
         # Reparameterisation trick
-        e = tf.random_normal(self.D, seed=next(seedgen))
+        e = tf.random_normal(self.d, seed=next(seedgen))
         x = self.mu + e * self.sigma
         return x
 
@@ -46,7 +46,7 @@ class Gaussian:
     mu : Tensor
         mean, shape [d_i, d_o]
     L : Tensor
-        Cholesky, shape [d_o, d_i, d_i]
+        Cholesky of the covariance matrix, shape [d_o, d_i, d_i]
     """
 
     def __init__(self, mu, L):
@@ -167,6 +167,7 @@ def gaus_posterior(dim, var0):
 # KL divergence calculations
 #
 
+
 def kl_qp(q, p):
     """A generic Kullback Leibler divergence wrapper.
 
@@ -182,17 +183,12 @@ def kl_qp(q, p):
     KL : Tensor
         the result of KL[q||p].
     """
-    dispatch = {
-        (Normal, Normal): kl_normal_normal,
-        (Gaussian, Normal): kl_gaussian_normal
-    }
-
     dists = (q.__class__, p.__class__)
 
-    if dists not in dispatch:
+    if dists not in __kl_dispatch:
         raise ValueError("KL not implemented for {} and {}".format(*dists))
 
-    KL = dispatch[dists](q, p)
+    KL = __kl_dispatch[dists](q, p)
     return KL
 
 
@@ -274,3 +270,10 @@ def _chollogdet(L):
     l = tf.maximum(tf.matrix_diag_part(L), 1e-15)  # Make sure we don't go to 0
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet
+
+
+__kl_dispatch = {
+    (Normal, Normal): kl_normal_normal,
+    (Gaussian, Normal): kl_gaussian_normal,
+    (Gaussian, Gaussian): kl_gaussian_gaussian
+}

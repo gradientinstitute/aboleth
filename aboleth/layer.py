@@ -351,7 +351,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
     l1_reg : float
         the value of the l1 weight regularizer, reg * ||w||_1
     l2_reg : float
-        the value of the l2 weight regularizer, reg * ||w||^2_2
+        the value of the l2 weight regularizer, reg * 0.5 * ||w||^2_2
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
 
