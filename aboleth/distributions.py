@@ -1,6 +1,7 @@
 """Model parameter distributions."""
 import numpy as np
 import tensorflow as tf
+from multipledispatch import dispatch
 
 from aboleth.util import pos
 from aboleth.random import seedgen
@@ -153,9 +154,8 @@ def gaus_posterior(dim, var0):
     l0 = np.tile(np.eye(I), [O, 1, 1])[:, u, v].T
     l0 = l0 * tf.random_gamma(alpha=sig0, shape=l0.shape, seed=next(seedgen))
     l = tf.Variable(l0, name="W_cov_q")
-    L = tf.scatter_nd(indices, l, shape=(I * I, O))
-    L = tf.transpose(L)
-    L = tf.reshape(L, (O, I, I))
+    Lt = tf.transpose(tf.scatter_nd(indices, l, shape=(I * I, O)))
+    L = tf.reshape(Lt, (O, I, I))
 
     mu_0 = tf.random_normal((I, O), stddev=sig0, seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
@@ -168,31 +168,8 @@ def gaus_posterior(dim, var0):
 #
 
 
+@dispatch(Normal, Normal)
 def kl_qp(q, p):
-    """A generic Kullback Leibler divergence wrapper.
-
-    Parameters
-    ----------
-    q : object
-        the approximating 'q' distribution.
-    p : object
-        the prior 'p' distribution.
-
-    Returns
-    -------
-    KL : Tensor
-        the result of KL[q||p].
-    """
-    dists = (q.__class__, p.__class__)
-
-    if dists not in __kl_dispatch:
-        raise ValueError("KL not implemented for {} and {}".format(*dists))
-
-    KL = __kl_dispatch[dists](q, p)
-    return KL
-
-
-def kl_normal_normal(q, p):
     """Normal-Normal Kullback Leibler divergence calculation.
 
     Parameters
@@ -213,7 +190,8 @@ def kl_normal_normal(q, p):
     return KL
 
 
-def kl_gaussian_normal(q, p):
+@dispatch(Gaussian, Normal)  # noqa
+def kl_qp(q, p):
     """Gaussian-Normal Kullback Leibler divergence calculation.
 
     Parameters
@@ -236,7 +214,8 @@ def kl_gaussian_normal(q, p):
     return KL
 
 
-def kl_gaussian_gaussian(q, p):
+@dispatch(Gaussian, Gaussian)  # noqa
+def kl_qp(q, p):
     """Gaussian-Gaussian Kullback Leibler divergence calculation.
 
     Parameters
@@ -270,10 +249,3 @@ def _chollogdet(L):
     l = tf.maximum(tf.matrix_diag_part(L), 1e-15)  # Make sure we don't go to 0
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet
-
-
-__kl_dispatch = {
-    (Normal, Normal): kl_normal_normal,
-    (Gaussian, Normal): kl_gaussian_normal,
-    (Gaussian, Gaussian): kl_gaussian_gaussian
-}

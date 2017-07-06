@@ -184,7 +184,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
 
     Note
     ----
-        This has to be called in an *active* tensorflow session!
+    This has to be called in an *active* tensorflow session!
     """
     pred = [predictor.eval(feed_dict=feed_dict, session=session)
             for _ in range(n_groups)]
@@ -218,7 +218,7 @@ def predict_expected(predictor, feed_dict, n_groups=1, session=None):
 
     Note
     ----
-        This has to be called in an *active* tensorflow session!
+    This has to be called in an *active* tensorflow session!
     """
     pred = 0
     for _ in range(n_groups):

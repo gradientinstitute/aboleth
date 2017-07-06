@@ -4,6 +4,12 @@ import numpy as np
 import tensorflow as tf
 import aboleth as ab
 
+from aboleth.distributions import norm_prior, gaus_posterior
+
+D = 10
+DIM = (2, 10)
+EDIM = (5, 10)
+
 
 def test_activation(make_data):
     """Test nonlinear activation layer."""
@@ -79,6 +85,7 @@ def test_fork_add(make_data):
 def test_kernels(kernels, make_data):
     """Test random kernels approximations."""
     d, D = 10, 100
+    S = 3
     kern, p = kernels
     k = kern(**p)
 
@@ -87,8 +94,7 @@ def test_kernels(kernels, make_data):
     assert P.shape == (d, D)
 
     x, _, _ = make_data
-    x_ = tf.placeholder(tf.float32, x.shape)
-    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
+    x_, X_ = _make_placeholders(x, S)
     N = x.shape[0]
 
     Phi, KL = ab.random_fourier(D, kernel=k)(X_)
@@ -106,9 +112,9 @@ def test_kernels(kernels, make_data):
 
 def test_arc_cosine(make_data):
     """Test the random Arc Cosine kernel."""
+    S = 3
     x, _, _ = make_data
-    x_ = tf.placeholder(tf.float32, x.shape)
-    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
+    x_, X_ = _make_placeholders(x, S)
 
     F, KL = ab.random_arccosine(n_features=10)(X_)
 
@@ -125,16 +131,13 @@ def test_dense_embeddings(make_categories):
     x, K = make_categories
     N = len(x)
     S = 3
-    D = 4
-    x_ = tf.placeholder(tf.int32, x.shape)
-    X_ = tf.tile(tf.expand_dims(x_, 0), [S, 1, 1])
+    x_, X_ = _make_placeholders(x, S, tf.int32)
     output, KL = ab.embedding_var(output_dim=D, n_categories=K)(X_)
 
-    init = tf.global_variables_initializer()
     tc = tf.test.TestCase()
     with tc.test_session():
-        init.run()
-        kl = KL.eval(feed_dict={x_: x})
+        tf.global_variables_initializer().run()
+        kl = KL.eval()
 
         assert np.isscalar(kl)
         assert kl > 0
@@ -148,10 +151,9 @@ def test_dense_embeddings(make_categories):
 def test_dense_outputs(dense, make_data):
     """Make sure the dense layers output expected dimensions."""
     x, _, _ = make_data
-    D = 20
+    S = 3
 
-    x_ = tf.placeholder(tf.float32, x.shape)
-    X_ = tf.tile(tf.expand_dims(x_, 0), [3, 1, 1])
+    x_, X_ = _make_placeholders(x, S)
     N = x.shape[0]
 
     Phi, KL = dense(output_dim=D)(X_)
@@ -160,6 +162,56 @@ def test_dense_outputs(dense, make_data):
     with tc.test_session():
         tf.global_variables_initializer().run()
         P = Phi.eval(feed_dict={x_: x})
-        assert P.shape == (3, N, D)
+        assert P.shape == (S, N, D)
         assert P.dtype == np.float32
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
+
+
+@pytest.mark.parametrize('dists', [
+    {'prior_W': norm_prior(DIM, 1.), 'prior_b': norm_prior((D,), 1.)},
+    {'post_W': norm_prior(DIM, 1.), 'post_b': norm_prior((D,), 1.)},
+    {'prior_W': norm_prior(DIM, 1.), 'post_W': norm_prior(DIM, 1.)},
+    {'prior_W': norm_prior(DIM, 1.), 'post_W': gaus_posterior(DIM, 1.)},
+    {'prior_W': gaus_posterior(DIM, 1.), 'post_W': gaus_posterior(DIM, 1.)},
+])
+def test_dense_distribution(dists, make_data):
+    x, _, _ = make_data
+    S = 3
+
+    x_, X_ = _make_placeholders(x, S)
+    N = x.shape[0]
+
+    Phi, KL = ab.dense_var(output_dim=D, **dists)(X_)
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        P = Phi.eval(feed_dict={x_: x})
+        assert P.shape == (S, N, D)
+        assert KL.eval() >= 0.
+
+
+@pytest.mark.parametrize('dists', [
+    {'prior_W': norm_prior(EDIM, 1.), 'post_W': norm_prior(EDIM, 1.)},
+    {'prior_W': norm_prior(EDIM, 1.), 'post_W': gaus_posterior(EDIM, 1.)},
+    {'prior_W': gaus_posterior(EDIM, 1.), 'post_W': gaus_posterior(EDIM, 1.)},
+])
+def test_embeddings_distribution(dists, make_categories):
+    """Test the embedding layer."""
+    x, K = make_categories
+    N = len(x)
+    S = 3
+    x_, X_ = _make_placeholders(x, S, tf.int32)
+    output, KL = ab.embedding_var(output_dim=D, n_categories=K, **dists)(X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        Phi = output.eval(feed_dict={x_: x})
+        assert Phi.shape == (S, N, D)
+        assert KL.eval() >= 0.
+
+
+def _make_placeholders(x, S, xtype=tf.float32):
+    x_ = tf.placeholder(xtype, x.shape)
+    X_ = tf.tile(tf.expand_dims(x_, 0), [S, 1, 1])
+    return x_, X_

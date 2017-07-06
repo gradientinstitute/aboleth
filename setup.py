@@ -19,10 +19,11 @@ setup(
     install_requires=[
         'numpy>=1.12.0',
         'scipy>=0.18.1',
+        'tensorflow>=1.1.0',
         'scikit-learn>=0.18.1',
         'six>=1.10.0',
         'bokeh>=0.12.4',
-        # 'tensorflow-gpu>=1.2.0',
+        'multipledispatch>=0.4.9',
     ],
     extras_require={
         'dev': [
