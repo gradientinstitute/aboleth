@@ -39,6 +39,22 @@ def bernoulli():
     return loglike
 
 
+def categorical():
+    """Categorical, or Generalized Bernoulli log-likelihood.
+
+    Returns
+    -------
+    loglike : callable
+        build the log likelihood graph of this distribution
+    """
+    def loglike(x, f):
+        # sum along last axis, which is assumed to be the `tasks` axis
+        ll = tf.reduce_sum(x * tf.log(pos(f)), axis=-1)
+        return ll
+
+    return loglike
+
+
 def binomial(n):
     """Binomial log-likelihood.
 
