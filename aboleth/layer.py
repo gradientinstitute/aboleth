@@ -234,7 +234,8 @@ def random_arccosine(n_features, lenscale=1.0, p=1):
 # Weight layers
 #
 
-def dense_var(output_dim, reg=1., full=False, use_bias=True):
+def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
+              prior_b=None, post_W=None, post_b=None):
     """Dense (fully connected) linear layer, with variational inference.
 
     Parameters
@@ -243,13 +244,31 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True):
         the dimension of the output of this layer
     reg : float
         the initial value of the weight prior, w ~ N(0, reg * I), this is
-        optimized (a la maximum likelihood type II)
+        optimized (a la maximum likelihood type II).
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
+    prior_W: {Normal, Gaussian}, optional
+        This is the prior distribution object to use on the layer weights. It
+        must have parameters compatible with ``(input_dim, output_dim)`` shaped
+        weights. This ignores the ``reg`` parameter.
+    prior_b: {Normal, Gaussian}, optional
+        This is the prior distribution object to use on the layer intercept. It
+        must have parameters compatible with ``(output_dim,)`` shaped weights.
+        This ignores the ``reg`` and ``use_bias`` parameters.
+    post_W: {Normal, Gaussian}, optional
+        This is the posterior distribution object to use on the layer weights.
+        It must have parameters compatible with ``(input_dim, output_dim)``
+        shaped weights. This ignores the ``full`` parameter. See
+        ``distributions.gaus_posterior``.
+    post_b: {Normal, Gaussian}, optional
+        This is the posterior distribution object to use on the layer
+        intercept. It must have parameters compatible with ``(output_dim,)``
+        shaped weights. This ignores the ``use_bias`` parameters.
+        See ``distributions.norm_posterior``.
 
     Returns
     -------
@@ -263,9 +282,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True):
         bdim = (output_dim,)
 
         # Layer weights
-        pW = norm_prior(dim=Wdim, var=reg)
-        qW = (gaus_posterior(dim=Wdim, var0=reg) if full else
-              norm_posterior(dim=Wdim, var0=reg))
+        pW, qW = _make_bayesian_weights(prior_W, post_W, Wdim, reg, full)
         Wsamples = _sample(qW, n_samples)
 
         # Linear layer
@@ -275,9 +292,8 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True):
         KL = kl_qp(qW, pW)
 
         # Optional bias
-        if use_bias is True:
-            qb = norm_posterior(dim=bdim, var0=reg)
-            pb = norm_prior(dim=bdim, var=reg)
+        if use_bias is True or prior_b or post_b:
+            pb, qb = _make_bayesian_weights(prior_b, post_b, bdim, reg, False)
             bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
             Net += bsamples
             KL += kl_qp(qb, pb)
@@ -287,7 +303,8 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True):
     return build_dense
 
 
-def embedding_var(output_dim, n_categories, reg=1., full=False):
+def embedding_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
+                  post_W=None):
     """Dense (fully connected) embedding layer, with variational inference.
 
     This layer works directly on shape (N, 1) inputs of category *indices*
@@ -306,6 +323,15 @@ def embedding_var(output_dim, n_categories, reg=1., full=False):
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
+    prior_W: {Normal, Gaussian}, optional
+        This is the prior distribution object to use on the layer weights. It
+        must have parameters compatible with ``(input_dim, output_dim)`` shaped
+        weights. This ignores the ``reg`` parameter.
+    post_W: {Normal, Gaussian}, optional
+        This is the posterior distribution object to use on the layer weights.
+        It must have parameters compatible with ``(input_dim, output_dim)``
+        shaped weights. This ignores the ``full`` parameter. See
+        ``distributions.gaus_posterior``.
 
     Returns
     -------
@@ -324,9 +350,7 @@ def embedding_var(output_dim, n_categories, reg=1., full=False):
         n_samples = X.shape[0]
 
         # Layer weights
-        pW = norm_prior(dim=Wdim, var=reg)
-        qW = (gaus_posterior(dim=Wdim, var0=reg) if full else
-              norm_posterior(dim=Wdim, var0=reg))
+        pW, qW = _make_bayesian_weights(prior_W, post_W, Wdim, reg, full)
         Wsamples = tf.transpose(_sample(qW, n_samples), [1, 2, 0])
 
         # Embedding layer -- gather only works on the first dim hence transpose
@@ -492,6 +516,28 @@ def _get_dims(X):
     return int(n_samples), int(input_dim)
 
 
+def _is_dim(X, dims):
+    shape = tuple([int(d) for d in X.get_shape()])
+    return shape == dims
+
+
 def _sample(dist, n_samples):
     samples = tf.stack([dist.sample() for _ in range(n_samples)])
     return samples
+
+
+def _make_bayesian_weights(prior_W, post_W, Wdim, reg, full):
+    if prior_W:
+        if not _is_dim(prior_W.mu, Wdim):
+            raise ValueError("Incompatible dimension in prior distribution!")
+    if post_W:
+        if not _is_dim(post_W.mu, Wdim):
+            raise ValueError("Incompatible dimension in posterior"
+                             " distribution!")
+
+    pW = prior_W if prior_W else norm_prior(dim=Wdim, var=reg)
+    qW = post_W if post_W else (
+        gaus_posterior(dim=Wdim, var0=reg) if full else
+        norm_posterior(dim=Wdim, var0=reg)
+    )
+    return pW, qW

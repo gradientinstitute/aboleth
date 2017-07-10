@@ -5,9 +5,7 @@ import tensorflow as tf
 from scipy.linalg import cho_solve
 from scipy.stats import wishart
 
-from aboleth.distributions import (Normal, Gaussian, kl_normal_normal,
-                                   kl_gaussian_normal, kl_gaussian_gaussian,
-                                   kl_qp, _chollogdet)
+from aboleth.distributions import Normal, Gaussian, kl_qp, _chollogdet
 
 
 def test_kl_normal_normal():
@@ -20,18 +18,18 @@ def test_kl_normal_normal():
 
     # Test 0 KL
     p = Normal(mu, var)
-    KL0 = kl_normal_normal(q, p)
+    KL0 = kl_qp(q, p)
 
     # Test diff var
     var1 = 2.0
     p = Normal(mu, var1)
-    KL1 = kl_normal_normal(q, p)
+    KL1 = kl_qp(q, p)
     rKL1 = 0.5 * (var / var1 - 1 + np.log(var1 / var)) * np.prod(dim)
 
     # Test diff mu
     mu1 = np.ones(dim)
     p = Normal(mu1, var)
-    KL2 = kl_normal_normal(q, p)
+    KL2 = kl_qp(q, p)
     rKL2 = 0.5 * (np.sum((mu1 - mu)**2) / var)
 
     tc = tf.test.TestCase()
@@ -56,7 +54,7 @@ def test_kl_gaussian_normal():
           for _ in range(dim[1])]
     p = Normal(mu1, var1)
 
-    KL = kl_gaussian_normal(q, p)
+    KL = kl_qp(q, p)
     KLr = KLdiv(mu0, L0, mu1, L1)
 
     tc = tf.test.TestCase()
@@ -77,7 +75,7 @@ def test_kl_gaussian_gaussian():
     L1 = random_chol(Dim)
     p = Gaussian(mu1, L1)
 
-    KL = kl_gaussian_gaussian(q, p)
+    KL = kl_qp(q, p)
     KLr = KLdiv(mu0, L0, mu1, L1)
 
     tc = tf.test.TestCase()
@@ -111,7 +109,7 @@ def test_kl_qp():
         assert np.isscalar(gn)
 
     # This is not implemented and should error
-    with pytest.raises(ValueError):
+    with pytest.raises(NotImplementedError):
         kl_qp(p, qg)
 
 
