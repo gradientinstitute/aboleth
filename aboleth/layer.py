@@ -527,17 +527,20 @@ def _sample(dist, n_samples):
 
 
 def _make_bayesian_weights(prior_W, post_W, Wdim, reg, full):
+    # Check/make prior
     if prior_W:
         if not _is_dim(prior_W.mu, Wdim):
             raise ValueError("Incompatible dimension in prior distribution!")
+    else:
+        prior_W = norm_prior(dim=Wdim, var=reg)
+
+    # Check/make posterior
     if post_W:
         if not _is_dim(post_W.mu, Wdim):
             raise ValueError("Incompatible dimension in posterior"
                              " distribution!")
+    else:
+        post_W = (gaus_posterior(dim=Wdim, var0=reg) if full else
+                  norm_posterior(dim=Wdim, var0=reg))
 
-    pW = prior_W if prior_W else norm_prior(dim=Wdim, var=reg)
-    qW = post_W if post_W else (
-        gaus_posterior(dim=Wdim, var0=reg) if full else
-        norm_posterior(dim=Wdim, var0=reg)
-    )
-    return pW, qW
+    return prior_W, post_W
