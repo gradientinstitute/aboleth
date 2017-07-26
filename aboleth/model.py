@@ -1,103 +1,12 @@
 """Network construction and evaluation."""
 import tensorflow as tf
 
-from aboleth.layer import compose_layers
+# from aboleth.layer import compose_layers
 
 
 #
 # Graph Building -- Models and Optimisation
 #
-
-
-def deepnet(X, Y, N, layers, likelihood, n_samples=10, like_weights=None):
-    """Make a supervised Bayesian deep net.
-
-    Parameters
-    ----------
-    X : ndarray, Tensor
-        the covariates of shape (N, dimensions).
-    Y : ndarray, Tensor
-        the targets of shape (N, tasks).
-    N : int, Tensor
-        the total size of the dataset (i.e. number of observations).
-    layers : sequence
-        a list (or sequence) of layers defining the neural net. See also the
-        ``layers`` module.
-    likelihood : Tensor
-        the likelihood model to use on the output of the last layer of the
-        neural net, see the ``likelihood`` module.
-    n_samples : int
-        the number of samples to use for evaluating the expected log-likelihood
-        in the objective function. This replicates the whole net for each
-        sample.
-    like_weights : callable, ndarray, Tensor
-        weights to apply to each sample in the expected log likelihood. This
-        should be an array of shape (samples, 1) or can be called as
-        ``like_weights(Y)`` and should return a (samples, 1) array.
-
-    Returns
-    -------
-    Net : Tensor
-        the neural net Tensor that can be used for prediction. This will return
-        ``n_samples`` predicted values, i.e. if it is queried with ``X``
-        having shape (N, D), it will return (n_samples, N, tasks).
-    loss : Tensor
-        the loss function use to train the model.
-    """
-    Net, KL = _tile_compose(X, layers, n_samples)
-    loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    return Net, loss
-
-
-def featurenet(features, Y, N, layers, likelihood, n_samples=10,
-               like_weights=None):
-    """Make a supervised Bayesian deep net with multiple input nets.
-
-    Parameters
-    ----------
-    features : list of (ndarray or Tensor, list) tuples
-        list of (``X``, ``layers``) pairs so the net can have different input
-        features of different type, e.g. categorical and continuous. The output
-        of these layers are concatenated before feeding into the rest of the
-        net.
-    Y : ndarray, Tensor
-        the targets of shape (N, tasks).
-    N : int, Tensor
-        the total size of the dataset (i.e. number of observations).
-    layers : sequence
-        a list (or sequence) of layers defining the neural net. See also the
-        ``layers`` module. This is applies after the ``features`` layers.
-    likelihood : Tensor
-        the likelihood model to use on the output of the last layer of the
-        neural net, see the ``likelihood`` module.
-    n_samples : int
-        the number of samples to use for evaluating the expected log-likelihood
-        in the objective function. This replicates the whole net for each
-        sample.
-    like_weights : callable, ndarray, Tensor
-        weights to apply to each sample in the expected log likelihood. This
-        should be an array of shape (samples, 1) or can be called as
-        ``like_weights(Y)`` and should return a (samples, 1) array.
-
-    Returns
-    -------
-    Net : Tensor
-        the neural net Tensor that can be used for prediction. This will return
-        ``n_samples`` predicted values, i.e. if it is queried with ``X``
-        having shape (N, D), it will return (n_samples, N, tasks).
-    loss : Tensor
-        the loss function use to train the model.
-    """
-    # Constuct all input nets and concatenate outputs
-    Net, KLs = zip(*map(lambda f: _tile_compose(*f, n_samples), features))
-    Net = tf.concat(Net, axis=-1)
-
-    # Now construct the rest of the net and add all penalty terms
-    Net, KL = compose_layers(Net, layers)
-    KL += sum(KLs)
-    loss = elbo(Net, Y, N, KL, likelihood, like_weights)
-    return Net, loss
-
 
 def elbo(Net, Y, N, KL, likelihood, like_weights=None):
     """Build the evidence lower bound loss for a neural net.
@@ -137,7 +46,6 @@ def elbo(Net, Y, N, KL, likelihood, like_weights=None):
     l = - B * ELL + KL
     return l
 
-
 #
 # Graph Building -- Prediction and evaluation
 #
@@ -164,14 +72,3 @@ def log_prob(Y, likelihood, Net):
     """
     log_prob = likelihood(Y, Net)
     return log_prob
-
-
-#
-# Private module utils
-#
-
-def _tile_compose(X, layers, n_samples):
-    """Tile X into seperate samples, then compose layers for each sample."""
-    Net = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])  # (n_samples, N, D)
-    Net, KL = compose_layers(Net, layers)
-    return Net, KL

@@ -25,18 +25,13 @@ LABEL_COLUMN = "label"
 # Algorithm properties
 RSEED = 17
 ab.set_hyperseed(RSEED)
-CON_LAYERS = [
-    ab.dense_var(output_dim=5, full=True)
-]
-LAYERS = [
-    ab.random_arccosine(100, 1.),
-    ab.dense_var(output_dim=1, full=True),
-    ab.activation(tf.sigmoid)
-]
+
+# Sample width of net
+T_SAMPLES = 10
 EMBED_DIMS = 3
+
 BSIZE = 50
 NITER = 60000
-T_SAMPLES = 10
 P_SAMPLES = 5  # results in T_SAMPLES * P_SAMPLES predcitions
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
@@ -47,34 +42,44 @@ def main():
     # Get Continuous and categorical data
     df_train, df_test = fetch_data()
     df = pd.concat((df_train, df_test))
-    X_con, X_cat, Y = input_fn(df)
+    X_con, X_cat, n_cats, Y = input_fn(df)
+
+    # Define our graph
+    con_layer = ab.stack(ab.sample(T_SAMPLES),
+                         ab.dense_var(output_dim=5, full=True))
+
+    # Note every embed_var call can be different
+    cat_layer_list = [ab.embed_var(i, EMBED_DIMS) for i in n_cats]
+
+    # # Concatenate assuming each layer gets a single slice
+    cat_layer = ab.stack(ab.sample(T_SAMPLES),
+                         ab.slicecat(*cat_layer_list))
+
+    net = ab.stack(ab.concat(con_layer, cat_layer),
+                   ab.random_arccosine(100, 1.),
+                   ab.dense_var(output_dim=1, full=True),
+                   ab.activation(tf.sigmoid))
 
     # Split data into training and testing
     Xt_con, Xs_con = np.split(X_con, [len(df_train)], axis=0)
-    Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=1)
-    D_cat = len(X_cat)
+    Xt_cat, Xs_cat = np.split(X_cat, [len(df_train)], axis=0)
     Yt, Ys = np.split(Y, [len(df_train)], axis=0)
 
     # Graph place holders
     X_con_ = tf.placeholder(tf.float32, [None, Xt_con.shape[1]])
+    X_cat_ = tf.placeholder(tf.int32, [None, Xt_cat.shape[1]])
     Y_ = tf.placeholder(tf.float32, [None, 1])
 
-    # Create the categorical embedding inputs
-    K = X_cat.max(axis=1).flatten() + 1
-    D_out = [EMBED_DIMS] * D_cat
-    X_cat_, catfeat = embedding_layers(D_out, K, full=False)
-
-    # Feed dicts
-    train_dict = {X_con_: Xt_con, Y_: Yt}
-    train_dict.update(dict(zip(X_cat_, Xt_cat)))
-    test_dict = {X_con_: Xs_con}
-    test_dict.update(dict(zip(X_cat_, Xs_cat)))
+    # # Feed dicts
+    train_dict = {X_con_: Xt_con, X_cat_: Xt_cat, Y_: Yt}
+    test_dict = {X_con_: Xs_con, X_cat_: Xs_cat}
 
     # Make model
     N = len(Xt_con)
-    features = [(X_con_, CON_LAYERS)] + catfeat
     likelihood = ab.bernoulli()
-    Net, loss = ab.featurenet(features, Y_, N, LAYERS, likelihood, T_SAMPLES)
+    Phi, kl = net(X_con_, X_cat_)
+
+    loss = ab.elbo(Phi, Y_, N, kl, likelihood)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
@@ -93,7 +98,7 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Ep = ab.predict_expected(Net, test_dict, P_SAMPLES)
+        Ep = ab.predict_expected(Phi, test_dict, P_SAMPLES)
 
     Ey = Ep > 0.5
 
@@ -136,25 +141,14 @@ def input_fn(df):
     # Creates a dictionary mapping from each categorical feature column name
     categ_cols = [np.where(pd.get_dummies(df[k]).values)[1][:, np.newaxis]
                   for k in CATEGORICAL_COLUMNS]
-    X_cat = np.array(categ_cols)
+    n_values = [np.amax(c) + 1 for c in categ_cols]
+    X_cat = np.concatenate(categ_cols, axis=1).astype(np.int32)
 
     # Converts the label column into a constant Tensor.
     label = df[LABEL_COLUMN].values[:, np.newaxis]
 
     # Returns the feature columns and the label.
-    return X_con, X_cat, label
-
-
-def embedding_layers(output_dims, n_categories, *args, **kwargs):
-
-    X_, features = [], []
-    for o, k in zip(output_dims, n_categories):
-        x_ = tf.placeholder(tf.int32, [None, 1])
-        layer = [ab.embedding_var(o, k, *args, **kwargs)]
-        features.append((x_, layer))
-        X_.append(x_)
-
-    return X_, features
+    return X_con, X_cat, n_values, label
 
 
 if __name__ == "__main__":
