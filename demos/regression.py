@@ -34,7 +34,9 @@ variance = tf.Variable(1.)
 reg = 1.
 
 lenscale1 = tf.Variable(1.)
-layers = [
+
+net = ab.stack(
+    ab.samples(n_samples),
     # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
     ab.random_fourier(n_features=200, kernel=ab.RBF(ab.pos(lenscale1))),
     # ab.dense_var(output_dim=20, reg=reg, full=True),
@@ -44,8 +46,7 @@ layers = [
     # ab.dense_var(output_dim=10, reg=reg, full=True),
     # ab.activation(tf.tanh),
     ab.dense_var(output_dim=1, reg=reg, full=True)
-]
-
+    )
 
 def main():
 
@@ -77,13 +78,14 @@ def main():
         lkhood = ab.normal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
-        Net, loss = ab.deepnet(X_, Y_, N, layers, lkhood, n_samples)
+        Phi, kl = net(X_)
+        loss = ab.elbo(Phi, Y_, N, kl, lkhood)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         global_step = tf.train.create_global_step()
         train = optimizer.minimize(loss, global_step=global_step)
-        logprob = ab.log_prob(Y_, lkhood, Net)
+        logprob = ab.log_prob(Y_, lkhood, Phi)
 
     # Logging
     log = tf.train.LoggingTensorHook(
@@ -105,7 +107,7 @@ def main():
             pass
 
         # Prediction
-        Ey = ab.predict_samples(Net, feed_dict={X_: Xq, Y_: np.zeros_like(Yq)},
+        Ey = ab.predict_samples(Phi, feed_dict={X_: Xq, Y_: np.zeros_like(Yq)},
                                 n_groups=n_pred_samples, session=sess)
         logPY = ab.predict_expected(logprob, feed_dict={Y_: Yi, X_: Xi},
                                     n_groups=n_pred_samples, session=sess)

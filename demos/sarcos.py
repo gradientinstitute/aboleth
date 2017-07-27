@@ -15,15 +15,17 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+NSAMPLES = 10
 VARIANCE = 10.0
 KERN = ab.RBF(
     lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
 )
-LAYERS = [
+net = ab.stack(
+    ab.samples(NSAMPLES),
     ab.random_fourier(n_features=1000, kernel=KERN),
     ab.dense_var(output_dim=1, full=True)
-]
-NSAMPLES = 10
+)
+
 BATCH_SIZE = 100
 NEPOCHS = 50
 NPREDICTSAMPLES = 10  # results in NSAMPLES * NPREDICTSAMPLES samples
@@ -62,7 +64,8 @@ def main():
         lkhood = ab.normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, loss = ab.deepnet(X_, Y_, N, LAYERS, lkhood, n_samples=NSAMPLES)
+        Phi, kl = net(X_)
+        loss = ab.elbo(Phi, Y_, N, kl, lkhood)
         tf.summary.scalar('loss', loss)
 
     with tf.name_scope("Train"):

@@ -35,7 +35,7 @@ def make_graph():
     x, Y, X = make_data()
 
     like = ab.normal(variance=1.)
-    layers = [ab.dense_map(output_dim=1)]
+    layers = ab.stack(ab.sample(10), ab.dense_map(output_dim=1))
     N = len(x)
 
     X_ = tf.placeholder(tf.float32, x.shape)

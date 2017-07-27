@@ -11,6 +11,22 @@ DIM = (2, 10)
 EDIM = (5, 10)
 
 
+def test_sample(make_data):
+    """Test the sample tiling layer."""
+    x, _, X = make_data
+    s = ab.sample(3)
+
+    F, KL = s(x)
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        f = F.eval()
+        X_array = X.eval()
+        assert KL == 0.0
+        assert np.array_equal(f, X_array)
+        for i in range(3):
+            assert np.array_equal(f[i], x)
+
+
 def test_activation(make_data):
     """Test nonlinear activation layer."""
     x, _, X = make_data
@@ -38,42 +54,6 @@ def test_dropout(make_data):
 
         assert f.shape == X.eval().shape
         assert (prop_zero > 0.4) and (prop_zero < 0.6)
-        assert KL == 0
-
-
-def test_fork_cat(make_data):
-    """Test forking layers with concatenation join."""
-    x, _, X = make_data
-    l1 = [ab.activation(), ab.activation()]
-    l2 = [ab.activation()]
-    fork = ab.fork('cat', l1, l2)
-
-    F, KL = fork(X)
-
-    tc = tf.test.TestCase()
-    with tc.test_session():
-        forked = F.eval()
-        orig = X.eval()
-        assert forked.shape == orig.shape[0:2] + (2 * orig.shape[2],)
-        assert np.all(forked == np.dstack((orig, orig)))
-        assert KL == 0
-
-
-def test_fork_add(make_data):
-    """Test forking layers with add join."""
-    x, _, X = make_data
-    l1 = [ab.activation(), ab.activation()]
-    l2 = [ab.activation()]
-    fork = ab.fork('add', l1, l2)
-
-    F, KL = fork(X)
-
-    tc = tf.test.TestCase()
-    with tc.test_session():
-        forked = F.eval()
-        orig = X.eval()
-        assert forked.shape == orig.shape
-        assert np.all(forked == 2 * orig)
         assert KL == 0
 
 
@@ -132,7 +112,7 @@ def test_dense_embeddings(make_categories):
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.embedding_var(output_dim=D, n_categories=K)(X_)
+    output, KL = ab.embed_var(output_dim=D, n_categories=K)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -201,7 +181,7 @@ def test_embeddings_distribution(dists, make_categories):
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.embedding_var(output_dim=D, n_categories=K, **dists)(X_)
+    output, KL = ab.embed_var(output_dim=D, n_categories=K, **dists)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():

@@ -29,6 +29,7 @@ setup(
         'dev': [
             'sphinx>=1.4.8',
             'pytest>=3.1.0',
+            'pytest-mock>=1.6.0',
             'pytest-cov>=2.5.1',
             'pytest-flake8>=0.8.1',
             'flake8-docstrings>=1.1.0',

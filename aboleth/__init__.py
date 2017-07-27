@@ -1,9 +1,9 @@
 """Package init."""
 from .version import __version__
-from .model import deepnet, featurenet, elbo, log_prob
-from .layer import (activation, fork, dropout, dense_var, dense_map,
-                    embedding_var, random_fourier, random_arccosine, Matern,
-                    RBF)
+from .model import elbo, log_prob
+from .layer import (sample, activation, dropout, dense_var, dense_map,
+                    embed_var, random_fourier, random_arccosine, Matern, RBF)
+from .ops import stack, concat, slicecat, add
 from .likelihood import normal, bernoulli, binomial
 from .distributions import (Normal, Gaussian, norm_prior, norm_posterior,
                             gaus_posterior)
@@ -18,11 +18,10 @@ __all__ = (
     'elbo',
     'log_prob',
     'activation',
-    'fork',
     'dropout',
     'dense_var',
     'dense_map',
-    'embedding_var',
+    'embed_var',
     'random_fourier',
     'random_arccosine',
     'RBF',
@@ -40,5 +39,10 @@ __all__ = (
     'predict_expected',
     'predict_samples',
     'batch_prediction',
-    'set_hyperseed'
+    'set_hyperseed',
+    'sample',
+    'stack',
+    'concat',
+    'slicecat',
+    'add'
 )

@@ -8,38 +8,38 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
 
 
 #
-# Layer Composition
+# Sampling layer
 #
 
-def compose_layers(Net, layers):
-    """Compose a list of layers into a network.
+def sample(n):
+    """Create a Sampling layer.
+
+    This layer takes a 2D tensor of shape (k,d) and tiles it along a new
+    first axis creating a (n,k,d) tensor. Used to propagate samples through
+    a variational deep net.
 
     Parameters
     ----------
-    Net : ndarray, Tensor
-        the neural net featues of shape (n_samples, N, output_dimensions).
-    layers : sequence
-        a list (or sequence) of layers defining the neural net.
+    n : int > 0
+        The number of samples.
 
     Returns
     -------
-    Net : Tensor
-        the neural net Tensor with ``layer`` applied.
-    KL : float, Tensor
-        the Kullback-Leibler divergence regularizer of the model parameters (or
-        just the weight Regularizers).
-    """
-    KL = 0.
-    for l in layers:
-        Net, kl = l(Net)
-        KL += kl
+    samplefunc : callable
+        A function implements the tiling.
 
-    return Net, KL
+    """
+    def samplefunc(X):
+        Xs = tf.tile(tf.expand_dims(X, 0), [n, 1, 1])  # (n, N, D)
+        print("sample layer: {} -> {}".format(X, Xs))
+        return Xs, 0.0
+    return samplefunc
 
 
 #
 # Activation Layers
 #
+
 
 def activation(h=lambda X: X):
     """Activation function layer.
@@ -60,42 +60,6 @@ def activation(h=lambda X: X):
         return Net, KL
 
     return build_activation
-
-
-def fork(join='cat', *layers):
-    """Fork into multiple layer-pipelines, then join the outputs.
-
-    Parameters
-    ----------
-    join : str, callable
-        the operation used to join the forked layers, this can be 'cat' to
-        concatenate, 'add' to add them (they must have the same shape) or a
-        callable.
-    *layers : args
-        layers-sequences to fork the input into.
-
-    Returns
-    -------
-    build_fork : callable
-        a function that builds the fork layer.
-    """
-    if not callable(join):
-        if join == 'add':
-            def join(P):
-                return tf.add_n(P)
-        elif join == 'cat':
-            def join(P):
-                return tf.concat(P, axis=-1)
-        else:
-            raise ValueError("join must be a callable, 'cat' or 'add'")
-
-    def build_fork(X):
-        Nets, KLs = zip(*map(lambda l: compose_layers(X, l), layers))
-        KL = sum(KLs)
-        Net = join(Nets)
-        return Net, KL
-
-    return build_fork
 
 
 def dropout(keep_prob):
@@ -303,8 +267,8 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
     return build_dense
 
 
-def embedding_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
-                  post_W=None):
+def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
+              post_W=None):
     """Dense (fully connected) embedding layer, with variational inference.
 
     This layer works directly on shape (N, 1) inputs of category *indices*
@@ -312,10 +276,10 @@ def embedding_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
 
     Parameters
     ----------
+    n_categories: int
+        the number of categories in the input variable
     output_dim : int
         the dimension of the output (embedding) of this layer
-    n_categories,
-        the number of categories in the input variable
     reg : float
         the initial value of the weight prior, w ~ N(0, reg * I), this is
         optimized (a la maximum likelihood type II)
@@ -344,6 +308,7 @@ def embedding_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
     def build_embedding(X):
         # X is a rank 3 tensor, [n_samples, N, 1]
         if X.shape[2] > 1:
+            print("embedding X: {}".format(X))
             raise ValueError("X must be a *column* of indices!")
 
         Wdim = (n_categories, output_dim)

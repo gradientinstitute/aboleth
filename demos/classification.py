@@ -24,15 +24,8 @@ PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
 REG = 0.1
 
 # Network structure
-# layers = [
-#     ab.dense_var(output_dim=20, reg=REG, full=False),
-#     ab.activation(h=tf.nn.relu),
-#     ab.dense_var(output_dim=20, reg=REG, full=False),
-#     ab.activation(h=tf.nn.relu),
-#     ab.dense_var(output_dim=1, reg=REG, full=False),
-#     ab.activation(h=tf.nn.sigmoid)
-# ]
-layers = [
+net = ab.stack(
+    ab.samples(LSAMPLES),
     ab.dropout(0.95),
     ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
@@ -42,7 +35,7 @@ layers = [
     ab.dropout(0.5),
     ab.dense_map(output_dim=1, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.sigmoid)
-]
+)
 
 
 def main():
@@ -66,7 +59,8 @@ def main():
         lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Net, loss = ab.deepnet(X_, Y_, N_, layers, lkhood, n_samples=LSAMPLES)
+        Phi, kl = net(X_)
+        loss = ab.elbo(Phi, Y_, N_, kl, lkhood)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
@@ -98,7 +92,7 @@ def main():
                     print("Iteration {}, loss = {}".format(i, loss_val))
 
             # Predict
-            Ey = ab.predict_expected(Net, {X_: Xs}, PSAMPLES)
+            Ey = ab.predict_expected(Phi, {X_: Xs}, PSAMPLES)
 
             print("Fold {}:".format(k))
             Ep = np.hstack((1. - Ey, Ey))
