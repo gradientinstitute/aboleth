@@ -36,7 +36,7 @@ reg = 1.
 lenscale1 = tf.Variable(1.)
 
 net = ab.stack(
-    ab.samples(n_samples),
+    ab.sample(n_samples),
     # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
     ab.random_fourier(n_features=200, kernel=ab.RBF(ab.pos(lenscale1))),
     # ab.dense_var(output_dim=20, reg=reg, full=True),

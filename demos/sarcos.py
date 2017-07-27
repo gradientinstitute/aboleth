@@ -21,7 +21,7 @@ KERN = ab.RBF(
     lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
 )
 net = ab.stack(
-    ab.samples(NSAMPLES),
+    ab.sample(NSAMPLES),
     ab.random_fourier(n_features=1000, kernel=KERN),
     ab.dense_var(output_dim=1, full=True)
 )
