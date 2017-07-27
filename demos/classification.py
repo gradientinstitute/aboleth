@@ -25,7 +25,7 @@ REG = 0.1
 
 # Network structure
 net = ab.stack(
-    ab.samples(LSAMPLES),
+    ab.sample(LSAMPLES),
     ab.dropout(0.95),
     ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
