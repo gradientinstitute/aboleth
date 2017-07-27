@@ -115,8 +115,9 @@ def add(*layers):
     return addfunc
 
 
+#
 # Private utility functions
-
+#
 
 def _stack2(layer1, layer2):
     """Stack 2 functions, by composing w.r.t tensor, adding w.r.t losses."""

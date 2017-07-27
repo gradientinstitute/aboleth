@@ -31,7 +31,6 @@ def sample(n):
     """
     def samplefunc(X):
         Xs = tf.tile(tf.expand_dims(X, 0), [n, 1, 1])  # (n, N, D)
-        print("sample layer: {} -> {}".format(X, Xs))
         return Xs, 0.0
     return samplefunc
 
