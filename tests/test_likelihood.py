@@ -44,9 +44,10 @@ def test_log_likelihoods_multitask(likelihood):
     alike, rvs, logprob = likelihood
 
     f = expit(np.random.randn(100, 5))
-    f /= np.sum(f, axis=-1).reshape(-1, 1)
+    f /= np.sum(f, axis=-1).reshape(-1, 1) # normalize
     f = f.astype(np.float32)
 
+    # apply_along_axis as scipy rvs doesn't support broadcasting
     x = np.apply_along_axis(lambda f: rvs(f, size=1), arr=f, axis=1)
     x = x.astype(np.float32)
 
