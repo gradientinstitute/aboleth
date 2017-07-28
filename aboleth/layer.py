@@ -268,7 +268,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
     return build_dense
 
 
-def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
+def embed_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
               post_W=None):
     """Dense (fully connected) embedding layer, with variational inference.
 
@@ -277,10 +277,10 @@ def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
 
     Parameters
     ----------
-    n_categories : int
-        the number of categories in the input variable
     output_dim : int
         the dimension of the output (embedding) of this layer
+    n_categories : int
+        the number of categories in the input variable
     reg : float
         the initial value of the weight prior, w ~ N(0, reg * I), this is
         optimized (a la maximum likelihood type II)
