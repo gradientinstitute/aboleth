@@ -48,7 +48,7 @@ def test_log_likelihoods_multitask(likelihood):
     f = f.astype(np.float32)
 
     x = np.apply_along_axis(lambda f: rvs(f, size=1), arr=f, axis=1)
-    x = np.squeeze(x, axis=1).astype(np.float32)
+    x = x.astype(np.float32)
 
     tc = tf.test.TestCase()
     with tc.test_session():
