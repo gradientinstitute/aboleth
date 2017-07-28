@@ -20,6 +20,10 @@ import aboleth.likelihood as lk
     (lk.bernoulli(),
      ss.bernoulli.rvs,
      lambda x, f: ss.bernoulli.logpmf(x, p=f)),
+
+    (lk.categorical(),
+     lambda f, size: ss.multinomial.rvs(n=1, p=f, size=size),
+     lambda x, f: ss.multinomial.logpmf(x, n=1, p=f)),
 ])
 def test_log_likelihoods(likelihood):
 
