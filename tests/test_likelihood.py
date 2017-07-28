@@ -21,9 +21,6 @@ import aboleth.likelihood as lk
      ss.bernoulli.rvs,
      lambda x, f: ss.bernoulli.logpmf(x, p=f)),
 
-    (lk.categorical(),
-     lambda f, size: ss.multinomial.rvs(n=1, p=f, size=size),
-     lambda x, f: ss.multinomial.logpmf(x, n=1, p=f)),
 ])
 def test_log_likelihoods(likelihood):
 
@@ -31,6 +28,27 @@ def test_log_likelihoods(likelihood):
 
     f = expit(np.random.randn(100).astype(np.float32))
     x = rvs(f, size=100).astype(np.float32)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        assert np.allclose(logprob(x, f), alike(x, f).eval())
+
+
+@pytest.mark.parametrize('likelihood', [
+    (lk.categorical(),
+     lambda f, size: ss.multinomial.rvs(n=1, p=f, size=size),
+     lambda x, f: ss.multinomial.logpmf(x, n=1, p=f)),
+])
+def test_log_likelihoods_multitask(likelihood):
+
+    alike, rvs, logprob = likelihood
+
+    f = expit(np.random.randn(100, 5))
+    f /= np.sum(f, axis=-1).reshape(-1, 1)
+    f = f.astype(np.float32)
+
+    x = np.apply_along_axis(lambda f: rvs(f, size=1), arr=f, axis=1)
+    x = np.squeeze(x, axis=1).astype(np.float32)
 
     tc = tf.test.TestCase()
     with tc.test_session():
