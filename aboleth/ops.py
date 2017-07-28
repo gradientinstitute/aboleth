@@ -45,7 +45,7 @@ def concat(*layers):
 
     """
     def concatfunc(*Xl):
-        tensors, losses = zip(*[l(X) for l, X in zip(layers, Xl)])
+        tensors, losses = zip(*map(lambda l, X: l(X), layers, Xl))
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
         return result, loss
@@ -79,10 +79,8 @@ def slicecat(*layers):
 
     """
     def slicefunc(X):
-        tensors, losses = zip(*[l(X[:, :, i:i + 1])
-                                for i, l in enumerate(layers)])
-        result = tf.concat(tensors, axis=-1)
-        loss = tf.add_n(losses)
+        result, loss = concat(*layers)(*(X[..., i:i + 1]
+                                       for i in range(len(layers))))
         return result, loss
     return slicefunc
 

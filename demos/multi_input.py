@@ -49,7 +49,7 @@ def main():
                          ab.dense_var(output_dim=5, full=True))
 
     # Note every embed_var call can be different
-    cat_layer_list = [ab.embed_var(i, EMBED_DIMS) for i in n_cats]
+    cat_layer_list = [ab.embed_var(EMBED_DIMS, i) for i in n_cats]
 
     # # Concatenate assuming each layer gets a single slice
     cat_layer = ab.stack(ab.sample(T_SAMPLES),
