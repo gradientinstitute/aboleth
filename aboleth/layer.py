@@ -110,7 +110,8 @@ def random_fourier(n_features, kernel=None):
     kernel = kernel if kernel else RBF()
 
     def build_random_ff(X):
-        n_samples, input_dim = _get_dims(X)
+        # X is a rank 3 tensor, [n_samples, N, D]
+        n_samples, input_dim = _check_dims_rank3(X)
 
         # Random weights, copy faster than map here
         P = kernel.weights(input_dim, n_features)
@@ -150,7 +151,7 @@ def random_arccosine(n_features, lenscale=1.0, p=1):
 
     Returns
     -------
-    build_random_ac: callable
+    build_random_ac : callable
         a function that builds the random arc-cosine feature layer.
 
     See Also
@@ -176,7 +177,8 @@ def random_arccosine(n_features, lenscale=1.0, p=1):
             return tf.pow(x, p)
 
     def build_random_ac(X):
-        n_samples, input_dim = _get_dims(X)
+        # X is a rank 3 tensor, [n_samples, N, D]
+        n_samples, input_dim = _check_dims_rank3(X)
 
         # Random weights
         rand = np.random.RandomState(next(seedgen))
@@ -214,20 +216,20 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
         posterior.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
-    prior_W: {Normal, Gaussian}, optional
+    prior_W : {Normal, Gaussian}, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with ``(input_dim, output_dim)`` shaped
         weights. This ignores the ``reg`` parameter.
-    prior_b: {Normal, Gaussian}, optional
+    prior_b : {Normal, Gaussian}, optional
         This is the prior distribution object to use on the layer intercept. It
         must have parameters compatible with ``(output_dim,)`` shaped weights.
         This ignores the ``reg`` and ``use_bias`` parameters.
-    post_W: {Normal, Gaussian}, optional
+    post_W : {Normal, Gaussian}, optional
         This is the posterior distribution object to use on the layer weights.
         It must have parameters compatible with ``(input_dim, output_dim)``
         shaped weights. This ignores the ``full`` parameter. See
         ``distributions.gaus_posterior``.
-    post_b: {Normal, Gaussian}, optional
+    post_b : {Normal, Gaussian}, optional
         This is the posterior distribution object to use on the layer
         intercept. It must have parameters compatible with ``(output_dim,)``
         shaped weights. This ignores the ``use_bias`` parameters.
@@ -240,13 +242,13 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
     """
     def build_dense(X):
         # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = _get_dims(X)
+        n_samples, input_dim = _check_dims_rank3(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
         # Layer weights
         pW, qW = _make_bayesian_weights(prior_W, post_W, Wdim, reg, full)
-        Wsamples = _sample(qW, n_samples)
+        Wsamples = _sample_weights(qW, n_samples)
 
         # Linear layer
         Net = tf.matmul(X, Wsamples)
@@ -257,7 +259,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
         # Optional bias
         if use_bias is True or prior_b or post_b:
             pb, qb = _make_bayesian_weights(prior_b, post_b, bdim, reg, False)
-            bsamples = tf.expand_dims(_sample(qb, n_samples), 1)
+            bsamples = tf.expand_dims(_sample_weights(qb, n_samples), 1)
             Net += bsamples
             KL += kl_qp(qb, pb)
 
@@ -275,7 +277,7 @@ def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
 
     Parameters
     ----------
-    n_categories: int
+    n_categories : int
         the number of categories in the input variable
     output_dim : int
         the dimension of the output (embedding) of this layer
@@ -286,11 +288,11 @@ def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
-    prior_W: {Normal, Gaussian}, optional
+    prior_W : {Normal, Gaussian}, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with ``(input_dim, output_dim)`` shaped
         weights. This ignores the ``reg`` parameter.
-    post_W: {Normal, Gaussian}, optional
+    post_W : {Normal, Gaussian}, optional
         This is the posterior distribution object to use on the layer weights.
         It must have parameters compatible with ``(input_dim, output_dim)``
         shaped weights. This ignores the ``full`` parameter. See
@@ -306,16 +308,16 @@ def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
 
     def build_embedding(X):
         # X is a rank 3 tensor, [n_samples, N, 1]
-        if X.shape[2] > 1:
+        n_samples, input_dim = _check_dims_rank3(X)
+        if input_dim > 1:
             print("embedding X: {}".format(X))
             raise ValueError("X must be a *column* of indices!")
 
         Wdim = (n_categories, output_dim)
-        n_samples = X.shape[0]
 
         # Layer weights
         pW, qW = _make_bayesian_weights(prior_W, post_W, Wdim, reg, full)
-        Wsamples = tf.transpose(_sample(qW, n_samples), [1, 2, 0])
+        Wsamples = tf.transpose(_sample_weights(qW, n_samples), [1, 2, 0])
 
         # Embedding layer -- gather only works on the first dim hence transpose
         embedding = tf.gather(Wsamples, X[0, :, 0])  # X ind is just replicated
@@ -350,7 +352,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
     """
     def build_dense_map(X):
         # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = _get_dims(X)
+        n_samples, input_dim = _check_dims_rank3(X)
         Wdim = (input_dim, output_dim)
 
         W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
@@ -475,7 +477,11 @@ def _l1_loss(X):
     return l1
 
 
-def _get_dims(X):
+def _check_dims_rank3(X):
+    rank = len(X.shape)
+    if rank != 3:
+        raise ValueError("This layer requires rank 3 inputs, got rank {}!"
+                         .format(rank))
     n_samples, input_dim = X.shape[0], X.shape[2]
     return int(n_samples), int(input_dim)
 
@@ -485,7 +491,7 @@ def _is_dim(X, dims):
     return shape == dims
 
 
-def _sample(dist, n_samples):
+def _sample_weights(dist, n_samples):
     samples = tf.stack([dist.sample() for _ in range(n_samples)])
     return samples
 

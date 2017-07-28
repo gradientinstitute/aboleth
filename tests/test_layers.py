@@ -147,6 +147,20 @@ def test_dense_outputs(dense, make_data):
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
 
 
+@pytest.mark.parametrize('layer_args', [
+    (ab.dense_map, (D,)),
+    (ab.dense_var, (D,)),
+    (ab.embed_var, (2, D)),
+    (ab.random_fourier, (2,)),
+    (ab.random_arccosine, (2,)),
+])
+def test_stochastic_layer_input_exception(layer_args, make_data):
+    x, _, _ = make_data
+    layer, args = layer_args
+    with pytest.raises(ValueError):
+        layer(*args)(x)
+
+
 @pytest.mark.parametrize('dists', [
     {'prior_W': norm_prior(DIM, 1.), 'prior_b': norm_prior((D,), 1.)},
     {'post_W': norm_prior(DIM, 1.), 'post_b': norm_prior((D,), 1.)},

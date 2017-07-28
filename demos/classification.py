@@ -47,7 +47,7 @@ def main():
     N, D = X.shape
 
     # Benchmark classifier
-    bcl = RandomForestClassifier()
+    bcl = RandomForestClassifier(random_state=RSEED)
 
     # Data
     with tf.name_scope("Input"):
