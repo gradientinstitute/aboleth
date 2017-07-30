@@ -11,12 +11,25 @@ DIM = (2, 10)
 EDIM = (5, 10)
 
 
-def test_sample(make_data):
-    """Test the sample tiling layer."""
+def test_input(make_data):
+    """Test the input layer."""
     x, _, X = make_data
-    s = ab.sample(3)
+    s = ab.input(name='myname')
 
-    F, KL = s(x)
+    F, KL = s(myname=x)
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        f = F.eval()
+        assert KL == 0.0
+        assert np.array_equal(f, x)
+
+
+def test_input_sample(make_data):
+    """Test the input and tiling layer."""
+    x, _, X = make_data
+    s = ab.input(name='myname', n_samples=3)
+
+    F, KL = s(myname=x)
     tc = tf.test.TestCase()
     with tc.test_session():
         f = F.eval()

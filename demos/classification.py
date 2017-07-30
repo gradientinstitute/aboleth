@@ -25,7 +25,7 @@ REG = 0.1
 
 # Network structure
 net = ab.stack(
-    ab.sample(LSAMPLES),
+    ab.input(name='X', n_samples=LSAMPLES),
     ab.dropout(0.95),
     ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
@@ -59,7 +59,7 @@ def main():
         lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X_)
+        Phi, kl = net(X=X_)
         loss = ab.elbo(Phi, Y_, N_, kl, lkhood)
 
     with tf.name_scope("Train"):
