@@ -45,14 +45,13 @@ def main():
     X_con, X_cat, n_cats, Y = input_fn(df)
 
     # Define our graph
-    con_layer = ab.stack(ab.sample(T_SAMPLES),
+    con_layer = ab.stack(ab.input(name='con', n_samples=T_SAMPLES),
                          ab.dense_var(output_dim=5, full=True))
 
     # Note every embed_var call can be different
     cat_layer_list = [ab.embed_var(EMBED_DIMS, i) for i in n_cats]
 
-    # # Concatenate assuming each layer gets a single slice
-    cat_layer = ab.stack(ab.sample(T_SAMPLES),
+    cat_layer = ab.stack(ab.input(name='cat', n_samples=T_SAMPLES),
                          ab.slicecat(*cat_layer_list))
 
     net = ab.stack(ab.concat(con_layer, cat_layer),
@@ -77,7 +76,7 @@ def main():
     # Make model
     N = len(Xt_con)
     likelihood = ab.bernoulli()
-    Phi, kl = net(X_con_, X_cat_)
+    Phi, kl = net(con=X_con_, cat=X_cat_)
 
     loss = ab.elbo(Phi, Y_, N, kl, likelihood)
     optimizer = tf.train.AdamOptimizer()

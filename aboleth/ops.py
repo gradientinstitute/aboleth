@@ -1,7 +1,8 @@
 """Operations for composing layers."""
 
-import tensorflow as tf
 from functools import reduce
+
+import tensorflow as tf
 
 
 def stack(*layers):
@@ -28,24 +29,23 @@ def stack(*layers):
 def concat(*layers):
     """Concatenate multiple layers by concatenating their outputs.
 
-    Note that it is expected that the functions will take different arguments.
-    The output function will take all arguments in the order they were
-    provided. That is, concat(f(X), g(Y)) -> h(X, Y).
+    The functions must all take (only) **kwargs. They can pull from
+    this dictionary as required. It is intended to work
+    on input layers, or functions composed with input layers.
 
     Parameters
     ----------
     layers : [callable]
-        The layers to concatenate. Supports layers with multiple arguments.
+        The layers to concatenate. Must be f(**kwargs).
 
     Returns
     -------
     concatfunc : callable
-        A layer function of the concatenated input layers, that will have as
-        many inputs as the set of original functions.
+        A layer function of the concatenated input layers.
 
     """
-    def concatfunc(*Xl):
-        tensors, losses = zip(*map(lambda l, X: l(X), layers, Xl))
+    def concatfunc(**kwargs):
+        tensors, losses = zip(*map(lambda l: l(**kwargs), layers))
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
         return result, loss
@@ -61,7 +61,7 @@ def slicecat(*layers):
     single tensor. This is mostly useful for simplifying embedding multiple
     categorical inputs that are stored columnwise in the same 2D tensor.
 
-    Note that this function assumes the tensor being provided is 3D.
+    This function assumes the tensor being provided is 3D.
 
     Parameters
     ----------
@@ -79,8 +79,10 @@ def slicecat(*layers):
 
     """
     def slicefunc(X):
-        result, loss = concat(*layers)(*(X[..., i:i + 1]
-                                       for i in range(len(layers))))
+        tensors, losses = zip(*[l(X[..., i:i + 1])
+                                for i, l in enumerate(layers)])
+        result = tf.concat(tensors, axis=-1)
+        loss = tf.add_n(losses)
         return result, loss
     return slicefunc
 
@@ -88,25 +90,23 @@ def slicecat(*layers):
 def add(*layers):
     """Concatenate multiple layers by adding their outputs.
 
-    Note that it is expected that the functions will take different arguments.
-    The output function will take all arguments in the order they were
-    provided. That is, concat(f(X), g(Y)) -> h(X, Y). The outputs will be added
-    along the last dimension.
+    Similar to concatenate, the functions must take (only) **kwargs. The
+    outputs of the functions will be added element-wise. Intended to work
+    on input layers or layers composed with input layers.
 
     Parameters
     ----------
     layers : [callable]
-        The layers to concatenate. Supports layers with multiple arguments.
+        The layers to concatenate. Must be of form f(**kwargs).
 
     Returns
     -------
     concatfunc : callable
-        A layer function of the concatenated input layers, that will have as
-        many inputs as the set of original functions.
+        A layer function that adds the outputs of its component layers.
 
     """
-    def addfunc(*Xl):
-        tensors, losses = zip(*[l(X) for l, X in zip(layers, Xl)])
+    def addfunc(**kwargs):
+        tensors, losses = zip(*map(lambda l: l(**kwargs), layers))
         result = tf.add_n(tensors)
         loss = tf.add_n(losses)
         return result, loss
@@ -119,8 +119,8 @@ def add(*layers):
 
 def _stack2(layer1, layer2):
     """Stack 2 functions, by composing w.r.t tensor, adding w.r.t losses."""
-    def stackfunc(*Xl):
-        result1, loss1 = layer1(*Xl)
+    def stackfunc(**kwargs):
+        result1, loss1 = layer1(**kwargs)
         result, loss2 = layer2(result1)
         loss = tf.add(loss1, loss2)
         return result, loss

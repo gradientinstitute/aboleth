@@ -112,3 +112,7 @@ shapes_cache
 
 # Plot output
 *.html
+
+# Other data
+data/sarcos_inv.mat
+data/sarcos_inv_test.mat

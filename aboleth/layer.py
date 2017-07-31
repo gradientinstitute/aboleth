@@ -11,16 +11,21 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
 # Sampling layer
 #
 
-def sample(n):
-    """Create a Sampling layer.
+def input(name, n_samples=None):
+    """Create a input layer.
 
-    This layer takes a 2D tensor of shape (k,d) and tiles it along a new
-    first axis creating a (n,k,d) tensor. Used to propagate samples through
-    a variational deep net.
+    This layer defines input kwargs so that a user may easily provide the
+    right inputs to a complex set of layers. It takes a 2D tensor of shape
+    (k,d).  If n_samples is specified, the input is tiled along a new first
+    axis creating a (n,k,d) tensor for propogating samples through a
+    variational deep net.
 
     Parameters
     ----------
-    n : int > 0
+    name : string
+        The name of the input. Used as the agument for input into the net.
+
+    n_samples : int > 0
         The number of samples.
 
     Returns
@@ -29,10 +34,14 @@ def sample(n):
         A function implements the tiling.
 
     """
-    def samplefunc(X):
-        Xs = tf.tile(tf.expand_dims(X, 0), [n, 1, 1])  # (n, N, D)
+    def firstlayer(**kwargs):
+        X = kwargs[name]
+        if n_samples is not None:
+            Xs = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])  # (n, N, D)
+        else:
+            Xs = tf.convert_to_tensor(X)
         return Xs, 0.0
-    return samplefunc
+    return firstlayer
 
 
 #

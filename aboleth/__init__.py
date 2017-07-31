@@ -1,7 +1,7 @@
 """Package init."""
 from .version import __version__
 from .model import elbo, log_prob
-from .layer import (sample, activation, dropout, dense_var, dense_map,
+from .layer import (activation, dropout, dense_var, dense_map, input,
                     embed_var, random_fourier, random_arccosine, Matern, RBF)
 from .ops import stack, concat, slicecat, add
 from .likelihood import normal, bernoulli, binomial
@@ -40,7 +40,7 @@ __all__ = (
     'predict_samples',
     'batch_prediction',
     'set_hyperseed',
-    'sample',
+    'input',
     'stack',
     'concat',
     'slicecat',

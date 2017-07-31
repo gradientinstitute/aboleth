@@ -8,7 +8,7 @@ import aboleth as ab
 def test_deepnet_outputs(make_graph):
     """Test for expected output dimensions from deepnet."""
     x, y, N, X_, Y_, N_, like, layers = make_graph
-    Net, kl = layers(X_)
+    Net, kl = layers(X=X_)
     loss = ab.elbo(Net, Y_, N, kl, like)
 
     tc = tf.test.TestCase()
@@ -25,7 +25,7 @@ def test_deepnet_outputs(make_graph):
 def test_deepnet_likelihood_weights(make_graph):
     """Test for expected output dimensions from deepnet."""
     x, y, N, X_, Y_, N_, like, layers = make_graph
-    Net, kl = layers(X_)
+    Net, kl = layers(X=X_)
 
     # Now test with likelihood weights
     lw = np.ones_like(y)
@@ -49,7 +49,7 @@ def test_deepnet_likelihood_weights(make_graph):
 def test_elbo_output(make_graph):
     """Test for scalar output from elbo."""
     x, y, N, X_, Y_, N_, like, layers = make_graph
-    Net, kl = layers(X_)
+    Net, kl = layers(X=X_)
     kl = 0.0
     elbo = ab.elbo(Net, Y_, N, kl, like)
 
@@ -64,7 +64,7 @@ def test_elbo_output(make_graph):
 def test_logprob_output(make_graph):
     """Test for correct output dimensions from logprob."""
     x, y, N, X_, Y_, N_, like, layers = make_graph
-    Net, kl = layers(X_)
+    Net, kl = layers(X=X_)
 
     logp = ab.log_prob(Y_, like, Net)
 
