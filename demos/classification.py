@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 import tensorflow as tf
 import numpy as np
+import numpy.ma as ma
 
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import KFold
@@ -13,6 +14,7 @@ import aboleth as ab
 
 FOLDS = 5
 RSEED = 100
+FRAC_MISSING = 0.2
 ab.set_hyperseed(RSEED)
 
 # Optimization
@@ -26,6 +28,7 @@ REG = 0.1
 # Network structure
 net = ab.stack(
     ab.sample(LSAMPLES),
+    ab.impute_mean(),
     ab.dropout(0.95),
     ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
@@ -46,6 +49,13 @@ def main():
     X = StandardScaler().fit_transform(X).astype(np.float32)
     N, D = X.shape
 
+    # Add random missingness
+    missing_mask = np.random.rand(N, D) < FRAC_MISSING
+    X_corrupted = X.copy() 
+    X_corrupted[missing_mask] = 666. #Might not be needed
+    masked_data = ma.asarray(X_corrupted)
+    masked_data[missing_mask] = ma.masked
+
     # Benchmark classifier
     bcl = RandomForestClassifier(random_state=RSEED)
 
@@ -54,12 +64,13 @@ def main():
         X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
         Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
         N_ = tf.placeholder(dtype=tf.float32)
+        M_ = tf.placeholder(dtype=np.bool, shape=(None, D))
 
     with tf.name_scope("Likelihood"):
         lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X_)
+        Phi, kl = net(X_, M_)
         loss = ab.elbo(Phi, Y_, N_, kl, lkhood)
 
     with tf.name_scope("Train"):
@@ -77,11 +88,14 @@ def main():
         for k, (r_ind, s_ind) in enumerate(kfold.split(X)):
             init.run()
 
-            Xr, Yr = X[r_ind], y[r_ind]
-            Xs, Ys = X[s_ind], y[s_ind]
+            Xr, Yr, Mr = [masked_data.data[r_ind], y[r_ind], 
+                          masked_data.mask[r_ind]]
+
+            Xs, Ys, Ms = [masked_data.data[s_ind], y[s_ind],
+                          masked_data.mask[s_ind]]
 
             batches = ab.batch(
-                {X_: Xr, Y_: Yr},
+                {X_: Xr, Y_: Yr, M_: Mr},
                 batch_size=BSIZE,
                 n_iter=NITER,
                 N_=N_)

@@ -267,7 +267,6 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
 
     return build_dense
 
-
 def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
               post_W=None):
     """Dense (fully connected) embedding layer, with variational inference.
@@ -374,6 +373,58 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
 
     return build_dense_map
 
+
+def impute_mean():
+    """Fill in the missing values with the column means of the real values
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    build_impute_mean : callable
+        a function that builds an impute that fills the nan_mean of cols into 
+        the missing values.
+    """
+    def build_impute_mean(X, M):
+
+        def impute_mean_fn(X_ND):
+            # Identify indices of the missing datapoints
+            missing_ind = tf.where(M)
+
+            # Determine nan_mean of each column
+            # Fill zeros in for missing data initially
+            real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+            data_zeroed_missing_tf = X_ND * real_val_mask
+
+            # Sum the real values in each column
+            col_tot = tf.reduce_sum(data_zeroed_missing_tf, 0)
+
+            # Divide column totals by the number of non-nan values
+            num_values_col = tf.reduce_sum(real_val_mask, 0)
+            # In case of divide by zero possiblity....
+            num_values_col = tf.maximum(num_values_col, 
+                                        tf.ones(tf.shape(num_values_col)))
+            col_nan_means = tf.div(col_tot, num_values_col)
+            # Make an vector of the impute values for each missing point
+            imputed_vals = tf.gather(col_nan_means, missing_ind[:, 1]) 
+
+            # Fill the imputed values into the data tensor
+            missing_imputed = tf.scatter_nd(missing_ind, imputed_vals,
+                                            tf.cast(tf.shape(data_zeroed_missing_tf),
+                                                    dtype=np.int64))
+
+            X_with_impute = data_zeroed_missing_tf + missing_imputed
+
+            return X_with_impute
+
+        Net = tf.map_fn(impute_mean_fn, X)
+        # Currently no loss for mean impute
+        penalty = 0
+
+        return Net, penalty
+
+    return build_impute_mean
 
 #
 # Random Fourier Kernels

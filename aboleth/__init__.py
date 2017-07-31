@@ -2,7 +2,8 @@
 from .version import __version__
 from .model import elbo, log_prob
 from .layer import (sample, activation, dropout, dense_var, dense_map,
-                    embed_var, random_fourier, random_arccosine, Matern, RBF)
+                    embed_var, random_fourier, random_arccosine, Matern, RBF,
+                    impute_mean)
 from .ops import stack, concat, slicecat, add
 from .likelihood import normal, bernoulli, binomial
 from .distributions import (Normal, Gaussian, norm_prior, norm_posterior,
@@ -44,5 +45,6 @@ __all__ = (
     'stack',
     'concat',
     'slicecat',
-    'add'
+    'add',
+    'impute_mean'
 )
