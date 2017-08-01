@@ -32,22 +32,15 @@ config = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
 
 variance = tf.Variable(1.)
 reg = 1.
-
-lenscale1 = tf.Variable(1.)
+lenscale = tf.Variable(1.)
 
 
 net = ab.stack(
-    ab.input(name="X", n_samples=n_samples),
-    # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
-    ab.random_fourier(n_features=200, kernel=ab.RBF(ab.pos(lenscale1))),
-    # ab.dense_var(output_dim=20, reg=reg, full=True),
-    # ab.activation(tf.nn.relu),
-    # ab.dense_var(output_dim=20, reg=reg, full=True),
-    # ab.activation(tf.nn.relu),
-    # ab.dense_var(output_dim=10, reg=reg, full=True),
-    # ab.activation(tf.tanh),
+    ab.InputLayer(name="X", n_samples=n_samples),
+    ab.RandomRBF(n_features=200, lenscale=ab.pos(lenscale)),
     ab.dense_var(output_dim=1, reg=reg, full=True)
     )
+
 
 def main():
 

@@ -45,19 +45,19 @@ def main():
     X_con, X_cat, n_cats, Y = input_fn(df)
 
     # Define our graph
-    con_layer = ab.stack(ab.input(name='con', n_samples=T_SAMPLES),
+    con_layer = ab.stack(ab.InputLayer(name='con', n_samples=T_SAMPLES),
                          ab.dense_var(output_dim=5, full=True))
 
     # Note every embed_var call can be different
     cat_layer_list = [ab.embed_var(EMBED_DIMS, i) for i in n_cats]
 
-    cat_layer = ab.stack(ab.input(name='cat', n_samples=T_SAMPLES),
+    cat_layer = ab.stack(ab.InputLayer(name='cat', n_samples=T_SAMPLES),
                          ab.slicecat(*cat_layer_list))
 
     net = ab.stack(ab.concat(con_layer, cat_layer),
-                   ab.random_arccosine(100, 1.),
+                   ab.RandomArcCosine(100, 1.),
                    ab.dense_var(output_dim=1, full=True),
-                   ab.activation(tf.sigmoid))
+                   ab.Activation(tf.sigmoid))
 
     # Split data into training and testing
     Xt_con, Xs_con = np.split(X_con, [len(df_train)], axis=0)

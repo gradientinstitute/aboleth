@@ -14,7 +14,7 @@ EDIM = (5, 10)
 def test_input(make_data):
     """Test the input layer."""
     x, _, X = make_data
-    s = ab.input(name='myname')
+    s = ab.InputLayer(name='myname')
 
     F, KL = s(myname=x)
     tc = tf.test.TestCase()
@@ -27,7 +27,7 @@ def test_input(make_data):
 def test_input_sample(make_data):
     """Test the input and tiling layer."""
     x, _, X = make_data
-    s = ab.input(name='myname', n_samples=3)
+    s = ab.InputLayer(name='myname', n_samples=3)
 
     F, KL = s(myname=x)
     tc = tf.test.TestCase()
@@ -43,7 +43,7 @@ def test_input_sample(make_data):
 def test_activation(make_data):
     """Test nonlinear activation layer."""
     x, _, X = make_data
-    act = ab.activation(tf.tanh)
+    act = ab.Activation(tf.tanh)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -56,7 +56,7 @@ def test_activation(make_data):
 def test_dropout(make_data):
     """Test dropout layer."""
     x, _, X = make_data
-    drop = ab.dropout(0.5)
+    drop = ab.DropOut(0.5)
 
     F, KL = drop(X)
 
@@ -71,26 +71,26 @@ def test_dropout(make_data):
 
 
 @pytest.mark.parametrize('kernels', [
-    (ab.RBF, {}),
-    (ab.Matern, {'p': 1}),
-    (ab.Matern, {'p': 2})
+    (ab.RandomRBF, {}),
+    (ab.RandomMatern, {'p': 1}),
+    (ab.RandomMatern, {'p': 2})
 ])
 def test_kernels(kernels, make_data):
     """Test random kernels approximations."""
     d, D = 10, 100
     S = 3
     kern, p = kernels
-    k = kern(**p)
-
-    # Check dim
-    P = k.weights(input_dim=d, n_features=D)
-    assert P.shape == (d, D)
+    k = kern(D, **p)
 
     x, _, _ = make_data
     x_, X_ = _make_placeholders(x, S)
     N = x.shape[0]
 
-    Phi, KL = ab.random_fourier(D, kernel=k)(X_)
+    Phi, KL = k(X_)
+
+    # Check dim
+    P = k.weights(input_dim=d)
+    assert P.shape == (d, D)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -109,7 +109,7 @@ def test_arc_cosine(make_data):
     x, _, _ = make_data
     x_, X_ = _make_placeholders(x, S)
 
-    F, KL = ab.random_arccosine(n_features=10)(X_)
+    F, KL = ab.RandomArcCosine(n_features=10)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -125,7 +125,7 @@ def test_dense_embeddings(make_categories):
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.embed_var(output_dim=D, n_categories=K)(X_)
+    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -140,7 +140,7 @@ def test_dense_embeddings(make_categories):
         assert Phi.shape == (S, N, D)
 
 
-@pytest.mark.parametrize('dense', [ab.dense_map, ab.dense_var])
+@pytest.mark.parametrize('dense', [ab.DenseMAP, ab.DenseVariational])
 def test_dense_outputs(dense, make_data):
     """Make sure the dense layers output expected dimensions."""
     x, _, _ = make_data
@@ -161,16 +161,17 @@ def test_dense_outputs(dense, make_data):
 
 
 @pytest.mark.parametrize('layer_args', [
-    (ab.dense_map, (D,)),
-    (ab.dense_var, (D,)),
-    (ab.embed_var, (2, D)),
-    (ab.random_fourier, (2,)),
-    (ab.random_arccosine, (2,)),
+    (ab.DenseMAP, (D,)),
+    (ab.DenseVariational, (D,)),
+    (ab.EmbedVariational, (2, D)),
+    (ab.RandomRBF, (2,)),
+    (ab.RandomMatern, (2,)),
+    (ab.RandomArcCosine, (2,)),
 ])
 def test_stochastic_layer_input_exception(layer_args, make_data):
     x, _, _ = make_data
     layer, args = layer_args
-    with pytest.raises(ValueError):
+    with pytest.raises(AssertionError):
         layer(*args)(x)
 
 
@@ -188,7 +189,7 @@ def test_dense_distribution(dists, make_data):
     x_, X_ = _make_placeholders(x, S)
     N = x.shape[0]
 
-    Phi, KL = ab.dense_var(output_dim=D, **dists)(X_)
+    Phi, KL = ab.DenseVariational(output_dim=D, **dists)(X_)
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
@@ -208,7 +209,7 @@ def test_embeddings_distribution(dists, make_categories):
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.embed_var(output_dim=D, n_categories=K, **dists)(X_)
+    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K, **dists)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():

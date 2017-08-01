@@ -35,7 +35,7 @@ def make_graph():
     x, Y, X = make_data()
 
     like = ab.normal(variance=1.)
-    layers = ab.stack(ab.input(name='X', n_samples=10),
+    layers = ab.stack(ab.InputLayer(name='X', n_samples=10),
                       ab.dense_map(output_dim=1))
     N = len(x)
 

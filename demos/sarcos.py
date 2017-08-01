@@ -17,12 +17,11 @@ logger.setLevel(logging.INFO)
 
 NSAMPLES = 10
 VARIANCE = 10.0
-KERN = ab.RBF(
-    lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
-)
+LENSCALE = tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
+
 net = ab.stack(
-    ab.sample(NSAMPLES),
-    ab.random_fourier(n_features=1000, kernel=KERN),
+    ab.InputLayer(NSAMPLES),
+    ab.RandomRBF(n_features=1000, lenscale=LENSCALE),
     ab.dense_var(output_dim=1, full=True)
 )
 
