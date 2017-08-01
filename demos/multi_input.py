@@ -38,7 +38,7 @@ CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 
 def main():
-
+    """Run the demo."""
     # Get Continuous and categorical data
     df_train, df_test = fetch_data()
     df = pd.concat((df_train, df_test))
@@ -46,17 +46,17 @@ def main():
 
     # Define our graph
     con_layer = ab.stack(ab.InputLayer(name='con', n_samples=T_SAMPLES),
-                         ab.dense_var(output_dim=5, full=True))
+                         ab.DenseVariational(output_dim=5, full=True))
 
     # Note every embed_var call can be different
-    cat_layer_list = [ab.embed_var(EMBED_DIMS, i) for i in n_cats]
+    cat_layer_list = [ab.EmbedVariational(EMBED_DIMS, i) for i in n_cats]
 
     cat_layer = ab.stack(ab.InputLayer(name='cat', n_samples=T_SAMPLES),
                          ab.slicecat(*cat_layer_list))
 
     net = ab.stack(ab.concat(con_layer, cat_layer),
                    ab.RandomArcCosine(100, 1.),
-                   ab.dense_var(output_dim=1, full=True),
+                   ab.DenseVariational(output_dim=1, full=True),
                    ab.Activation(tf.sigmoid))
 
     # Split data into training and testing
@@ -108,6 +108,7 @@ def main():
 
 
 def fetch_data():
+    """Download the data."""
     train_file = tempfile.NamedTemporaryFile()
     test_file = tempfile.NamedTemporaryFile()
     req.urlretrieve("http://mlr.cs.umass.edu/ml/machine-learning-databases"
@@ -128,6 +129,7 @@ def fetch_data():
 
 
 def input_fn(df):
+    """Format the downloaded data."""
     # Creates a dictionary mapping from each continuous feature column name (k)
     # to the values of that column stored in a constant Tensor.
     continuous_cols = [df[k].values for k in CONTINUOUS_COLUMNS]

@@ -27,19 +27,19 @@ REG = 0.1
 net = ab.stack(
     ab.InputLayer(name='X', n_samples=LSAMPLES),
     ab.DropOut(0.95),
-    ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
+    ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.Activation(h=tf.nn.relu),
     ab.DropOut(0.5),
-    ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
+    ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.Activation(h=tf.nn.relu),
     ab.DropOut(0.5),
-    ab.dense_map(output_dim=1, l1_reg=0., l2_reg=REG),
+    ab.DenseMAP(output_dim=1, l1_reg=0., l2_reg=REG),
     ab.Activation(h=tf.nn.sigmoid)
 )
 
 
 def main():
-
+    """Run the demo."""
     data = load_breast_cancer()
     X = data.data.astype(np.float32)
     y = data.target.astype(np.float32)[:, np.newaxis]

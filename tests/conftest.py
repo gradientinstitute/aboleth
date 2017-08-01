@@ -35,8 +35,10 @@ def make_graph():
     x, Y, X = make_data()
 
     like = ab.normal(variance=1.)
-    layers = ab.stack(ab.InputLayer(name='X', n_samples=10),
-                      ab.dense_map(output_dim=1))
+    layers = ab.stack(
+        ab.InputLayer(name='X', n_samples=10),
+        lambda X: (X[:, :, 0:1], 0.0)   # Mock a sampling layer
+    )
     N = len(x)
 
     X_ = tf.placeholder(tf.float32, x.shape)

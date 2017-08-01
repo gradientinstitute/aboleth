@@ -27,6 +27,7 @@ class InputLayer:
 
     n_samples : int > 0
         The number of samples.
+
     """
 
     def __init__(self, name, n_samples=None):
@@ -79,6 +80,7 @@ class Layer:
         KL : {float, Tensor}
             the regularizer/Kullback Liebler 'cost' of the parameters in this
             layer.
+
         """
         return X, 0.0
 
@@ -116,6 +118,7 @@ class Activation(Layer):
     ----------
     h : callable
         the *element-wise* activation function.
+
     """
 
     def __init__(self, h=lambda X: X):
@@ -140,6 +143,7 @@ class DropOut(Layer):
     keep_prob : float, Tensor
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
+
     """
 
     def __init__(self, keep_prob):
@@ -173,6 +177,7 @@ class RandomRBF(SampleLayer):
         the lenght scales of the radial basis kernel, this can be a scalar for
         an isotropic kernel, or a vector for an automatic relevance detection
         (ARD) kernel.
+
     """
 
     def __init__(self, n_features, lenscale=1.0):
@@ -213,6 +218,7 @@ class RandomRBF(SampleLayer):
         P : ndarray
             the random weights of the fourier features of shape
             ``(input_dim, n_features)``.
+
         """
         rand = np.random.RandomState(next(seedgen))
         P = rand.randn(input_dim, self.n_features).astype(np.float32)
@@ -238,6 +244,7 @@ class RandomMatern(RandomRBF):
         this is the Matern kernel 'number', i.e. a v = 3/2 kernel would be p =
         1, the rule is :math:`v = p + .5`. This has to be an integer greater
         than or equal to 0.
+
     """
 
     def __init__(self, n_features, lenscale=1.0, p=1):
@@ -262,6 +269,7 @@ class RandomMatern(RandomRBF):
         P : ndarray
             the random weights of the fourier features of shape
             ``(input_dim, n_features)``.
+
         """
         # p is the matern number (v = p + .5) and the two is a transformation
         # of variables between Rasmussen 2006 p84 and the CF of a Multivariate
@@ -310,6 +318,7 @@ class RandomArcCosine(SampleLayer):
         Filippone. "Accelerating Deep Gaussian Processes Inference with
         Arc-Cosine Kernels." Bayesian Deep Learning Workshop, Advances in
         Neural Information Processing Systems, NIPS 2016, Barcelona
+
     """
 
     def __init__(self, n_features, lenscale=1.0, p=1):
@@ -381,6 +390,7 @@ class DenseVariational(SampleLayer):
         intercept. It must have parameters compatible with ``(output_dim,)``
         shaped weights. This ignores the ``use_bias`` parameters.
         See ``distributions.norm_posterior``.
+
     """
 
     def __init__(self, output_dim, reg=1., full=False, use_bias=True,
@@ -414,7 +424,7 @@ class DenseVariational(SampleLayer):
         if self.use_bias is True or self.prior_b or self.post_b:
             # Layer intercepts
             self.pb = self._make_prior(self.pb)
-            self.qb = self._make_posterior(self.qb, input_dim)
+            self.qb = self._make_posterior(self.qb)
 
             # Regularizers
             KL += kl_qp(self.qb, self.pb)
@@ -480,6 +490,7 @@ class EmbedVariational(DenseVariational):
         It must have parameters compatible with ``(input_dim, output_dim)``
         shaped weights. This ignores the ``full`` parameter. See
         ``distributions.gaus_posterior``.
+
     """
 
     def __init__(self, output_dim, n_categories, reg=1., full=False,
@@ -526,13 +537,14 @@ class DenseMAP(SampleLayer):
         the value of the l2 weight regularizer, reg * 0.5 * ||w||^2_2
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
+
     """
 
     def __init__(self, output_dim, l1_reg=1., l2_reg=1., use_bias=True):
         """Create and instance of a dense layer with MAP regularizers."""
         self.output_dim = output_dim
         self.l1 = l1_reg
-        self.l2 = l2_reg,
+        self.l2 = l2_reg
         self.use_bias = use_bias
 
     def build(self, X):
@@ -560,14 +572,14 @@ class DenseMAP(SampleLayer):
 
 #
 # Private module stuff
-#
-
 
 def _l1_loss(X):
+    """Calculate the L1 loss, |X|."""
     l1 = tf.reduce_sum(tf.abs(X))
     return l1
 
 
 def _is_dim(X, dims):
+    """Check if ``X``'s dimension is the same as the tuple ``dims``."""
     shape = tuple([int(d) for d in X.get_shape()])
     return shape == dims

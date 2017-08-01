@@ -5,6 +5,8 @@ import tensorflow as tf
 import aboleth as ab
 
 from aboleth.distributions import norm_prior, gaus_posterior
+from aboleth.layer import SampleLayer
+
 
 D = 10
 DIM = (2, 10)
@@ -161,6 +163,7 @@ def test_dense_outputs(dense, make_data):
 
 
 @pytest.mark.parametrize('layer_args', [
+    (SampleLayer, ()),
     (ab.DenseMAP, (D,)),
     (ab.DenseVariational, (D,)),
     (ab.EmbedVariational, (2, D)),
@@ -168,7 +171,8 @@ def test_dense_outputs(dense, make_data):
     (ab.RandomMatern, (2,)),
     (ab.RandomArcCosine, (2,)),
 ])
-def test_stochastic_layer_input_exception(layer_args, make_data):
+def test_sample_layer_input_exception(layer_args, make_data):
+    """Make sure sample layers fail when the don't get a rank 3 tensor."""
     x, _, _ = make_data
     layer, args = layer_args
     with pytest.raises(AssertionError):
@@ -183,6 +187,7 @@ def test_stochastic_layer_input_exception(layer_args, make_data):
     {'prior_W': gaus_posterior(DIM, 1.), 'post_W': gaus_posterior(DIM, 1.)},
 ])
 def test_dense_distribution(dists, make_data):
+    """Test initialising dense variational layers with distributions."""
     x, _, _ = make_data
     S = 3
 
@@ -204,7 +209,7 @@ def test_dense_distribution(dists, make_data):
     {'prior_W': gaus_posterior(EDIM, 1.), 'post_W': gaus_posterior(EDIM, 1.)},
 ])
 def test_embeddings_distribution(dists, make_categories):
-    """Test the embedding layer."""
+    """Test initialising embedding variational layers with distributions."""
     x, K = make_categories
     N = len(x)
     S = 3

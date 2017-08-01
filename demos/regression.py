@@ -38,12 +38,12 @@ lenscale = tf.Variable(1.)
 net = ab.stack(
     ab.InputLayer(name="X", n_samples=n_samples),
     ab.RandomRBF(n_features=200, lenscale=ab.pos(lenscale)),
-    ab.dense_var(output_dim=1, reg=reg, full=True)
+    ab.DenseVariational(output_dim=1, reg=reg, full=True)
     )
 
 
 def main():
-
+    """Run the demo."""
     n_iters = int(round(n_epochs * N / batch_size))
     print("Iterations = {}".format(n_iters))
 
@@ -126,6 +126,7 @@ def main():
 
 
 def batch_training(X, Y, batch_size, n_epochs):
+    """Batch training queue."""
     X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
     Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
     X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 1000, 1,
