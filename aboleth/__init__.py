@@ -3,7 +3,7 @@ from .version import __version__
 from .model import elbo, log_prob
 from .layer import (activation, dropout, dense_var, dense_map, input,
                     embed_var, random_fourier, random_arccosine, Matern, RBF,
-                    impute_mean)
+                    )
 from .ops import stack, concat, slicecat, add, impute
 from .likelihood import normal, bernoulli, binomial
 from .distributions import (Normal, Gaussian, norm_prior, norm_posterior,
