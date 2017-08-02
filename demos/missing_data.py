@@ -1,4 +1,3 @@
-
 #! /usr/bin/env python3
 import tensorflow as tf
 import numpy as np
@@ -27,20 +26,20 @@ PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
 REG = 0.1
 
 # Network structure
-datanet = ab.input(name='X_nan', n_samples=LSAMPLES)
-masknet = ab.input(name='M')
+datanet = ab.InputLayer(name='X_nan', n_samples=LSAMPLES)
+masknet = ab.InputLayer(name='M')
 
 net = ab.stack(
     ab.mean_impute(datanet, masknet),
-    ab.dropout(0.95),
-    ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
-    ab.activation(h=tf.nn.relu),
-    ab.dropout(0.5),
-    ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
-    ab.activation(h=tf.nn.relu),
-    ab.dropout(0.5),
-    ab.dense_map(output_dim=1, l1_reg=0., l2_reg=REG),
-    ab.activation(h=tf.nn.sigmoid)
+    ab.DropOut(0.95),
+    ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
+    ab.Activation(h=tf.nn.relu),
+    ab.DropOut(0.5),
+    ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
+    ab.Activation(h=tf.nn.relu),
+    ab.DropOut(0.5),
+    ab.DenseMAP(output_dim=1, l1_reg=0., l2_reg=REG),
+    ab.Activation(h=tf.nn.sigmoid)
 )
 
 
@@ -54,8 +53,8 @@ def main():
 
     # Add random missingness
     missing_mask = np.random.rand(N, D) < FRAC_MISSING
-    X_corrupted = X.copy() 
-    X_corrupted[missing_mask] = 666. #Might not be needed
+    X_corrupted = X.copy()
+    X_corrupted[missing_mask] = 666.  # Might not be needed
     masked_data = ma.asarray(X_corrupted)
     masked_data[missing_mask] = ma.masked
 
@@ -91,7 +90,7 @@ def main():
         for k, (r_ind, s_ind) in enumerate(kfold.split(X)):
             init.run()
 
-            Xr, Yr, Mr = [masked_data.data[r_ind], y[r_ind], 
+            Xr, Yr, Mr = [masked_data.data[r_ind], y[r_ind],
                           masked_data.mask[r_ind]]
 
             Xs, Ys, Ms = [masked_data.data[s_ind], y[s_ind],

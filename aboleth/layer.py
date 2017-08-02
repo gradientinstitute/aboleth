@@ -5,7 +5,6 @@ import tensorflow as tf
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
-from aboleth import util as util
 
 
 #
@@ -40,7 +39,7 @@ class InputLayer:
         """Build the tiling input layer."""
         X = kwargs[self.name]
         if self.n_samples is not None:
-            # (n, N, D)
+            # (n_samples, N, D)
             Xs = tf.tile(tf.expand_dims(X, 0), [self.n_samples, 1, 1])
         else:
             Xs = tf.convert_to_tensor(X)
