@@ -5,6 +5,7 @@ import tensorflow as tf
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
+from aboleth import util as util
 
 
 #
@@ -572,6 +573,7 @@ class DenseMAP(SampleLayer):
 
 #
 # Private module stuff
+#
 
 def _l1_loss(X):
     """Calculate the L1 loss, |X|."""
