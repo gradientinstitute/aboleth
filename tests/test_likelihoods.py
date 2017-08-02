@@ -5,19 +5,19 @@ import tensorflow as tf
 import scipy.stats as ss
 from scipy.special import expit
 
-import aboleth.likelihoods as lk
+import aboleth as ab
 
 
 @pytest.mark.parametrize('likelihood', [
-    (lk.normal(variance=1),
+    (ab.LikeNormal(variance=1),
      ss.norm.rvs,
      lambda x, f: ss.norm.logpdf(x, loc=f)),
 
-    (lk.binomial(n=10.),
+    (ab.LikeBinomial(n=10.),
      lambda f, size: ss.binom.rvs(n=10, p=f, size=size),
      lambda x, f: ss.binom.logpmf(x, n=10, p=f)),
 
-    (lk.bernoulli(),
+    (ab.LikeBernoulli(),
      ss.bernoulli.rvs,
      lambda x, f: ss.bernoulli.logpmf(x, p=f)),
 
@@ -35,7 +35,7 @@ def test_log_likelihoods(likelihood):
 
 
 @pytest.mark.parametrize('likelihood', [
-    (lk.categorical(),
+    (ab.LikeCategorical(),
      lambda f, size: ss.multinomial.rvs(n=1, p=f, size=size),
      lambda x, f: ss.multinomial.logpmf(x, n=1, p=f)),
 ])
@@ -44,7 +44,7 @@ def test_log_likelihoods_multitask(likelihood):
     alike, rvs, logprob = likelihood
 
     f = expit(np.random.randn(100, 5))
-    f /= np.sum(f, axis=-1).reshape(-1, 1) # normalize
+    f /= np.sum(f, axis=-1).reshape(-1, 1)  # normalize
     f = f.astype(np.float32)
 
     # apply_along_axis as scipy rvs doesn't support broadcasting

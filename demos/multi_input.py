@@ -75,7 +75,7 @@ def main():
 
     # Make model
     N = len(Xt_con)
-    likelihood = ab.bernoulli()
+    likelihood = ab.LikeBernoulli()
     Phi, kl = net(con=X_con_, cat=X_cat_)
 
     loss = ab.elbo(Phi, Y_, N, kl, likelihood)

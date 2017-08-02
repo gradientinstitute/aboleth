@@ -69,7 +69,7 @@ def main():
         Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
 
     with tf.name_scope("Likelihood"):
-        lkhood = ab.normal(variance=ab.pos(variance))
+        lkhood = ab.LikeNormal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X=X_)

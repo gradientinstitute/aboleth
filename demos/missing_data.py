@@ -69,7 +69,7 @@ def main():
         M_ = tf.placeholder(dtype=np.bool, shape=(None, D))
 
     with tf.name_scope("Likelihood"):
-        lkhood = ab.bernoulli()
+        lkhood = ab.LikeBernoulli()
 
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X_nan=X_, M=M_)

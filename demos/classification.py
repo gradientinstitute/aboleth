@@ -56,7 +56,7 @@ def main():
         N_ = tf.placeholder(dtype=tf.float32)
 
     with tf.name_scope("Likelihood"):
-        lkhood = ab.bernoulli()
+        lkhood = ab.LikeBernoulli()
 
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X=X_)

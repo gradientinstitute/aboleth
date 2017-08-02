@@ -11,7 +11,24 @@ from aboleth.random import seedgen
 # Generic prior and posterior classes
 #
 
-class Normal:
+class ParameterDistribution:
+    """Abstract base class for parameter distribution objects."""
+
+    def __init__(self):
+        """Construct a ParameterDistibution object."""
+        raise NotImplementedError('Abstract base class only.')
+
+    def sample(self):
+        """Draw a random sample from the distribution."""
+        raise NotImplementedError('Abstract base class only.')
+
+    def __call__(self):
+        """Draw a random sample from the distribution."""
+        sample = self.sample()
+        return sample
+
+
+class ParamNormal(ParameterDistribution):
     """
     Normal (IID) prior/posterior.
 
@@ -38,7 +55,7 @@ class Normal:
         return x
 
 
-class Gaussian:
+class ParamGaussian(ParameterDistribution):
     """
     Gaussian prior/posterior.
 
@@ -98,7 +115,7 @@ def norm_prior(dim, var):
     """
     mu = tf.zeros(dim)
     var = pos(tf.Variable(var, name="W_mu_p"))
-    P = Normal(mu, var)
+    P = ParamNormal(mu, var)
     return P
 
 
@@ -123,7 +140,7 @@ def norm_posterior(dim, var0):
     var_0 = tf.random_gamma(alpha=var0, shape=dim, seed=next(seedgen))
     var = pos(tf.Variable(var_0, name="W_var_q"))
 
-    Q = Normal(mu, var)
+    Q = ParamNormal(mu, var)
     return Q
 
 
@@ -159,7 +176,7 @@ def gaus_posterior(dim, var0):
 
     mu_0 = tf.random_normal((I, O), stddev=sig0, seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
-    Q = Gaussian(mu, L)
+    Q = ParamGaussian(mu, L)
     return Q
 
 
@@ -168,7 +185,7 @@ def gaus_posterior(dim, var0):
 #
 
 
-@dispatch(Normal, Normal)
+@dispatch(ParamNormal, ParamNormal)
 def kl_qp(q, p):
     """Normal-Normal Kullback Leibler divergence calculation.
 
@@ -190,7 +207,7 @@ def kl_qp(q, p):
     return KL
 
 
-@dispatch(Gaussian, Normal)  # noqa
+@dispatch(ParamGaussian, ParamNormal)  # noqa
 def kl_qp(q, p):
     """Gaussian-Normal Kullback Leibler divergence calculation.
 
@@ -214,7 +231,7 @@ def kl_qp(q, p):
     return KL
 
 
-@dispatch(Gaussian, Gaussian)  # noqa
+@dispatch(ParamGaussian, ParamGaussian)  # noqa
 def kl_qp(q, p):
     """Gaussian-Gaussian Kullback Leibler divergence calculation.
 

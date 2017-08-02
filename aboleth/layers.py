@@ -61,6 +61,7 @@ class Layer:
         """Build the graph of this layer.
 
         See: build
+
         """
         Net, KL = self.build(X)
         return Net, KL
@@ -94,7 +95,11 @@ class SampleLayer(Layer):
     """
 
     def __call__(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        See: build
+
+        """
         rank = len(X.shape)
         assert rank == 3
         Net, KL = self.build(X)
@@ -458,7 +463,7 @@ class DenseVariational(SampleLayer):
 
     @staticmethod
     def _sample_W(dist, n_samples):
-        samples = tf.stack([dist.sample() for _ in range(n_samples)])
+        samples = tf.stack([dist() for _ in range(n_samples)])
         return samples
 
 

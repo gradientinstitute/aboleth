@@ -1,6 +1,5 @@
 """Test the ops module."""
 import numpy as np
-import numpy.ma as ma
 import tensorflow as tf
 import aboleth as ab
 
@@ -45,7 +44,7 @@ def test_stack(mocker):
     f = mocker.MagicMock()
     g = mocker.MagicMock()
     h = mocker.MagicMock()
-    ab.stack(f, g, h)
+    ab.Stack(f, g, h)
     mocked_reduce.assert_called_once_with(ab.ops._stack2, (f, g, h))
 
 
@@ -60,7 +59,7 @@ def test_stack_real():
     def h(X):
         return "h({})".format(X), 5.0
 
-    h = ab.stack(f, g, h)
+    h = ab.Stack(f, g, h)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -80,7 +79,7 @@ def test_concat(make_data):
     def g(**kwargs):
         return kwargs['Y'], 0.0
 
-    catlayer = ab.concat(f, g)
+    catlayer = ab.Concat(f, g)
 
     F, KL = catlayer(X=X, Y=X)
 
@@ -102,7 +101,7 @@ def test_slicecat(make_data):
             return X + i, float(i)
         return idlayer
 
-    catlayer = ab.slicecat(make_idxlayer(2), make_idxlayer(3))
+    catlayer = ab.SliceCat(make_idxlayer(2), make_idxlayer(3))
     F, KL = catlayer(X)
 
     tc = tf.test.TestCase()
@@ -126,7 +125,7 @@ def test_add(make_data):
     def g(**kwargs):
         return kwargs['Y'], 0.0
 
-    addlayer = ab.add(f, g)
+    addlayer = ab.Add(f, g)
 
     F, KL = addlayer(X=X, Y=X)
 
@@ -150,7 +149,7 @@ def test_impute(make_missing_data):
     def mask_layer(**kwargs):
         return kwargs['M'], 0.0
 
-    impute = ab.mean_impute(data_layer, mask_layer)
+    impute = ab.MeanImpute(data_layer, mask_layer)
 
     F, KL = impute(X=X, M=m)
 
