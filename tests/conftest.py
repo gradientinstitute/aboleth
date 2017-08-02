@@ -20,6 +20,19 @@ def make_data():
 
 
 @pytest.fixture
+def make_missing_data():
+    """Make some simple data."""
+    N = 10
+    D = 5
+    x = np.ones((N, D)) * np.linspace(1, D, D)
+    mask = np.zeros((N, D)).astype(bool)
+    mask[N-5:] = True
+    x[mask] = 666.
+    X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
+    return x, mask, X
+
+
+@pytest.fixture
 def make_categories():
     """Make some simple categorical data."""
     N = 100
@@ -35,7 +48,8 @@ def make_graph():
     x, Y, X = make_data()
 
     like = ab.normal(variance=1.)
-    layers = ab.stack(ab.sample(10), ab.dense_map(output_dim=1))
+    layers = ab.stack(ab.input(name='X', n_samples=10),
+                      ab.dense_map(output_dim=1))
     N = len(x)
 
     X_ = tf.placeholder(tf.float32, x.shape)

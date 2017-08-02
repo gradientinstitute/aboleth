@@ -1,5 +1,6 @@
 """Test the ops module."""
 import numpy as np
+import numpy.ma as ma
 import tensorflow as tf
 import aboleth as ab
 
@@ -16,7 +17,7 @@ def test_stack2():
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        phi, loss = h("x")
+        phi, loss = h(X="x")
         assert phi == "g(f(x))"
         assert loss.eval() == 30.0
 
@@ -33,7 +34,7 @@ def test_stack2_multi():
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        phi, loss = h("x", "y")
+        phi, loss = h(X="x", Y="y")
         assert phi == "g(f(x, y))"
         assert loss.eval() == 30.0
 
@@ -63,7 +64,7 @@ def test_stack_real():
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        phi, loss = h("x", "y")
+        phi, loss = h(X="x", Y="y")
         assert phi == "h(g(f(x, y)))"
         assert loss.eval() == 35.0
 
@@ -71,9 +72,17 @@ def test_stack_real():
 def test_concat(make_data):
     """Test concatenation op."""
     x, _, X = make_data
-    catlayer = ab.concat(ab.activation(), ab.activation())
 
-    F, KL = catlayer(X, X)
+    # This replicates the input layer behaviour
+    def f(**kwargs):
+        return kwargs['X'], 0.0
+
+    def g(**kwargs):
+        return kwargs['Y'], 0.0
+
+    catlayer = ab.concat(f, g)
+
+    F, KL = catlayer(X=X, Y=X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -109,9 +118,17 @@ def test_slicecat(make_data):
 def test_add(make_data):
     """Test the add join."""
     x, _, X = make_data
-    addlayer = ab.add(ab.activation(), ab.activation())
 
-    F, KL = addlayer(X, X)
+    # This replicates the input layer behaviour
+    def f(**kwargs):
+        return kwargs['X'], 0.0
+
+    def g(**kwargs):
+        return kwargs['Y'], 0.0
+
+    addlayer = ab.add(f, g)
+
+    F, KL = addlayer(X=X, Y=X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -121,3 +138,26 @@ def test_add(make_data):
         assert np.all(forked == 2 * orig)
         assert KL.eval() == 0.0
 
+
+def test_impute(make_missing_data):
+    """Test the impute_mean."""
+    _, m, X = make_missing_data
+    X = tf.cast(X, tf.float32)
+
+    # This replicates the input layer behaviour
+    def data_layer(**kwargs):
+        return kwargs['X'], 0.0
+
+    def mask_layer(**kwargs):
+        return kwargs['M'], 0.0
+
+    impute = ab.impute(data_layer, mask_layer)
+
+    F, KL = impute(X=X, M=m)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        X_imputed = F.eval()
+        imputed_data = X_imputed[1, m]
+        assert list(imputed_data[-5:]) == [1., 2., 3., 4., 5.]
+        assert KL.eval() == 0.0

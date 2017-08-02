@@ -26,9 +26,11 @@ PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
 REG = 0.1
 
 # Network structure
+datanet = ab.input(name='X_nan', n_samples=LSAMPLES)
+masknet = ab.input(name='M')
+
 net = ab.stack(
-    ab.sample(LSAMPLES),
-    ab.impute_mean(),
+    ab.impute(datanet, masknet),
     ab.dropout(0.95),
     ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),
@@ -70,7 +72,7 @@ def main():
         lkhood = ab.bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X_, M_)
+        Phi, kl = net(X_nan=X_, M=M_)
         loss = ab.elbo(Phi, Y_, N_, kl, lkhood)
 
     with tf.name_scope("Train"):
@@ -106,7 +108,7 @@ def main():
                     print("Iteration {}, loss = {}".format(i, loss_val))
 
             # Predict
-            Ey = ab.predict_expected(Phi, {X_: Xs}, PSAMPLES)
+            Ey = ab.predict_expected(Phi, {X_: Xs, M_: Ms}, PSAMPLES)
 
             print("Fold {}:".format(k))
             Ep = np.hstack((1. - Ey, Ey))

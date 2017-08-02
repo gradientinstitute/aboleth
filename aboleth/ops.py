@@ -1,7 +1,17 @@
 """Operations for composing layers."""
 
-import tensorflow as tf
 from functools import reduce
+
+import tensorflow as tf
+
+
+def _check_dims_rank3(X):
+    rank = len(X.shape)
+    if rank != 3:
+        raise ValueError("This layer requires rank 3 inputs, got rank {}!"
+                         .format(rank))
+    n_samples, input_dim = X.shape[0], X.shape[2]
+    return int(n_samples), int(input_dim)
 
 
 def stack(*layers):
@@ -28,24 +38,23 @@ def stack(*layers):
 def concat(*layers):
     """Concatenate multiple layers by concatenating their outputs.
 
-    Note that it is expected that the functions will take different arguments.
-    The output function will take all arguments in the order they were
-    provided. That is, concat(f(X), g(Y)) -> h(X, Y).
+    The functions must all take (only) **kwargs. They can pull from
+    this dictionary as required. It is intended to work
+    on input layers, or functions composed with input layers.
 
     Parameters
     ----------
     layers : [callable]
-        The layers to concatenate. Supports layers with multiple arguments.
+        The layers to concatenate. Must be f(**kwargs).
 
     Returns
     -------
     concatfunc : callable
-        A layer function of the concatenated input layers, that will have as
-        many inputs as the set of original functions.
+        A layer function of the concatenated input layers.
 
     """
-    def concatfunc(*Xl):
-        tensors, losses = zip(*[l(X) for l, X in zip(layers, Xl)])
+    def concatfunc(**kwargs):
+        tensors, losses = zip(*map(lambda l: l(**kwargs), layers))
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
         return result, loss
@@ -61,7 +70,7 @@ def slicecat(*layers):
     single tensor. This is mostly useful for simplifying embedding multiple
     categorical inputs that are stored columnwise in the same 2D tensor.
 
-    Note that this function assumes the tensor being provided is 3D.
+    This function assumes the tensor being provided is 3D.
 
     Parameters
     ----------
@@ -79,7 +88,7 @@ def slicecat(*layers):
 
     """
     def slicefunc(X):
-        tensors, losses = zip(*[l(X[:, :, i:i + 1])
+        tensors, losses = zip(*[l(X[..., i:i + 1])
                                 for i, l in enumerate(layers)])
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
@@ -90,39 +99,102 @@ def slicecat(*layers):
 def add(*layers):
     """Concatenate multiple layers by adding their outputs.
 
-    Note that it is expected that the functions will take different arguments.
-    The output function will take all arguments in the order they were
-    provided. That is, concat(f(X), g(Y)) -> h(X, Y). The outputs will be added
-    along the last dimension.
+    Similar to concatenate, the functions must take (only) **kwargs. The
+    outputs of the functions will be added element-wise. Intended to work
+    on input layers or layers composed with input layers.
 
     Parameters
     ----------
     layers : [callable]
-        The layers to concatenate. Supports layers with multiple arguments.
+        The layers to concatenate. Must be of form f(**kwargs).
 
     Returns
     -------
     concatfunc : callable
-        A layer function of the concatenated input layers, that will have as
-        many inputs as the set of original functions.
+        A layer function that adds the outputs of its component layers.
 
     """
-    def addfunc(*Xl):
-        tensors, losses = zip(*[l(X) for l, X in zip(layers, Xl)])
+    def addfunc(**kwargs):
+        tensors, losses = zip(*map(lambda l: l(**kwargs), layers))
         result = tf.add_n(tensors)
         loss = tf.add_n(losses)
         return result, loss
     return addfunc
 
 
+def impute(datalayer, masklayer, param=None):
+    """Impute the missing values using the stochastic mean of their column.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer.  Returns a layer that returns a tensor in which the masked
+    values have been imputed as the column means.
+
+    Parameters
+    ----------
+    datalayers : [callable]
+        A layer that returns a data tensor. Must be of form f(**kwargs).
+
+    datalayers : [callable]
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be of form f(**kwargs).
+
+    Returns
+    -------
+    mean_impute : callable
+        A layer function that imputes missing values using their column mean.
+
+    """
+    def mean_impute(**kwargs):
+        X_ND, loss1 = datalayer(**kwargs)
+        M, loss2 = masklayer(**kwargs)
+
+        n_samples, input_dim = _check_dims_rank3(X_ND)
+
+        # Identify indices of the missing datapoints
+        missing_ind = tf.where(M)
+        real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+
+        def mean_impute_2D(X_2D):
+            # Fill zeros in for missing data initially
+            data_zeroed_missing_tf = X_2D * real_val_mask
+
+            # Sum the real values in each column
+            col_tot = tf.reduce_sum(data_zeroed_missing_tf, 0)
+
+            # Divide column totals by the number of non-nan values
+            num_values_col = tf.reduce_sum(real_val_mask, 0)
+            num_values_col = tf.maximum(num_values_col,
+                                        tf.ones(tf.shape(num_values_col)))
+            col_nan_means = tf.div(col_tot, num_values_col)
+
+            # Make an vector of the impute values for each missing point
+            imputed_vals = tf.gather(col_nan_means, missing_ind[:, 1])
+
+            # Fill the imputed values into the data tensor of zeros
+            shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+            missing_imputed = tf.scatter_nd(missing_ind, imputed_vals,
+                                            shape)
+
+            X_with_impute = data_zeroed_missing_tf + missing_imputed
+
+            return X_with_impute
+
+        # We don't want to copy tf.Variable W so map over X
+        Net = tf.map_fn(mean_impute_2D, X_ND)
+
+        loss = tf.add(loss1, loss2)
+        return Net, loss
+
+    return mean_impute
+
+
 #
 # Private utility functions
 #
-
 def _stack2(layer1, layer2):
     """Stack 2 functions, by composing w.r.t tensor, adding w.r.t losses."""
-    def stackfunc(*Xl):
-        result1, loss1 = layer1(*Xl)
+    def stackfunc(**kwargs):
+        result1, loss1 = layer1(**kwargs)
         result, loss2 = layer2(result1)
         loss = tf.add(loss1, loss2)
         return result, loss

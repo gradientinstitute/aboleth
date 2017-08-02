@@ -11,16 +11,21 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
 # Sampling layer
 #
 
-def sample(n):
-    """Create a Sampling layer.
+def input(name, n_samples=None):
+    """Create a input layer.
 
-    This layer takes a 2D tensor of shape (k,d) and tiles it along a new
-    first axis creating a (n,k,d) tensor. Used to propagate samples through
-    a variational deep net.
+    This layer defines input kwargs so that a user may easily provide the
+    right inputs to a complex set of layers. It takes a 2D tensor of shape
+    (k,d).  If n_samples is specified, the input is tiled along a new first
+    axis creating a (n,k,d) tensor for propogating samples through a
+    variational deep net.
 
     Parameters
     ----------
-    n : int > 0
+    name : string
+        The name of the input. Used as the agument for input into the net.
+
+    n_samples : int > 0
         The number of samples.
 
     Returns
@@ -29,10 +34,14 @@ def sample(n):
         A function implements the tiling.
 
     """
-    def samplefunc(X):
-        Xs = tf.tile(tf.expand_dims(X, 0), [n, 1, 1])  # (n, N, D)
+    def firstlayer(**kwargs):
+        X = kwargs[name]
+        if n_samples is not None:
+            Xs = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])  # (n, N, D)
+        else:
+            Xs = tf.convert_to_tensor(X)
         return Xs, 0.0
-    return samplefunc
+    return firstlayer
 
 
 #
@@ -267,7 +276,8 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
 
     return build_dense
 
-def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
+
+def embed_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
               post_W=None):
     """Dense (fully connected) embedding layer, with variational inference.
 
@@ -276,10 +286,10 @@ def embed_var(n_categories, output_dim, reg=1., full=False, prior_W=None,
 
     Parameters
     ----------
-    n_categories : int
-        the number of categories in the input variable
     output_dim : int
         the dimension of the output (embedding) of this layer
+    n_categories : int
+        the number of categories in the input variable
     reg : float
         the initial value of the weight prior, w ~ N(0, reg * I), this is
         optimized (a la maximum likelihood type II)
