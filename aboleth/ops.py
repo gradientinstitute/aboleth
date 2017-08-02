@@ -4,14 +4,7 @@ from functools import reduce
 
 import tensorflow as tf
 
-
-def _check_dims_rank3(X):
-    rank = len(X.shape)
-    if rank != 3:
-        raise ValueError("This layer requires rank 3 inputs, got rank {}!"
-                         .format(rank))
-    n_samples, input_dim = X.shape[0], X.shape[2]
-    return int(n_samples), int(input_dim)
+from aboleth import util as util
 
 
 def stack(*layers):
@@ -122,12 +115,12 @@ def add(*layers):
     return addfunc
 
 
-def impute(datalayer, masklayer, param=None):
+def mean_impute(datalayer, masklayer):
     """Impute the missing values using the stochastic mean of their column.
 
     Takes two layers, one the returns a data tensor and the other returns a
     mask layer.  Returns a layer that returns a tensor in which the masked
-    values have been imputed as the column means.
+    values have been imputed as the column means calculated from the batch.
 
     Parameters
     ----------
@@ -144,11 +137,11 @@ def impute(datalayer, masklayer, param=None):
         A layer function that imputes missing values using their column mean.
 
     """
-    def mean_impute(**kwargs):
+    def build_impute(**kwargs):
         X_ND, loss1 = datalayer(**kwargs)
         M, loss2 = masklayer(**kwargs)
 
-        n_samples, input_dim = _check_dims_rank3(X_ND)
+        n_samples, input_dim = util.check_dims_rank3(X_ND)
 
         # Identify indices of the missing datapoints
         missing_ind = tf.where(M)
@@ -179,13 +172,12 @@ def impute(datalayer, masklayer, param=None):
 
             return X_with_impute
 
-        # We don't want to copy tf.Variable W so map over X
         Net = tf.map_fn(mean_impute_2D, X_ND)
 
         loss = tf.add(loss1, loss2)
         return Net, loss
 
-    return mean_impute
+    return build_impute
 
 
 #

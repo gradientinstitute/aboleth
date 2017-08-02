@@ -29,6 +29,7 @@ def make_missing_data():
     mask[N-5:] = True
     x[mask] = 666.
     X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
+    X = tf.cast(X, tf.float32)
     return x, mask, X
 
 

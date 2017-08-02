@@ -31,7 +31,7 @@ datanet = ab.input(name='X_nan', n_samples=LSAMPLES)
 masknet = ab.input(name='M')
 
 net = ab.stack(
-    ab.impute(datanet, masknet),
+    ab.mean_impute(datanet, masknet),
     ab.dropout(0.95),
     ab.dense_map(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.activation(h=tf.nn.relu),

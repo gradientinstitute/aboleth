@@ -142,7 +142,6 @@ def test_add(make_data):
 def test_impute(make_missing_data):
     """Test the impute_mean."""
     _, m, X = make_missing_data
-    X = tf.cast(X, tf.float32)
 
     # This replicates the input layer behaviour
     def data_layer(**kwargs):
@@ -151,7 +150,7 @@ def test_impute(make_missing_data):
     def mask_layer(**kwargs):
         return kwargs['M'], 0.0
 
-    impute = ab.impute(data_layer, mask_layer)
+    impute = ab.mean_impute(data_layer, mask_layer)
 
     F, KL = impute(X=X, M=m)
 

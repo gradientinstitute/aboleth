@@ -5,11 +5,12 @@ import tensorflow as tf
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
-
+from aboleth import util as util
 
 #
 # Sampling layer
 #
+
 
 def input(name, n_samples=None):
     """Create a input layer.
@@ -121,7 +122,7 @@ def random_fourier(n_features, kernel=None):
 
     def build_random_ff(X):
         # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = _check_dims_rank3(X)
+        n_samples, input_dim = util.check_dims_rank3(X)
 
         # Random weights, copy faster than map here
         P = kernel.weights(input_dim, n_features)
@@ -188,7 +189,7 @@ def random_arccosine(n_features, lenscale=1.0, p=1):
 
     def build_random_ac(X):
         # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = _check_dims_rank3(X)
+        n_samples, input_dim = util.check_dims_rank3(X)
 
         # Random weights
         rand = np.random.RandomState(next(seedgen))
@@ -252,7 +253,7 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
     """
     def build_dense(X):
         # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = _check_dims_rank3(X)
+        n_samples, input_dim = util.check_dims_rank3(X)
         Wdim = (input_dim, output_dim)
         bdim = (output_dim,)
 
@@ -318,7 +319,7 @@ def embed_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
 
     def build_embedding(X):
         # X is a rank 3 tensor, [n_samples, N, 1]
-        n_samples, input_dim = _check_dims_rank3(X)
+        n_samples, input_dim = util.check_dims_rank3(X)
         if input_dim > 1:
             print("embedding X: {}".format(X))
             raise ValueError("X must be a *column* of indices!")
@@ -362,7 +363,7 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
     """
     def build_dense_map(X):
         # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = _check_dims_rank3(X)
+        n_samples, input_dim = util.check_dims_rank3(X)
         Wdim = (input_dim, output_dim)
 
         W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
@@ -485,15 +486,6 @@ class Matern(RBF):
 def _l1_loss(X):
     l1 = tf.reduce_sum(tf.abs(X))
     return l1
-
-
-def _check_dims_rank3(X):
-    rank = len(X.shape)
-    if rank != 3:
-        raise ValueError("This layer requires rank 3 inputs, got rank {}!"
-                         .format(rank))
-    n_samples, input_dim = X.shape[0], X.shape[2]
-    return int(n_samples), int(input_dim)
 
 
 def _is_dim(X, dims):
