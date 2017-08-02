@@ -1,11 +1,11 @@
 """Package init."""
 from .version import __version__
-from .model import elbo, log_prob
-from .layer import (Activation, DropOut, DenseVariational, DenseMAP,
-                    InputLayer, EmbedVariational, RandomRBF, RandomMatern,
-                    RandomArcCosine)
+from .losses import elbo
+from .layers import (Activation, DropOut, DenseVariational, DenseMAP,
+                     InputLayer, EmbedVariational, RandomRBF, RandomMatern,
+                     RandomArcCosine)
 from .ops import stack, concat, slicecat, add
-from .likelihood import normal, bernoulli, binomial
+from .likelihoods import normal, bernoulli, binomial
 from .distributions import (Normal, Gaussian, norm_prior, norm_posterior,
                             gaus_posterior)
 from .util import (batch, pos, predict_expected, predict_samples,
@@ -15,7 +15,6 @@ from .random import set_hyperseed
 __all__ = (
     '__version__',
     'elbo',
-    'log_prob',
     'Activation',
     'DropOut',
     'DenseVariational',

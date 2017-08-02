@@ -79,7 +79,7 @@ def main():
         optimizer = tf.train.AdamOptimizer()
         global_step = tf.train.create_global_step()
         train = optimizer.minimize(loss, global_step=global_step)
-        logprob = ab.log_prob(Y_, lkhood, Phi)
+        logprob = lkhood(Y_, Phi)
 
     # Logging
     log = tf.train.LoggingTensorHook(

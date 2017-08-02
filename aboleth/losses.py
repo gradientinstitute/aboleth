@@ -1,12 +1,6 @@
-"""Network construction and evaluation."""
+"""Network loss functions."""
 import tensorflow as tf
 
-# from aboleth.layer import compose_layers
-
-
-#
-# Graph Building -- Models and Optimisation
-#
 
 def elbo(Net, Y, N, KL, likelihood, like_weights=None):
     """Build the evidence lower bound loss for a neural net.
@@ -45,30 +39,3 @@ def elbo(Net, Y, N, KL, likelihood, like_weights=None):
 
     l = - B * ELL + KL
     return l
-
-#
-# Graph Building -- Prediction and evaluation
-#
-
-
-def log_prob(Y, likelihood, Net):
-    """Build the log probability density of the model for each observation.
-
-    Parameters
-    ----------
-    Y: ndarray, Tensor
-        the targets of shape (N, tasks).
-    likelihood: Tensor
-        the likelihood model to use on the output of the last layer of the
-        neural net, see the ``likelihood`` module.
-    Net: Tensor
-        the neural net featues of shape (n_samples, N, tasks).
-
-    Returns
-    -------
-    logp : Tensor
-        ``n_samples`` of the log probability of each ``Y`` under the model.
-        This is of shape (n_samples, N).
-    """
-    log_prob = likelihood(Y, Net)
-    return log_prob

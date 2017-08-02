@@ -5,7 +5,7 @@ import tensorflow as tf
 import scipy.stats as ss
 from scipy.special import expit
 
-import aboleth.likelihood as lk
+import aboleth.likelihoods as lk
 
 
 @pytest.mark.parametrize('likelihood', [

@@ -5,7 +5,7 @@ import tensorflow as tf
 import aboleth as ab
 
 from aboleth.distributions import norm_prior, gaus_posterior
-from aboleth.layer import SampleLayer
+from aboleth.layers import SampleLayer
 
 
 D = 10
