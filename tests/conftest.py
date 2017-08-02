@@ -20,6 +20,20 @@ def make_data():
 
 
 @pytest.fixture
+def make_missing_data():
+    """Make some simple data."""
+    N = 10
+    D = 5
+    x = np.ones((N, D)) * np.linspace(1, D, D)
+    mask = np.zeros((N, D)).astype(bool)
+    mask[N-5:] = True
+    x[mask] = 666.
+    X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
+    X = tf.cast(X, tf.float32)
+    return x, mask, X
+
+
+@pytest.fixture
 def make_categories():
     """Make some simple categorical data."""
     N = 100
