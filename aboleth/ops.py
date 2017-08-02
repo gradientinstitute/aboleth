@@ -4,6 +4,8 @@ from functools import reduce
 
 import tensorflow as tf
 
+from aboleth import util as util
+
 
 def stack(*layers):
     """Stack multiple layers together (function composition).
@@ -113,10 +115,74 @@ def add(*layers):
     return addfunc
 
 
+def mean_impute(datalayer, masklayer):
+    """Impute the missing values using the stochastic mean of their column.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer.  Returns a layer that returns a tensor in which the masked
+    values have been imputed as the column means calculated from the batch.
+
+    Parameters
+    ----------
+    datalayers : [callable]
+        A layer that returns a data tensor. Must be of form f(**kwargs).
+
+    datalayers : [callable]
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be of form f(**kwargs).
+
+    Returns
+    -------
+    mean_impute : callable
+        A layer function that imputes missing values using their column mean.
+
+    """
+    def build_impute(**kwargs):
+        X_ND, loss1 = datalayer(**kwargs)
+        M, loss2 = masklayer(**kwargs)
+
+        n_samples, input_dim = util.check_dims_rank3(X_ND)
+
+        # Identify indices of the missing datapoints
+        missing_ind = tf.where(M)
+        real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+
+        def mean_impute_2D(X_2D):
+            # Fill zeros in for missing data initially
+            data_zeroed_missing_tf = X_2D * real_val_mask
+
+            # Sum the real values in each column
+            col_tot = tf.reduce_sum(data_zeroed_missing_tf, 0)
+
+            # Divide column totals by the number of non-nan values
+            num_values_col = tf.reduce_sum(real_val_mask, 0)
+            num_values_col = tf.maximum(num_values_col,
+                                        tf.ones(tf.shape(num_values_col)))
+            col_nan_means = tf.div(col_tot, num_values_col)
+
+            # Make an vector of the impute values for each missing point
+            imputed_vals = tf.gather(col_nan_means, missing_ind[:, 1])
+
+            # Fill the imputed values into the data tensor of zeros
+            shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+            missing_imputed = tf.scatter_nd(missing_ind, imputed_vals,
+                                            shape)
+
+            X_with_impute = data_zeroed_missing_tf + missing_imputed
+
+            return X_with_impute
+
+        Net = tf.map_fn(mean_impute_2D, X_ND)
+
+        loss = tf.add(loss1, loss2)
+        return Net, loss
+
+    return build_impute
+
+
 #
 # Private utility functions
 #
-
 def _stack2(layer1, layer2):
     """Stack 2 functions, by composing w.r.t tensor, adding w.r.t losses."""
     def stackfunc(**kwargs):

@@ -1,5 +1,6 @@
 """Test the ops module."""
 import numpy as np
+import numpy.ma as ma
 import tensorflow as tf
 import aboleth as ab
 
@@ -137,3 +138,25 @@ def test_add(make_data):
         assert np.all(forked == 2 * orig)
         assert KL.eval() == 0.0
 
+
+def test_impute(make_missing_data):
+    """Test the impute_mean."""
+    _, m, X = make_missing_data
+
+    # This replicates the input layer behaviour
+    def data_layer(**kwargs):
+        return kwargs['X'], 0.0
+
+    def mask_layer(**kwargs):
+        return kwargs['M'], 0.0
+
+    impute = ab.mean_impute(data_layer, mask_layer)
+
+    F, KL = impute(X=X, M=m)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        X_imputed = F.eval()
+        imputed_data = X_imputed[1, m]
+        assert list(imputed_data[-5:]) == [1., 2., 3., 4., 5.]
+        assert KL.eval() == 0.0

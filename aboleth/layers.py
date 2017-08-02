@@ -39,7 +39,7 @@ class InputLayer:
         """Build the tiling input layer."""
         X = kwargs[self.name]
         if self.n_samples is not None:
-            # (n, N, D)
+            # (n_samples, N, D)
             Xs = tf.tile(tf.expand_dims(X, 0), [self.n_samples, 1, 1])
         else:
             Xs = tf.convert_to_tensor(X)
@@ -572,6 +572,7 @@ class DenseMAP(SampleLayer):
 
 #
 # Private module stuff
+#
 
 def _l1_loss(X):
     """Calculate the L1 loss, |X|."""
