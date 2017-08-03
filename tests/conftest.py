@@ -49,7 +49,7 @@ def make_graph():
     x, Y, X = make_data()
 
     like = ab.LikeNormal(variance=1.)
-    layers = ab.Stack(
+    layers = ab.stack(
         ab.InputLayer(name='X', n_samples=10),
         lambda X: (X[:, :, 0:1], 0.0)   # Mock a sampling layer
     )

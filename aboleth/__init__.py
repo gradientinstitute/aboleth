@@ -4,7 +4,7 @@ from .losses import elbo
 from .layers import (Activation, DropOut, DenseVariational, DenseMAP,
                      InputLayer, EmbedVariational, RandomRBF, RandomMatern,
                      RandomArcCosine)
-from .ops import Stack, Concat, Add, SliceCat, MeanImpute
+from .ops import stack, concat, add, slicecat, mean_impute
 from .likelihoods import (LikeNormal, LikeBernoulli, LikeBinomial,
                           LikeCategorical)
 from .distributions import (ParamNormal, ParamGaussian, norm_prior,
@@ -40,9 +40,9 @@ __all__ = (
     'batch_prediction',
     'set_hyperseed',
     'InputLayer',
-    'Stack',
-    'Concat',
-    'Add',
-    'SliceCat',
-    'MeanImpute'
+    'stack',
+    'concat',
+    'add',
+    'slicecat',
+    'mean_impute'
 )

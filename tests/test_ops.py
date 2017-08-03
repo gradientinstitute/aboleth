@@ -44,7 +44,7 @@ def test_stack(mocker):
     f = mocker.MagicMock()
     g = mocker.MagicMock()
     h = mocker.MagicMock()
-    ab.Stack(f, g, h)
+    ab.stack(f, g, h)
     mocked_reduce.assert_called_once_with(ab.ops._stack2, (f, g, h))
 
 
@@ -59,7 +59,7 @@ def test_stack_real():
     def h(X):
         return "h({})".format(X), 5.0
 
-    h = ab.Stack(f, g, h)
+    h = ab.stack(f, g, h)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -79,7 +79,7 @@ def test_concat(make_data):
     def g(**kwargs):
         return kwargs['Y'], 0.0
 
-    catlayer = ab.Concat(f, g)
+    catlayer = ab.concat(f, g)
 
     F, KL = catlayer(X=X, Y=X)
 
@@ -101,7 +101,7 @@ def test_slicecat(make_data):
             return X + i, float(i)
         return idlayer
 
-    catlayer = ab.SliceCat(make_idxlayer(2), make_idxlayer(3))
+    catlayer = ab.slicecat(make_idxlayer(2), make_idxlayer(3))
     F, KL = catlayer(X)
 
     tc = tf.test.TestCase()
@@ -125,7 +125,7 @@ def test_add(make_data):
     def g(**kwargs):
         return kwargs['Y'], 0.0
 
-    addlayer = ab.Add(f, g)
+    addlayer = ab.add(f, g)
 
     F, KL = addlayer(X=X, Y=X)
 
@@ -149,7 +149,7 @@ def test_impute(make_missing_data):
     def mask_layer(**kwargs):
         return kwargs['M'], 0.0
 
-    impute = ab.MeanImpute(data_layer, mask_layer)
+    impute = ab.mean_impute(data_layer, mask_layer)
 
     F, KL = impute(X=X, M=m)
 
