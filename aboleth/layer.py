@@ -532,46 +532,6 @@ class DenseMAP(SampleLayer):
 
         return Net, penalty
 
-<<<<<<< HEAD
-=======
-    return build_dense_map
-
-
-def max_pooling2d(pool_size, strides, padding='SAME'):
-    """Max pooling layer for 2D inputs (e.g. images).
-
-    This is just a thin wrapper around `tf.nn.max_pool
-    <https://www.tensorflow.org/api_docs/python/tf/nn/max_pool>`_
-
-    Parameters
-    ----------
-    pool_size : tuple or list of 2 ints
-        width and height of the pooling window.
-    strides : tuple or list of 2 ints
-        the strides of the pooling operation along the height and width.
-    padding : str
-        One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
-
-    Returns
-    -------
-    build_max_pooling2d : callable
-        a function that builds the max pooling layer.
-    """
-    def build_max_pooling2d(X):
-
-        ksize = [1] + list(pool_size) + [1]
-        s = [1] + list(strides) + [1]
-
-        Net = tf.map_fn(lambda inputs: tf.nn.max_pool(inputs,
-                                                      ksize=ksize,
-                                                      strides=s,
-                                                      padding=padding), X)
-        KL = 0.
-        return Net, KL
-
-    return build_max_pooling2d
-
->>>>>>> fixed linting
 
 #
 # Random Fourier Kernels
