@@ -76,10 +76,10 @@ def test_max_pooling2d(make_image_data):
     """Test dropout layer."""
     x, _, X = make_image_data
 
-    max_pool = ab.MaxPool2D(pool_size=(2, 2), 
-                            strides=(2, 2))
-    
     # downsample by 2x
+    max_pool = ab.MaxPool2D(pool_size=(2, 2),
+                            strides=(2, 2))
+
     F, KL = max_pool(X)
 
     tc = tf.test.TestCase()
