@@ -5,6 +5,8 @@ import tensorflow as tf
 
 import aboleth as ab
 
+from scipy.special import expit
+
 
 @pytest.fixture
 def make_data():
@@ -16,6 +18,19 @@ def make_data():
     w = np.array([[0.5], [2.0]])
     Y = np.dot(x, w) + np.random.randn(N, 1)
     X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
+    return x, Y, X
+
+
+@pytest.fixture
+def make_image_data():
+    """Make some simple data."""
+    N = 100
+    M = 5
+    # N 28x28 RGB float images
+    x = expit(np.random.randn(N, 28, 28, 3)).astype(np.float32)
+    w = np.linspace(-2.5, 2.5, 28*28*3)
+    Y = np.dot(x.reshape(-1, 28*28*3), w) + np.random.randn(N, 1)
+    X = tf.tile(tf.expand_dims(x, 0), [M, 1, 1, 1, 1])
     return x, Y, X
 
 

@@ -1,10 +1,11 @@
 """Package init."""
 from .version import __version__
 from .losses import elbo
-from .layers import (Activation, DropOut, DenseVariational, DenseMAP,
-                     InputLayer, EmbedVariational, RandomRBF, RandomMatern,
+from .layers import (Activation, DropOut, MaxPool2D, DenseVariational,
+                     DenseMAP, InputLayer, EmbedVariational, RandomFourier,
                      RandomArcCosine)
-from .ops import stack, concat, add, slicecat, mean_impute
+from .ops import stack, concat, slicecat, add, mean_impute, gaussian_impute
+from .kernels import RBF, Matern
 from .likelihoods import (LikeNormal, LikeBernoulli, LikeBinomial,
                           LikeCategorical)
 from .distributions import (ParamNormal, ParamGaussian, norm_prior,
@@ -18,11 +19,11 @@ __all__ = (
     'elbo',
     'Activation',
     'DropOut',
+    'MaxPool2D',
     'DenseVariational',
     'DenseMAP',
     'EmbedVariational',
-    'RandomRBF',
-    'RandomMatern',
+    'RandomFourier',
     'RandomArcCosine',
     'LikeNormal',
     'LikeBernoulli',
@@ -44,5 +45,8 @@ __all__ = (
     'concat',
     'add',
     'slicecat',
-    'mean_impute'
+    'mean_impute',
+    'gaussian_impute',
+    'RBF',
+    'Matern'
 )

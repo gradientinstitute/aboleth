@@ -72,36 +72,33 @@ def test_dropout(make_data):
         assert KL == 0
 
 
-@pytest.mark.parametrize('kernels', [
-    (ab.RandomRBF, {}),
-    (ab.RandomMatern, {'p': 1}),
-    (ab.RandomMatern, {'p': 2})
-])
-def test_kernels(kernels, make_data):
-    """Test random kernels approximations."""
-    d, D = 10, 100
-    S = 3
-    kern, p = kernels
-    k = kern(D, **p)
+def test_max_pooling2d(make_image_data):
+    """Test dropout layer."""
+    x, _, X = make_image_data
 
-    x, _, _ = make_data
-    x_, X_ = _make_placeholders(x, S)
-    N = x.shape[0]
+    # downsample by 2x
+    max_pool = ab.MaxPool2D(pool_size=(2, 2),
+                            strides=(2, 2))
 
-    Phi, KL = k(X_)
-
-    # Check dim
-    P = k.weights(input_dim=d)
-    assert P.shape == (d, D)
+    F, KL = max_pool(X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        P = Phi.eval(feed_dict={x_: x})
-        for i in range(P.shape[0]):
-            p = P[i]
-            assert p.shape == (N, 2 * D)
-            # Check behaving properly with k(x, x) ~ 1.0
-            assert np.allclose((p**2).sum(axis=1), np.ones(N))
+        f = F.eval()
+
+        # test equivalence of first window across batches
+        assert np.all(np.max(x[:, :2, :2, :], axis=(1, 2)) == f[0, :, 0, 0, :])
+
+        # n_samples and batch size remain unchanged
+        assert f.shape[:2] == X.eval().shape[:2]
+
+        # downsampled by 2x
+        assert 2 * f.shape[2] == X.eval().shape[2]
+        assert 2 * f.shape[3] == X.eval().shape[3]
+
+        # number of channels remain unchanged
+        assert f.shape[-1] == X.eval().shape[-1]
+
         assert KL == 0
 
 
@@ -167,8 +164,7 @@ def test_dense_outputs(dense, make_data):
     (ab.DenseMAP, (D,)),
     (ab.DenseVariational, (D,)),
     (ab.EmbedVariational, (2, D)),
-    (ab.RandomRBF, (2,)),
-    (ab.RandomMatern, (2,)),
+    (ab.RandomFourier, (2, ab.RBF())),
     (ab.RandomArcCosine, (2,)),
 ])
 def test_sample_layer_input_exception(layer_args, make_data):
@@ -177,6 +173,35 @@ def test_sample_layer_input_exception(layer_args, make_data):
     layer, args = layer_args
     with pytest.raises(AssertionError):
         layer(*args)(x)
+
+
+@pytest.mark.parametrize('kernels', [
+    (ab.RBF, {}),
+    (ab.Matern, {'p': 1}),
+    (ab.Matern, {'p': 2})
+])
+def test_fourier_features(kernels, make_data):
+    """Test random fourier kernels approximations."""
+    D = 100
+    S = 3
+    kern, p = kernels
+    k = kern(D, **p)
+
+    x, _, _ = make_data
+    x_, X_ = _make_placeholders(x, S)
+    N = x.shape[0]
+
+    Phi, KL = ab.RandomFourier(D, k)(X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        P = Phi.eval(feed_dict={x_: x})
+        for i in range(P.shape[0]):
+            p = P[i]
+            assert p.shape == (N, 2 * D)
+            # Check behaving properly with k(x, x) ~ 1.0
+            assert np.allclose((p**2).sum(axis=1), np.ones(N))
+        assert KL == 0
 
 
 @pytest.mark.parametrize('dists', [
