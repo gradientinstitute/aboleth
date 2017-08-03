@@ -5,6 +5,7 @@ from functools import reduce
 import tensorflow as tf
 
 from aboleth import util as util
+from aboleth.distributions import Normal
 
 
 def stack(*layers):
@@ -124,16 +125,16 @@ def mean_impute(datalayer, masklayer):
 
     Parameters
     ----------
-    datalayers : [callable]
+    datalayer : [callable]
         A layer that returns a data tensor. Must be of form f(**kwargs).
 
-    datalayers : [callable]
+    masklayer : [callable]
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form f(**kwargs).
 
     Returns
     -------
-    mean_impute : callable
+    build_impute : callable
         A layer function that imputes missing values using their column mean.
 
     """
@@ -173,6 +174,76 @@ def mean_impute(datalayer, masklayer):
             return X_with_impute
 
         Net = tf.map_fn(mean_impute_2D, X_ND)
+
+        loss = tf.add(loss1, loss2)
+        return Net, loss
+
+    return build_impute
+
+
+def gaussian_impute(datalayer, masklayer, mu_array, var_array):
+    """Impute the missing values using the marginal gaussians over each column.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer.  Returns a layer that returns a tensor in which the masked
+    values have been imputed as the column means calculated from the batch.
+
+    Parameters
+    ----------
+    datalayer : [callable]
+        A layer that returns a data tensor. Must be of form f(**kwargs).
+
+    masklayer : [callable]
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be of form f(**kwargs).
+
+    mu_array : array-like
+        A list of the global mean values of each dat column
+
+    var_array : array-like
+        A list of the global variance of each data column
+
+    Returns
+    -------
+    build_impute : callable
+        A layer function that imputes missing values using their draws from
+        user-provided Gaussians mean.
+
+    """
+    def build_impute(**kwargs):
+        X_ND, loss1 = datalayer(**kwargs)
+        M, loss2 = masklayer(**kwargs)
+
+        n_samples, input_dim = util.check_dims_rank3(X_ND)
+
+        assert(len(mu_array) == input_dim)
+        assert(len(var_array) == input_dim)
+
+        normal_array = [Normal(m, v) for m, v in zip(mu_array, var_array)]
+
+        # Identify indices of the missing datapoints
+        missing_ind = tf.where(M)
+        real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+
+        def gauss_impute_2D(X_2D):
+            # Fill zeros in for missing data initially
+            data_zeroed_missing_tf = X_2D * real_val_mask
+
+            # Divide column totals by the number of non-nan values
+            col_draws = [n.sample() for n in normal_array]
+            # Make an vector of the impute values for each missing point
+            imputed_vals = tf.gather(col_draws, missing_ind[:, 1])
+
+            # Fill the imputed values into the data tensor of zeros
+            shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+            missing_imputed = tf.scatter_nd(missing_ind, imputed_vals,
+                                            shape)
+
+            X_with_impute = data_zeroed_missing_tf + missing_imputed
+
+            return X_with_impute
+
+        Net = tf.map_fn(gauss_impute_2D, X_ND)
 
         loss = tf.add(loss1, loss2)
         return Net, loss
