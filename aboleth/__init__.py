@@ -4,7 +4,7 @@ from .model import elbo, log_prob
 from .layer import (activation, dropout, dense_var, dense_map, input,
                     embed_var, random_fourier, random_arccosine, Matern, RBF,
                     )
-from .ops import stack, concat, slicecat, add, mean_impute
+from .ops import stack, concat, slicecat, add, mean_impute, gaussian_impute
 from .likelihood import normal, bernoulli, binomial
 from .distributions import (Normal, Gaussian, norm_prior, norm_posterior,
                             gaus_posterior)
@@ -47,4 +47,5 @@ __all__ = (
     'slicecat',
     'add',
     'mean_impute'
+    'gaussian_impute'
 )
