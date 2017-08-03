@@ -5,21 +5,36 @@ import tensorflow as tf
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
-from aboleth import util as util
+
 
 #
-# Sampling layer
+# Multi layers
 #
 
+class MultiLayer:
+    """Base class for MultiLayers, or layers that take in multiple inputs."""
 
-def input(name, n_samples=None):
-    """Create a input layer.
+    def __call__(self, **kwargs):
+        """Build the multiple input layer.
 
-    This layer defines input kwargs so that a user may easily provide the
-    right inputs to a complex set of layers. It takes a 2D tensor of shape
-    (k,d).  If n_samples is specified, the input is tiled along a new first
-    axis creating a (n,k,d) tensor for propogating samples through a
-    variational deep net.
+        See: _build() for the implementation details.
+        """
+        Net, KL = self._build(**kwargs)
+        return Net, KL
+
+    def _build(self, **kwargs):
+        """Build the multiple input layer."""
+        raise NotImplementedError("Base class for MultiLayers only!")
+
+
+class InputLayer(MultiLayer):
+    """Create an input layer.
+
+    This layer defines input kwargs so that a user may easily provide the right
+    inputs to a complex set of layers. It takes a 2D tensor of shape (k, d).
+    If n_samples is specified, the input is tiled along a new first axis
+    creating a (n,k,d) tensor for propogating samples through a variational
+    deep net.
 
     Parameters
     ----------
@@ -29,28 +44,90 @@ def input(name, n_samples=None):
     n_samples : int > 0
         The number of samples.
 
-    Returns
-    -------
-    samplefunc : callable
-        A function implements the tiling.
-
     """
-    def firstlayer(**kwargs):
-        X = kwargs[name]
-        if n_samples is not None:
-            Xs = tf.tile(tf.expand_dims(X, 0), [n_samples, 1, 1])  # (n, N, D)
+
+    def __init__(self, name, n_samples=None):
+        """Construct an instance of InputLayer."""
+        self.name = name
+        self.n_samples = n_samples
+
+    def _build(self, **kwargs):
+        """Build the tiling input layer."""
+        X = kwargs[self.name]
+        if self.n_samples is not None:
+            # (n_samples, N, D)
+            Xs = tf.tile(tf.expand_dims(X, 0), [self.n_samples, 1, 1])
         else:
             Xs = tf.convert_to_tensor(X)
         return Xs, 0.0
-    return firstlayer
+
+
+#
+# Generic Layers
+#
+
+class Layer:
+    """Layer base class.
+
+    This is an identity layer, and is primarily meant to be subclassed to
+    construct more intersting layers.
+    """
+
+    def __call__(self, X):
+        """Build the graph of this layer.
+
+        See: _build
+        """
+        Net, KL = self._build(X)
+        return Net, KL
+
+    def _build(self, X):
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : {float, Tensor}
+            the regularizer/Kullback Liebler 'cost' of the parameters in this
+            layer.
+
+        """
+        return X, 0.0
+
+
+class SampleLayer(Layer):
+    """Sample Layer base class.
+
+    This is the base class for layers that build upon stochastic (variational)
+    nets. These expect *rank 3* input Tensors, where the first dimension
+    indexes the random samples of the stochastic net.
+    """
+
+    def __call__(self, X):
+        """Build the graph of this layer."""
+        rank = len(X.shape)
+        assert rank == 3
+        Net, KL = self._build(X)
+        return Net, KL
+
+    @staticmethod
+    def get_X_dims(X):
+        """Get the dimensions of the rank 3 input tensor."""
+        n_samples, input_dim = int(X.shape[0]), int(X.shape[2])
+        return n_samples, input_dim
 
 
 #
 # Activation Layers
 #
 
-
-def activation(h=lambda X: X):
+class Activation(Layer):
     """Activation function layer.
 
     Parameters
@@ -58,21 +135,20 @@ def activation(h=lambda X: X):
     h : callable
         the *element-wise* activation function.
 
-    Returns
-    -------
-    build_activation : callable
-        a function that builds the activation layer.
-
     """
-    def build_activation(X):
-        Net = h(X)
+
+    def __init__(self, h=lambda X: X):
+        """Create an instance of an Activation layer."""
+        self.h = h
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        Net = self.h(X)
         KL = 0.
         return Net, KL
 
-    return build_activation
 
-
-def dropout(keep_prob):
+class DropOut(Layer):
     """Dropout layer, Bernoulli probability of not setting an input to zero.
 
     This is just a thin wrapper around `tf.dropout
@@ -84,22 +160,59 @@ def dropout(keep_prob):
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
 
-    Returns
-    -------
-    build_dropout : callable
-        a function that builds the dropout layer.
     """
-    def build_dropout(X):
+
+    def __init__(self, keep_prob):
+        """Create an instance of a Dropout layer."""
+        self.keep_prob = keep_prob
+
+    def _build(self, X):
+        """Build the graph of this layer."""
         noise_shape = None  # equivalent to different samples from posterior
-        Net = tf.nn.dropout(X, keep_prob, noise_shape, seed=next(seedgen))
+        Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
 
-    return build_dropout
+
+class MaxPool2D(Layer):
+    """Max pooling layer for 2D inputs (e.g. images).
+
+    This is just a thin wrapper around `tf.nn.max_pool
+    <https://www.tensorflow.org/api_docs/python/tf/nn/max_pool>`_
+
+    Parameters
+    ----------
+    pool_size : tuple or list of 2 ints
+        width and height of the pooling window.
+    strides : tuple or list of 2 ints
+        the strides of the pooling operation along the height and width.
+    padding : str
+        One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
+
+    """
+
+    def __init__(self, pool_size, strides, padding='SAME'):
+        """Initialize instance of a MaxPool2D layer."""
+        self.ksize = [1] + list(pool_size) + [1]
+        self.strides = [1] + list(strides) + [1]
+        self.padding = padding
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        Net = tf.map_fn(lambda inputs: tf.nn.max_pool(inputs,
+                                                      ksize=self.ksize,
+                                                      strides=self.strides,
+                                                      padding=self.padding), X)
+        KL = 0.
+        return Net, KL
 
 
-def random_fourier(n_features, kernel=None):
-    """Random fourier feature layer.
+#
+# Kernel Approximation Layers
+#
+
+class RandomFourier(SampleLayer):
+    """Random Fourier feature (RFF) kernel approximation layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
         kernel approximation.
@@ -109,38 +222,37 @@ def random_fourier(n_features, kernel=None):
     n_features : int
         the number of unique random features, the actual output dimension of
         this layer will be ``2 * n_features``.
-    kernel : object
-        the object that yeilds the random samples from the fourier spectrum of
-        a particular kernel to approximate. See ``RBF`` and ``Matern`` etc.
+    kernel : kernels.ShiftInvariant
+        the kernel object that yeilds the random samples from the fourier
+        spectrum of a particular kernel to approximate. See ``RBF`` and
+        ``Matern`` etc.
 
-    Returns
-    -------
-    build_random_ff : callable
-        a function that builds the random fourier feature layer.
     """
-    kernel = kernel if kernel else RBF()
 
-    def build_random_ff(X):
-        # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = util.check_dims_rank3(X)
+    def __init__(self, n_features, kernel):
+        """Construct and instance of a RandomFourier object."""
+        self.n_features = n_features
+        self.kernel = kernel
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, input_dim = self.get_X_dims(X)
 
         # Random weights, copy faster than map here
-        P = kernel.weights(input_dim, n_features)
+        P = self.kernel.weights(input_dim, self.n_features)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
         XP = tf.matmul(X, Ps)
         real = tf.cos(XP)
         imag = tf.sin(XP)
-        Net = tf.concat([real, imag], axis=-1) / np.sqrt(n_features)
+        Net = tf.concat([real, imag], axis=-1) / np.sqrt(self.n_features)
         KL = 0.
 
         return Net, KL
 
-    return build_random_ff
 
-
-def random_arccosine(n_features, lenscale=1.0, p=1):
+class RandomArcCosine(SampleLayer):
     """Random arc-cosine kernel layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
@@ -157,13 +269,8 @@ def random_arccosine(n_features, lenscale=1.0, p=1):
         (ARD) kernel.
     p : int
         The order of the arc-cosine kernel, this must be an integer greater
-        than zero. 0 will lead to sigmoid-like kernels, 1 will lead to
-        relu-like kernels, 2 quadratic-relu kernels etc.
-
-    Returns
-    -------
-    build_random_ac : callable
-        a function that builds the random arc-cosine feature layer.
+        than, or eual to zero. 0 will lead to sigmoid-like kernels, 1 will lead
+        to relu-like kernels, 2 quadratic-relu kernels etc.
 
     See Also
     --------
@@ -174,44 +281,45 @@ def random_arccosine(n_features, lenscale=1.0, p=1):
         Filippone. "Accelerating Deep Gaussian Processes Inference with
         Arc-Cosine Kernels." Bayesian Deep Learning Workshop, Advances in
         Neural Information Processing Systems, NIPS 2016, Barcelona
-    """
-    if p < 0 or not isinstance(p, int):
-        raise ValueError("p must be a positive integer!")
-    elif p == 0:
-        def pfunc(x):
-            return tf.sign(x)
-    elif p == 1:
-        def pfunc(x):
-            return x
-    else:
-        def pfunc(x):
-            return tf.pow(x, p)
 
-    def build_random_ac(X):
-        # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = util.check_dims_rank3(X)
+    """
+
+    def __init__(self, n_features, lenscale=1.0, p=1):
+        """Create an instance of an arc cosine kernel layer."""
+        assert isinstance(p, int) and p >= 0
+        if p == 0:
+            self.pfunc = tf.sign
+        elif p == 1:
+            self.pfunc = lambda x: x
+        else:
+            self.pfunc = lambda x: tf.pow(x, p)
+
+        self.n_features = n_features
+        self.lenscale = lenscale
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, input_dim = self.get_X_dims(X)
 
         # Random weights
         rand = np.random.RandomState(next(seedgen))
-        P = rand.randn(input_dim, n_features).astype(np.float32) / lenscale
+        P = rand.randn(input_dim, self.n_features).astype(np.float32) \
+            / self.lenscale
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
         XP = tf.matmul(X, Ps)
-        Net = np.sqrt(2. / n_features) * tf.nn.relu(pfunc(XP))
+        Net = np.sqrt(2. / self.n_features) * tf.nn.relu(self.pfunc(XP))
         KL = 0.
 
         return Net, KL
-
-    return build_random_ac
 
 
 #
 # Weight layers
 #
 
-def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
-              prior_b=None, post_W=None, post_b=None):
+class DenseVariational(SampleLayer):
     """Dense (fully connected) linear layer, with variational inference.
 
     Parameters
@@ -246,41 +354,78 @@ def dense_var(output_dim, reg=1., full=False, use_bias=True, prior_W=None,
         shaped weights. This ignores the ``use_bias`` parameters.
         See ``distributions.norm_posterior``.
 
-    Returns
-    -------
-    build_dense : callable
-        a function that builds the dense variational layer.
     """
-    def build_dense(X):
-        # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = util.check_dims_rank3(X)
-        Wdim = (input_dim, output_dim)
-        bdim = (output_dim,)
+
+    def __init__(self, output_dim, reg=1., full=False, use_bias=True,
+                 prior_W=None, prior_b=None, post_W=None, post_b=None):
+        """Create and instance of a variational dense layer."""
+        self.output_dim = output_dim
+        self.reg = reg
+        self.full = full
+        self.use_bias = use_bias
+        self.pW = prior_W
+        self.pb = prior_b
+        self.qW = post_W
+        self.qb = post_b
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, input_dim = self.get_X_dims(X)
 
         # Layer weights
-        pW, qW = _make_bayesian_weights(prior_W, post_W, Wdim, reg, full)
-        Wsamples = _sample_weights(qW, n_samples)
-
-        # Linear layer
-        Net = tf.matmul(X, Wsamples)
+        self.pW = self._make_prior(self.pW, input_dim)
+        self.qW = self._make_posterior(self.qW, input_dim)
 
         # Regularizers
-        KL = kl_qp(qW, pW)
+        KL = kl_qp(self.qW, self.pW)
+
+        # Linear layer
+        Wsamples = self._sample_W(self.qW, n_samples)
+        Net = tf.matmul(X, Wsamples)
 
         # Optional bias
-        if use_bias is True or prior_b or post_b:
-            pb, qb = _make_bayesian_weights(prior_b, post_b, bdim, reg, False)
-            bsamples = tf.expand_dims(_sample_weights(qb, n_samples), 1)
+        if self.use_bias is True or self.prior_b or self.post_b:
+            # Layer intercepts
+            self.pb = self._make_prior(self.pb)
+            self.qb = self._make_posterior(self.qb)
+
+            # Regularizers
+            KL += kl_qp(self.qb, self.pb)
+
+            # Linear layer
+            bsamples = tf.expand_dims(self._sample_W(self.qb, n_samples), 1)
             Net += bsamples
-            KL += kl_qp(qb, pb)
 
         return Net, KL
 
-    return build_dense
+    def _make_prior(self, prior_W, input_dim=None):
+        """Check/make prior."""
+        dim = (input_dim, self.output_dim) if input_dim else (self.output_dim,)
+        if prior_W:
+            assert _is_dim(prior_W.mu, dim), "Prior inconsistent dimension!"
+        else:
+            prior_W = norm_prior(dim=dim, var=self.reg)
+        return prior_W
+
+    def _make_posterior(self, post_W, input_dim=None):
+        """Check/make posterior."""
+        dim = (input_dim, self.output_dim) if input_dim else (self.output_dim,)
+        if post_W:
+            assert _is_dim(post_W.mu, dim), "Posterior inconsistent dimension!"
+        else:
+            # We don't want a full-covariance on an intercept, check input_dim
+            fullcov = self.full and input_dim
+            post_W = (gaus_posterior(dim=dim, var0=self.reg) if fullcov else
+                      norm_posterior(dim=dim, var0=self.reg))
+        return post_W
+
+    @staticmethod
+    def _sample_W(dist, n_samples):
+        samples = tf.stack([dist.sample() for _ in range(n_samples)])
+        return samples
 
 
-def embed_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
-              post_W=None):
+class EmbedVariational(DenseVariational):
     """Dense (fully connected) embedding layer, with variational inference.
 
     This layer works directly on shape (N, 1) inputs of category *indices*
@@ -309,40 +454,40 @@ def embed_var(output_dim, n_categories, reg=1., full=False, prior_W=None,
         shaped weights. This ignores the ``full`` parameter. See
         ``distributions.gaus_posterior``.
 
-    Returns
-    -------
-    build_embedding : callable
-        a function that builds the embedding variational layer.
     """
-    if n_categories < 2:
-        raise ValueError("There must be more than 2 categories for embedding!")
 
-    def build_embedding(X):
-        # X is a rank 3 tensor, [n_samples, N, 1]
-        n_samples, input_dim = util.check_dims_rank3(X)
-        if input_dim > 1:
-            print("embedding X: {}".format(X))
-            raise ValueError("X must be a *column* of indices!")
+    def __init__(self, output_dim, n_categories, reg=1., full=False,
+                 prior_W=None, post_W=None):
+        """Create and instance of a variational dense embedding layer."""
+        assert n_categories >= 2, "Need 2 or more categories for embedding!"
+        self.output_dim = output_dim
+        self.n_categories = n_categories
+        self.reg = reg
+        self.full = full
+        self.pW = prior_W
+        self.qW = post_W
 
-        Wdim = (n_categories, output_dim)
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, input_dim = self.get_X_dims(X)
+        assert input_dim == 1, "X must be a *column* of indices!"
 
         # Layer weights
-        pW, qW = _make_bayesian_weights(prior_W, post_W, Wdim, reg, full)
-        Wsamples = tf.transpose(_sample_weights(qW, n_samples), [1, 2, 0])
+        self.pW = self._make_prior(self.pW, self.n_categories)
+        self.qW = self._make_posterior(self.qW, self.n_categories)
 
         # Embedding layer -- gather only works on the first dim hence transpose
+        Wsamples = tf.transpose(self._sample_W(self.qW, n_samples), [1, 2, 0])
         embedding = tf.gather(Wsamples, X[0, :, 0])  # X ind is just replicated
         Net = tf.transpose(embedding, [2, 0, 1])  # reshape after index 1st dim
 
         # Regularizers
-        KL = kl_qp(qW, pW)
+        KL = kl_qp(self.qW, self.pW)
 
         return Net, KL
 
-    return build_embedding
 
-
-def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
+class DenseMAP(SampleLayer):
     """Dense (fully connected) linear layer, with MAP inference.
 
     Parameters
@@ -356,15 +501,19 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
 
-    Returns
-    -------
-    build_dense_map : callable
-        a function that builds the dense MAP layer.
     """
-    def build_dense_map(X):
-        # X is a rank 3 tensor, [n_samples, N, D]
-        n_samples, input_dim = util.check_dims_rank3(X)
-        Wdim = (input_dim, output_dim)
+
+    def __init__(self, output_dim, l1_reg=1., l2_reg=1., use_bias=True):
+        """Create and instance of a dense layer with MAP regularizers."""
+        self.output_dim = output_dim
+        self.l1 = l1_reg
+        self.l2 = l2_reg
+        self.use_bias = use_bias
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, input_dim = self.get_X_dims(X)
+        Wdim = (input_dim, self.output_dim)
 
         W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
                         name="W_map")
@@ -373,146 +522,28 @@ def dense_map(output_dim, l1_reg=1., l2_reg=1., use_bias=True):
         Net = tf.map_fn(lambda x: tf.matmul(x, W), X)
 
         # Regularizers
-        penalty = l2_reg * tf.nn.l2_loss(W) + l1_reg * _l1_loss(W)
+        penalty = self.l2 * tf.nn.l2_loss(W) + self.l1 * _l1_loss(W)
 
         # Optional Bias
-        if use_bias is True:
-            b = tf.Variable(tf.zeros(output_dim), name="b_map")
+        if self.use_bias is True:
+            b = tf.Variable(tf.zeros(self.output_dim), name="b_map")
             Net += b
-            penalty += l2_reg * tf.nn.l2_loss(b) + l1_reg * _l1_loss(b)
+            penalty += self.l2 * tf.nn.l2_loss(b) + self.l1 * _l1_loss(b)
 
         return Net, penalty
-
-    return build_dense_map
-
-
-#
-# Random Fourier Kernels
-#
-
-class RBF:
-    """Radial basis kernel approximation.
-
-    Parameters
-    ----------
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the radial basis kernel, this can be a scalar for
-        an isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
-    """
-
-    def __init__(self, lenscale=1.0):
-        """Constuct an RBF kernel object."""
-        self.lenscale = lenscale
-
-    def weights(self, input_dim, n_features):
-        """Generate the random fourier weights for this kernel.
-
-        Parameters
-        ----------
-        input_dim : int
-            the input dimension to this layer.
-        n_features : int
-            the number of unique random features, the actual output dimension
-            of this layer will be ``2 * n_features``.
-
-        Returns
-        -------
-        P : ndarray
-            the random weights of the fourier features of shape
-            ``(input_dim, n_features)``.
-        """
-        rand = np.random.RandomState(next(seedgen))
-        P = rand.randn(input_dim, n_features).astype(np.float32)
-        return P / self.lenscale
-
-
-class Matern(RBF):
-    """Matern kernel approximation.
-
-    Parameters
-    ----------
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the Matern kernel, this can be a scalar for an
-        isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
-    """
-
-    def __init__(self, lenscale=1.0, p=1):
-        """Constuct a Matern kernel object."""
-        super().__init__(lenscale)
-        self.p = p
-
-    def weights(self, input_dim, n_features):
-        """Generate the random fourier weights for this kernel.
-
-        Parameters
-        ----------
-        input_dim : int
-            the input dimension to this layer.
-        n_features : int
-            the number of unique random features, the actual output dimension
-            of this layer will be ``2 * n_features``.
-
-        Returns
-        -------
-        P : ndarray
-            the random weights of the fourier features of shape
-            ``(input_dim, n_features)``.
-        """
-        # p is the matern number (v = p + .5) and the two is a transformation
-        # of variables between Rasmussen 2006 p84 and the CF of a Multivariate
-        # Student t (see wikipedia). Also see "A Note on the Characteristic
-        # Function of Multivariate t Distribution":
-        #   http://ocean.kisti.re.kr/downfile/volume/kss/GCGHC8/2014/v21n1/
-        #   GCGHC8_2014_v21n1_81.pdf
-        # To sample from a m.v. t we use the formula
-        # from wikipedia, x = y * np.sqrt(df / u) where y ~ norm(0, I),
-        # u ~ chi2(df), then x ~ mvt(0, I, df)
-        df = 2 * (self.p + 0.5)
-        rand = np.random.RandomState(next(seedgen))
-        y = rand.randn(input_dim, n_features)
-        u = rand.chisquare(df, size=(n_features,))
-        P = y * np.sqrt(df / u)
-        P = P.astype(np.float32)
-        return P / self.lenscale
 
 
 #
 # Private module stuff
 #
 
-
 def _l1_loss(X):
+    """Calculate the L1 loss, |X|."""
     l1 = tf.reduce_sum(tf.abs(X))
     return l1
 
 
 def _is_dim(X, dims):
+    """Check if ``X``'s dimension is the same as the tuple ``dims``."""
     shape = tuple([int(d) for d in X.get_shape()])
     return shape == dims
-
-
-def _sample_weights(dist, n_samples):
-    samples = tf.stack([dist.sample() for _ in range(n_samples)])
-    return samples
-
-
-def _make_bayesian_weights(prior_W, post_W, Wdim, reg, full):
-    # Check/make prior
-    if prior_W:
-        if not _is_dim(prior_W.mu, Wdim):
-            raise ValueError("Incompatible dimension in prior distribution!")
-    else:
-        prior_W = norm_prior(dim=Wdim, var=reg)
-
-    # Check/make posterior
-    if post_W:
-        if not _is_dim(post_W.mu, Wdim):
-            raise ValueError("Incompatible dimension in posterior"
-                             " distribution!")
-    else:
-        post_W = (gaus_posterior(dim=Wdim, var0=reg) if full else
-                  norm_posterior(dim=Wdim, var0=reg))
-
-    return prior_W, post_W

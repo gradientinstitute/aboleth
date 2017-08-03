@@ -32,25 +32,19 @@ config = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
 
 variance = tf.Variable(1.)
 reg = 1.
-
-lenscale1 = tf.Variable(1.)
+lenscale = tf.Variable(1.)
+kern = ab.RBF(lenscale=ab.pos(lenscale))
 
 
 net = ab.stack(
-    ab.input(name="X", n_samples=n_samples),
-    # ab.random_arccosine(n_features=100, lenscale=ab.pos(lenscale1)),
-    ab.random_fourier(n_features=200, kernel=ab.RBF(ab.pos(lenscale1))),
-    # ab.dense_var(output_dim=20, reg=reg, full=True),
-    # ab.activation(tf.nn.relu),
-    # ab.dense_var(output_dim=20, reg=reg, full=True),
-    # ab.activation(tf.nn.relu),
-    # ab.dense_var(output_dim=10, reg=reg, full=True),
-    # ab.activation(tf.tanh),
-    ab.dense_var(output_dim=1, reg=reg, full=True)
+    ab.InputLayer(name="X", n_samples=n_samples),
+    ab.RandomFourier(n_features=200, kernel=kern),
+    ab.DenseVariational(output_dim=1, reg=reg, full=True)
     )
 
-def main():
 
+def main():
+    """Run the demo."""
     n_iters = int(round(n_epochs * N / batch_size))
     print("Iterations = {}".format(n_iters))
 
@@ -133,6 +127,7 @@ def main():
 
 
 def batch_training(X, Y, batch_size, n_epochs):
+    """Batch training queue."""
     X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
     Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
     X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 1000, 1,

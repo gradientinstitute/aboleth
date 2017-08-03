@@ -17,13 +17,13 @@ logger.setLevel(logging.INFO)
 
 NSAMPLES = 10
 VARIANCE = 10.0
-KERN = ab.RBF(
-    lenscale=tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
-)
+LENSCALE = tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
+KERNEL = ab.RBF(LENSCALE)
+
 net = ab.stack(
-    ab.sample(NSAMPLES),
-    ab.random_fourier(n_features=1000, kernel=KERN),
-    ab.dense_var(output_dim=1, full=True)
+    ab.InputLayer(name='X', n_samples=NSAMPLES),
+    ab.RandomFourier(n_features=1000, kernel=KERNEL),
+    ab.DenseVariational(output_dim=1, full=True)
 )
 
 BATCH_SIZE = 100
@@ -34,7 +34,7 @@ CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
 
 
 def main():
-
+    """Run the demo."""
     data = fetch_gpml_sarcos_data()
     Xr = data.train.data.astype(np.float32)
     Yr = data.train.targets.astype(np.float32)[:, np.newaxis]
@@ -64,7 +64,7 @@ def main():
         lkhood = ab.normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X_)
+        Phi, kl = net(X=X_)
         loss = ab.elbo(Phi, Y_, N, kl, lkhood)
         tf.summary.scalar('loss', loss)
 
@@ -112,6 +112,7 @@ def main():
 
 
 def msll(Y_true, Y_pred, V_pred, Y_train):
+    """Mean standardised log loss."""
     mt, st = Y_train.mean(), Y_train.std()
     ll = norm.logpdf(Y_true, loc=Y_pred, scale=np.sqrt(V_pred))
     rand_ll = norm.logpdf(Y_true, loc=mt, scale=st)
@@ -120,6 +121,7 @@ def msll(Y_true, Y_pred, V_pred, Y_train):
 
 
 def batch_training(X, Y, batch_size, n_epochs):
+    """Batch training queue."""
     X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
     Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
     X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 1000, 1,
