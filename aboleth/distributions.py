@@ -11,7 +11,19 @@ from aboleth.random import seedgen
 # Generic prior and posterior classes
 #
 
-class Normal:
+class ParameterDistribution:
+    """Abstract base class for parameter distribution objects."""
+
+    def __init__(self):
+        """Construct a ParameterDistibution object."""
+        raise NotImplementedError('Abstract base class only.')
+
+    def sample(self):
+        """Draw a random sample from the distribution."""
+        raise NotImplementedError('Abstract base class only.')
+
+
+class Normal(ParameterDistribution):
     """
     Normal (IID) prior/posterior.
 
@@ -38,7 +50,7 @@ class Normal:
         return x
 
 
-class Gaussian:
+class Gaussian(ParameterDistribution):
     """
     Gaussian prior/posterior.
 

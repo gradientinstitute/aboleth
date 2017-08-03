@@ -4,7 +4,6 @@ from functools import reduce
 
 import tensorflow as tf
 
-from aboleth import util as util
 from aboleth.distributions import Normal
 
 
@@ -142,8 +141,6 @@ def mean_impute(datalayer, masklayer):
         X_ND, loss1 = datalayer(**kwargs)
         M, loss2 = masklayer(**kwargs)
 
-        n_samples, input_dim = util.check_dims_rank3(X_ND)
-
         # Identify indices of the missing datapoints
         missing_ind = tf.where(M)
         real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
@@ -213,8 +210,7 @@ def gaussian_impute(datalayer, masklayer, mu_array, var_array):
     def build_impute(**kwargs):
         X_ND, loss1 = datalayer(**kwargs)
         M, loss2 = masklayer(**kwargs)
-
-        n_samples, input_dim = util.check_dims_rank3(X_ND)
+        input_dim = int(X_ND.shape[2])
 
         assert(len(mu_array) == input_dim)
         assert(len(var_array) == input_dim)

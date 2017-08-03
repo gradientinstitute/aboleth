@@ -228,27 +228,6 @@ def predict_expected(predictor, feed_dict, n_groups=1, session=None):
     return pred
 
 
-def check_dims_rank3(X):
-    """Inspects a tensor to ensure its rank is 3.
-
-    Parameters
-    ---------
-    X : A tensor
-
-    Returns
-    -------
-    n_samples : the number of samples in the tensor
-    input_dim : the dimensionality of the data
-
-    """
-    rank = len(X.shape)
-    if rank != 3:
-        raise ValueError("This layer requires rank 3 inputs, got rank {}!"
-                         .format(rank))
-    n_samples, input_dim = X.shape[0], X.shape[2]
-    return int(n_samples), int(input_dim)
-
-
 def __data_len(feed_dict):
     N = feed_dict[list(feed_dict.keys())[0]].shape[0]
     return N

@@ -5,7 +5,7 @@ import tensorflow as tf
 from scipy.linalg import cho_solve
 from scipy.stats import wishart
 
-from aboleth.distributions import Normal, Gaussian, kl_qp, _chollogdet
+from aboleth.distributions import (Normal, Gaussian, kl_qp, _chollogdet)
 
 
 def test_kl_normal_normal():

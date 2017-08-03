@@ -5,8 +5,10 @@ import urllib.request as req
 import numpy as np
 import tensorflow as tf
 import pandas as pd
-import aboleth as ab
 from sklearn.metrics import log_loss, accuracy_score
+
+import aboleth as ab
+from aboleth.likelihoods import Bernoulli
 
 
 # Data properties
@@ -75,7 +77,7 @@ def main():
 
     # Make model
     N = len(Xt_con)
-    likelihood = ab.bernoulli()
+    likelihood = Bernoulli()
     Phi, kl = net(con=X_con_, cat=X_cat_)
 
     loss = ab.elbo(Phi, Y_, N, kl, likelihood)

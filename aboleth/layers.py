@@ -77,6 +77,7 @@ class Layer:
         """Build the graph of this layer.
 
         See: _build
+
         """
         Net, KL = self._build(X)
         return Net, KL
@@ -110,7 +111,11 @@ class SampleLayer(Layer):
     """
 
     def __call__(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        See: build
+
+        """
         rank = len(X.shape)
         assert rank == 3
         Net, KL = self._build(X)

@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 import aboleth as ab
+from aboleth.likelihoods import Normal
 
 from scipy.special import expit
 
@@ -63,7 +64,7 @@ def make_graph():
     """Make the requirements for making a simple tf graph."""
     x, Y, X = make_data()
 
-    like = ab.normal(variance=1.)
+    like = Normal(variance=1.)
     layers = ab.stack(
         ab.InputLayer(name='X', n_samples=10),
         lambda X: (X[:, :, 0:1], 0.0)   # Mock a sampling layer

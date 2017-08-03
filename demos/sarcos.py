@@ -8,6 +8,7 @@ from sklearn.metrics import r2_score
 from sklearn.preprocessing import StandardScaler
 
 import aboleth as ab
+from aboleth.likelihoods import Normal
 from aboleth.datasets import fetch_gpml_sarcos_data
 
 
@@ -61,7 +62,7 @@ def main():
 
     with tf.name_scope("Likelihood"):
         var = ab.pos(tf.Variable(VARIANCE))
-        lkhood = ab.normal(variance=var)
+        lkhood = Normal(variance=var)
 
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X=X_)
