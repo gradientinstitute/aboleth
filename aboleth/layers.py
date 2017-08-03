@@ -212,6 +212,27 @@ class MaxPool2D(Layer):
         return Net, KL
 
 
+class Reshape(Layer):
+    """Reshape layer.
+
+    Parameters
+    ----------
+    targe_shape : tuple of ints
+        Does not include the samples or batch axes.
+    """
+
+    def __init__(self, target_shape):
+        """Initialize instance of a Reshape layer."""
+        self.target_shape = target_shape
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        new_shape = X.shape[:2].concatenate(tf.TensorShape(self.target_shape))
+        Net = tf.reshape(X, new_shape)
+        KL = 0.
+        return Net, KL
+
+
 #
 # Kernel Approximation Layers
 #

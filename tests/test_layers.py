@@ -102,6 +102,25 @@ def test_max_pooling2d(make_image_data):
         assert KL == 0
 
 
+def test_reshape(make_image_data):
+    """Test dropout layer."""
+    x, _, X = make_image_data
+
+    # reshape. useful for feeding output of conv layer into dense layer
+    reshape = ab.Reshape(target_shape=(28*28*3,))
+
+    F, KL = reshape(X)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        f = F.eval()
+
+        assert f.shape[-1] == np.prod(X.eval().shape[2:])
+        assert np.all(f == np.reshape(X.eval(), (5, 100, 28*28*3)))
+
+        assert KL == 0
+
+
 def test_arc_cosine(make_data):
     """Test the random Arc Cosine kernel."""
     S = 3
