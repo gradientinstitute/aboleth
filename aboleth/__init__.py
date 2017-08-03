@@ -45,7 +45,7 @@ __all__ = (
     'slicecat',
     'add',
     'mean_impute',
-    'gaussian_impute'
+    'gaussian_impute',
     'RBF',
     'Matern'
 )
