@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 
 import aboleth as ab
+from aboleth.likelihoods import Bernoulli
 
 
 FOLDS = 5
@@ -56,7 +57,7 @@ def main():
         N_ = tf.placeholder(dtype=tf.float32)
 
     with tf.name_scope("Likelihood"):
-        lkhood = ab.LikeBernoulli()
+        lkhood = Bernoulli()
 
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X=X_)

@@ -8,7 +8,7 @@ from aboleth.util import pos
 class Likelihood:
     """Abstract base class for likelihood objects."""
 
-    def loglike(self, y, f):
+    def _loglike(self, y, f):
         """Build the log likelihood.
 
         Parameters
@@ -23,14 +23,14 @@ class Likelihood:
     def __call__(self, y, f):
         """Build the log likelihood.
 
-        See: loglike.
+        See: _loglike.
 
         """
-        ll = self.loglike(y, f)
+        ll = self._loglike(y, f)
         return ll
 
 
-class LikeNormal(Likelihood):
+class Normal(Likelihood):
     """Normal log-likelihood.
 
     Parameters
@@ -44,7 +44,7 @@ class LikeNormal(Likelihood):
         """Construct an instance of a Normal likelihood."""
         self.variance = variance
 
-    def loglike(self, y, f):
+    def _loglike(self, y, f):
         """Build the log likelihood.
 
         Parameters
@@ -59,10 +59,10 @@ class LikeNormal(Likelihood):
         return ll
 
 
-class LikeBernoulli(Likelihood):
+class Bernoulli(Likelihood):
     """Bernoulli log-likelihood."""
 
-    def loglike(self, y, f):
+    def _loglike(self, y, f):
         """Build the log likelihood.
 
         Parameters
@@ -76,10 +76,10 @@ class LikeBernoulli(Likelihood):
         return ll
 
 
-class LikeCategorical(Likelihood):
+class Categorical(Likelihood):
     """Categorical, or Generalized Bernoulli log-likelihood."""
 
-    def loglike(self, y, f):
+    def _loglike(self, y, f):
         """Build the log likelihood.
 
         Parameters
@@ -94,7 +94,7 @@ class LikeCategorical(Likelihood):
         return ll
 
 
-class LikeBinomial(Likelihood):
+class Binomial(Likelihood):
     """Binomial log-likelihood.
 
     Parameters
@@ -108,7 +108,7 @@ class LikeBinomial(Likelihood):
         """Construct an instance of a Binomial likelihood."""
         self.n = n
 
-    def loglike(self, y, f):
+    def _loglike(self, y, f):
         """Build the log likelihood.
 
         Parameters

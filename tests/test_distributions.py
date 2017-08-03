@@ -5,31 +5,30 @@ import tensorflow as tf
 from scipy.linalg import cho_solve
 from scipy.stats import wishart
 
-from aboleth.distributions import (ParamNormal, ParamGaussian, kl_qp,
-                                   _chollogdet)
+from aboleth.distributions import (Normal, Gaussian, kl_qp, _chollogdet)
 
 
 def test_kl_normal_normal():
-    """Test ParamNormal/ParamNormal KL."""
+    """Test Normal/Normal KL."""
     dim = (10, 5)
     mu = np.zeros(dim)
     var = 1.0
 
-    q = ParamNormal(mu, var)
+    q = Normal(mu, var)
 
     # Test 0 KL
-    p = ParamNormal(mu, var)
+    p = Normal(mu, var)
     KL0 = kl_qp(q, p)
 
     # Test diff var
     var1 = 2.0
-    p = ParamNormal(mu, var1)
+    p = Normal(mu, var1)
     KL1 = kl_qp(q, p)
     rKL1 = 0.5 * (var / var1 - 1 + np.log(var1 / var)) * np.prod(dim)
 
     # Test diff mu
     mu1 = np.ones(dim)
-    p = ParamNormal(mu1, var)
+    p = Normal(mu1, var)
     KL2 = kl_qp(q, p)
     rKL2 = 0.5 * (np.sum((mu1 - mu)**2) / var)
 
@@ -41,19 +40,19 @@ def test_kl_normal_normal():
 
 
 def test_kl_gaussian_normal():
-    """Test ParamGaussian/ParamNormal KL."""
+    """Test Gaussian/Normal KL."""
     dim = (10, 5)
     Dim = (5, 10, 10)
 
     mu0 = np.random.randn(*dim).astype(np.float32)
     L0 = random_chol(Dim)
-    q = ParamGaussian(mu0, L0)
+    q = Gaussian(mu0, L0)
 
     mu1 = np.random.randn(*dim).astype(np.float32)
     var1 = 1.0
     L1 = [(np.sqrt(var1) * np.eye(dim[0])).astype(np.float32)
           for _ in range(dim[1])]
-    p = ParamNormal(mu1, var1)
+    p = Normal(mu1, var1)
 
     KL = kl_qp(q, p)
     KLr = KLdiv(mu0, L0, mu1, L1)
@@ -64,17 +63,17 @@ def test_kl_gaussian_normal():
 
 
 def test_kl_gaussian_gaussian():
-    """Test ParamGaussian/ParamGaussian KL."""
+    """Test Gaussian/Gaussian KL."""
     dim = (10, 5)
     Dim = (5, 10, 10)
 
     mu0 = np.random.randn(*dim).astype(np.float32)
     L0 = random_chol(Dim)
-    q = ParamGaussian(mu0, L0)
+    q = Gaussian(mu0, L0)
 
     mu1 = np.random.randn(*dim).astype(np.float32)
     L1 = random_chol(Dim)
-    p = ParamGaussian(mu1, L1)
+    p = Gaussian(mu1, L1)
 
     KL = kl_qp(q, p)
     KLr = KLdiv(mu0, L0, mu1, L1)
@@ -93,9 +92,9 @@ def test_kl_qp():
     var = 1.0
     L = random_chol(Dim)
 
-    qn = ParamNormal(mu, var)
-    qg = ParamGaussian(mu, L)
-    p = ParamNormal(mu, var)
+    qn = Normal(mu, var)
+    qg = Gaussian(mu, L)
+    p = Normal(mu, var)
     kl_nn = kl_qp(qn, p)
     kl_gn = kl_qp(qg, p)
 

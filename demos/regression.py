@@ -9,6 +9,7 @@ import tensorflow as tf
 from sklearn.gaussian_process.kernels import RBF as kern
 
 import aboleth as ab
+from aboleth.likelihoods import Normal
 from aboleth.datasets import gp_draws
 
 logger = logging.getLogger()
@@ -70,7 +71,7 @@ def main():
         Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
 
     with tf.name_scope("Likelihood"):
-        lkhood = ab.LikeNormal(variance=ab.pos(variance))
+        lkhood = Normal(variance=ab.pos(variance))
 
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X=X_)

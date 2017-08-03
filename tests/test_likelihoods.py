@@ -5,19 +5,19 @@ import tensorflow as tf
 import scipy.stats as ss
 from scipy.special import expit
 
-import aboleth as ab
+from aboleth.likelihoods import Normal, Bernoulli, Binomial, Categorical
 
 
 @pytest.mark.parametrize('likelihood', [
-    (ab.LikeNormal(variance=1),
+    (Normal(variance=1),
      ss.norm.rvs,
      lambda x, f: ss.norm.logpdf(x, loc=f)),
 
-    (ab.LikeBinomial(n=10.),
+    (Binomial(n=10.),
      lambda f, size: ss.binom.rvs(n=10, p=f, size=size),
      lambda x, f: ss.binom.logpmf(x, n=10, p=f)),
 
-    (ab.LikeBernoulli(),
+    (Bernoulli(),
      ss.bernoulli.rvs,
      lambda x, f: ss.bernoulli.logpmf(x, p=f)),
 
@@ -35,7 +35,7 @@ def test_log_likelihoods(likelihood):
 
 
 @pytest.mark.parametrize('likelihood', [
-    (ab.LikeCategorical(),
+    (Categorical(),
      lambda f, size: ss.multinomial.rvs(n=1, p=f, size=size),
      lambda x, f: ss.multinomial.logpmf(x, n=1, p=f)),
 ])

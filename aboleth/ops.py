@@ -4,7 +4,7 @@ from functools import reduce
 
 import tensorflow as tf
 
-from aboleth.distributions import ParamNormal
+from aboleth.distributions import Normal
 
 
 def stack(*layers):
@@ -215,7 +215,7 @@ def gaussian_impute(datalayer, masklayer, mu_array, var_array):
         assert(len(mu_array) == input_dim)
         assert(len(var_array) == input_dim)
 
-        normal_array = [ParamNormal(m, v) for m, v in zip(mu_array, var_array)]
+        normal_array = [Normal(m, v) for m, v in zip(mu_array, var_array)]
 
         # Identify indices of the missing datapoints
         missing_ind = tf.where(M)

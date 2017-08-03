@@ -22,13 +22,8 @@ class ParameterDistribution:
         """Draw a random sample from the distribution."""
         raise NotImplementedError('Abstract base class only.')
 
-    def __call__(self):
-        """Draw a random sample from the distribution."""
-        sample = self.sample()
-        return sample
 
-
-class ParamNormal(ParameterDistribution):
+class Normal(ParameterDistribution):
     """
     Normal (IID) prior/posterior.
 
@@ -55,7 +50,7 @@ class ParamNormal(ParameterDistribution):
         return x
 
 
-class ParamGaussian(ParameterDistribution):
+class Gaussian(ParameterDistribution):
     """
     Gaussian prior/posterior.
 
@@ -115,7 +110,7 @@ def norm_prior(dim, var):
     """
     mu = tf.zeros(dim)
     var = pos(tf.Variable(var, name="W_mu_p"))
-    P = ParamNormal(mu, var)
+    P = Normal(mu, var)
     return P
 
 
@@ -140,7 +135,7 @@ def norm_posterior(dim, var0):
     var_0 = tf.random_gamma(alpha=var0, shape=dim, seed=next(seedgen))
     var = pos(tf.Variable(var_0, name="W_var_q"))
 
-    Q = ParamNormal(mu, var)
+    Q = Normal(mu, var)
     return Q
 
 
@@ -176,7 +171,7 @@ def gaus_posterior(dim, var0):
 
     mu_0 = tf.random_normal((I, O), stddev=sig0, seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
-    Q = ParamGaussian(mu, L)
+    Q = Gaussian(mu, L)
     return Q
 
 
@@ -185,7 +180,7 @@ def gaus_posterior(dim, var0):
 #
 
 
-@dispatch(ParamNormal, ParamNormal)
+@dispatch(Normal, Normal)
 def kl_qp(q, p):
     """Normal-Normal Kullback Leibler divergence calculation.
 
@@ -207,7 +202,7 @@ def kl_qp(q, p):
     return KL
 
 
-@dispatch(ParamGaussian, ParamNormal)  # noqa
+@dispatch(Gaussian, Normal)  # noqa
 def kl_qp(q, p):
     """Gaussian-Normal Kullback Leibler divergence calculation.
 
@@ -231,7 +226,7 @@ def kl_qp(q, p):
     return KL
 
 
-@dispatch(ParamGaussian, ParamGaussian)  # noqa
+@dispatch(Gaussian, Gaussian)  # noqa
 def kl_qp(q, p):
     """Gaussian-Gaussian Kullback Leibler divergence calculation.
 

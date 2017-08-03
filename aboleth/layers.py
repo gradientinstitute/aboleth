@@ -447,7 +447,7 @@ class DenseVariational(SampleLayer):
 
     @staticmethod
     def _sample_W(dist, n_samples):
-        samples = tf.stack([dist() for _ in range(n_samples)])
+        samples = tf.stack([dist.sample() for _ in range(n_samples)])
         return samples
 
 

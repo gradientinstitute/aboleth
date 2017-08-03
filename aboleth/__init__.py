@@ -6,10 +6,7 @@ from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
                      RandomArcCosine)
 from .ops import stack, concat, slicecat, add, mean_impute, gaussian_impute
 from .kernels import RBF, Matern
-from .likelihoods import (LikeNormal, LikeBernoulli, LikeBinomial,
-                          LikeCategorical)
-from .distributions import (ParamNormal, ParamGaussian, norm_prior,
-                            norm_posterior, gaus_posterior)
+from .distributions import (norm_prior, norm_posterior, gaus_posterior)
 from .util import (batch, pos, predict_expected, predict_samples,
                    batch_prediction)
 from .random import set_hyperseed
@@ -26,12 +23,6 @@ __all__ = (
     'EmbedVariational',
     'RandomFourier',
     'RandomArcCosine',
-    'LikeNormal',
-    'LikeBernoulli',
-    'LikeBinomial',
-    'LikeCategorical',
-    'ParamNormal',
-    'ParamGaussian',
     'norm_prior',
     'norm_posterior',
     'gaus_posterior',
