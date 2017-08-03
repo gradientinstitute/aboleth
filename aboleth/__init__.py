@@ -1,7 +1,7 @@
 """Package init."""
 from .version import __version__
 from .model import elbo, log_prob
-from .layer import (Activation, DropOut, DenseVariational, DenseMAP,
+from .layer import (Activation, DropOut, MaxPool2D, DenseVariational, DenseMAP,
                     InputLayer, EmbedVariational, RandomFourier,
                     RandomArcCosine)
 from .ops import stack, concat, slicecat, add, mean_impute
@@ -19,6 +19,7 @@ __all__ = (
     'log_prob',
     'Activation',
     'DropOut',
+    'MaxPool2D',
     'DenseVariational',
     'DenseMAP',
     'EmbedVariational',

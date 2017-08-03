@@ -174,6 +174,39 @@ class DropOut(Layer):
         return Net, KL
 
 
+class MaxPool2D(Layer):
+    """Max pooling layer for 2D inputs (e.g. images).
+
+    This is just a thin wrapper around `tf.nn.max_pool
+    <https://www.tensorflow.org/api_docs/python/tf/nn/max_pool>`_
+
+    Parameters
+    ----------
+    pool_size : tuple or list of 2 ints
+        width and height of the pooling window.
+    strides : tuple or list of 2 ints
+        the strides of the pooling operation along the height and width.
+    padding : str
+        One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
+
+    """
+
+    def __init__(self, pool_size, strides, padding='SAME'):
+        """Initialize instance of a MaxPool2D layer."""
+        self.ksize = [1] + list(pool_size) + [1]
+        self.strides = [1] + list(strides) + [1]
+        self.padding = padding
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        Net = tf.map_fn(lambda inputs: tf.nn.max_pool(inputs,
+                                                      ksize=self.ksize,
+                                                      strides=self.strides,
+                                                      padding=self.padding), X)
+        KL = 0.
+        return Net, KL
+
+
 #
 # Kernel Approximation Layers
 #
