@@ -72,6 +72,36 @@ def test_dropout(make_data):
         assert KL == 0
 
 
+def test_max_pooling2d(make_image_data):
+    """Test dropout layer."""
+    x, _, X = make_image_data
+
+    max_pool = ab.MaxPool2D(pool_size=(2, 2), 
+                            strides=(2, 2))
+    
+    # downsample by 2x
+    F, KL = max_pool(X)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        f = F.eval()
+
+        # test equivalence of first window across batches
+        assert np.all(np.max(x[:, :2, :2, :], axis=(1, 2)) == f[0, :, 0, 0, :])
+
+        # n_samples and batch size remain unchanged
+        assert f.shape[:2] == X.eval().shape[:2]
+
+        # downsampled by 2x
+        assert 2 * f.shape[2] == X.eval().shape[2]
+        assert 2 * f.shape[3] == X.eval().shape[3]
+
+        # number of channels remain unchanged
+        assert f.shape[-1] == X.eval().shape[-1]
+
+        assert KL == 0
+
+
 def test_arc_cosine(make_data):
     """Test the random Arc Cosine kernel."""
     S = 3
