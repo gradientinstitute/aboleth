@@ -46,6 +46,6 @@ __all__ = (
     'concat',
     'slicecat',
     'add',
-    'mean_impute'
+    'mean_impute',
     'gaussian_impute'
 )
