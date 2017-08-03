@@ -207,7 +207,7 @@ class MaxPool2D(Layer):
         return Net, KL
 
 
-class Reshape(Activation):
+class Reshape(Layer):
     """Reshape layer.
 
     Parameters
@@ -218,10 +218,14 @@ class Reshape(Activation):
 
     def __init__(self, target_shape):
         """Initialize instance of a Reshape layer."""
-        super(Reshape, self).__init__(
-            lambda X: tf.reshape(
-                X,
-                X.shape[:2].concatenate(tf.TensorShape(target_shape))))
+        self.target_shape = target_shape
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        new_shape = X.shape[:2].concatenate(tf.TensorShape(self.target_shape))
+        Net = tf.reshape(X, new_shape)
+        KL = 0.
+        return Net, KL
 
 
 #
