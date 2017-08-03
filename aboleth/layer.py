@@ -8,10 +8,26 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
 
 
 #
-# Input layers
+# Multi layers
 #
 
-class InputLayer:
+class MultiLayer:
+    """Base class for MultiLayers, or layers that take in multiple inputs."""
+
+    def __call__(self, **kwargs):
+        """Build the multiple input layer.
+
+        See: _build() for the implementation details.
+        """
+        Net, KL = self._build(**kwargs)
+        return Net, KL
+
+    def _build(self, **kwargs):
+        """Build the multiple input layer."""
+        raise NotImplementedError("Base class for MultiLayers only!")
+
+
+class InputLayer(MultiLayer):
     """Create an input layer.
 
     This layer defines input kwargs so that a user may easily provide the right
@@ -35,7 +51,7 @@ class InputLayer:
         self.name = name
         self.n_samples = n_samples
 
-    def __call__(self, **kwargs):
+    def _build(self, **kwargs):
         """Build the tiling input layer."""
         X = kwargs[self.name]
         if self.n_samples is not None:
@@ -60,12 +76,12 @@ class Layer:
     def __call__(self, X):
         """Build the graph of this layer.
 
-        See: build
+        See: _build
         """
-        Net, KL = self.build(X)
+        Net, KL = self._build(X)
         return Net, KL
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer.
 
         Parameters
@@ -97,7 +113,7 @@ class SampleLayer(Layer):
         """Build the graph of this layer."""
         rank = len(X.shape)
         assert rank == 3
-        Net, KL = self.build(X)
+        Net, KL = self._build(X)
         return Net, KL
 
     @staticmethod
@@ -125,7 +141,7 @@ class Activation(Layer):
         """Create an instance of an Activation layer."""
         self.h = h
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer."""
         Net = self.h(X)
         KL = 0.
@@ -150,7 +166,7 @@ class DropOut(Layer):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer."""
         noise_shape = None  # equivalent to different samples from posterior
         Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
@@ -162,8 +178,8 @@ class DropOut(Layer):
 # Kernel Approximation Layers
 #
 
-class RandomRBF(SampleLayer):
-    """Random radial basis function (RBF) Fourier feature layer.
+class RandomFourier(SampleLayer):
+    """Random Fourier feature (RFF) kernel approximation layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
         kernel approximation.
@@ -173,24 +189,24 @@ class RandomRBF(SampleLayer):
     n_features : int
         the number of unique random features, the actual output dimension of
         this layer will be ``2 * n_features``.
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the radial basis kernel, this can be a scalar for
-        an isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
+    kernel : kernels.ShiftInvariant
+        the kernel object that yeilds the random samples from the fourier
+        spectrum of a particular kernel to approximate. See ``RBF`` and
+        ``Matern`` etc.
 
     """
 
-    def __init__(self, n_features, lenscale=1.0):
-        """Create an instance of an RBF kernel layer."""
+    def __init__(self, n_features, kernel):
+        """Construct and instance of a RandomFourier object."""
         self.n_features = n_features
-        self.lenscale = lenscale
+        self.kernel = kernel
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self.get_X_dims(X)
 
         # Random weights, copy faster than map here
-        P = self.weights(input_dim)
+        P = self.kernel.weights(input_dim, self.n_features)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
@@ -201,92 +217,6 @@ class RandomRBF(SampleLayer):
         KL = 0.
 
         return Net, KL
-
-    def weights(self, input_dim):
-        """Generate the random fourier weights for this kernel.
-
-        Parameters
-        ----------
-        input_dim : int
-            the input dimension to this layer.
-        n_features : int
-            the number of unique random features, the actual output dimension
-            of this layer will be ``2 * n_features``.
-
-        Returns
-        -------
-        P : ndarray
-            the random weights of the fourier features of shape
-            ``(input_dim, n_features)``.
-
-        """
-        rand = np.random.RandomState(next(seedgen))
-        P = rand.randn(input_dim, self.n_features).astype(np.float32)
-        return P / self.lenscale
-
-
-class RandomMatern(RandomRBF):
-    """Random Matern Fourier feature layer.
-
-    NOTE: This should be followed by a dense layer to properly implement a
-        kernel approximation.
-
-    Parameters
-    ----------
-    n_features : int
-        the number of unique random features, the actual output dimension of
-        this layer will be ``2 * n_features``.
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the radial basis kernel, this can be a scalar for
-        an isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
-    p : int
-        this is the Matern kernel 'number', i.e. a v = 3/2 kernel would be p =
-        1, the rule is :math:`v = p + .5`. This has to be an integer greater
-        than or equal to 0.
-
-    """
-
-    def __init__(self, n_features, lenscale=1.0, p=1):
-        """Create an instance of an Matern kernel layer."""
-        super().__init__(n_features, lenscale)
-        assert isinstance(p, int) and p >= 0
-        self.p = p
-
-    def weights(self, input_dim):
-        """Generate the random fourier weights for this kernel.
-
-        Parameters
-        ----------
-        input_dim : int
-            the input dimension to this layer.
-        n_features : int
-            the number of unique random features, the actual output dimension
-            of this layer will be ``2 * n_features``.
-
-        Returns
-        -------
-        P : ndarray
-            the random weights of the fourier features of shape
-            ``(input_dim, n_features)``.
-
-        """
-        # p is the matern number (v = p + .5) and the two is a transformation
-        # of variables between Rasmussen 2006 p84 and the CF of a Multivariate
-        # Student t (see wikipedia). Also see "A Note on the Characteristic
-        # Function of Multivariate t Distribution":
-        #   http://ocean.kisti.re.kr/downfile/volume/kss/GCGHC8/2014/v21n1/
-        #   GCGHC8_2014_v21n1_81.pdf
-        # To sample from a m.v. t we use the formula
-        # from wikipedia, x = y * np.sqrt(df / u) where y ~ norm(0, I),
-        # u ~ chi2(df), then x ~ mvt(0, I, df)
-        df = 2 * (self.p + 0.5)
-        rand = np.random.RandomState(next(seedgen))
-        y = rand.randn(input_dim, self.n_features)
-        u = rand.chisquare(df, size=(self.n_features,))
-        P = y * np.sqrt(df / u)
-        P = P.astype(np.float32)
-        return P / self.lenscale
 
 
 class RandomArcCosine(SampleLayer):
@@ -334,7 +264,7 @@ class RandomArcCosine(SampleLayer):
         self.n_features = n_features
         self.lenscale = lenscale
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self.get_X_dims(X)
 
@@ -405,7 +335,7 @@ class DenseVariational(SampleLayer):
         self.qW = post_W
         self.qb = post_b
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self.get_X_dims(X)
 
@@ -504,7 +434,7 @@ class EmbedVariational(DenseVariational):
         self.pW = prior_W
         self.qW = post_W
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self.get_X_dims(X)
         assert input_dim == 1, "X must be a *column* of indices!"
@@ -547,7 +477,7 @@ class DenseMAP(SampleLayer):
         self.l2 = l2_reg
         self.use_bias = use_bias
 
-    def build(self, X):
+    def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self.get_X_dims(X)
         Wdim = (input_dim, self.output_dim)

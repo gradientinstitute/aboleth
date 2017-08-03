@@ -2,9 +2,10 @@
 from .version import __version__
 from .model import elbo, log_prob
 from .layer import (Activation, DropOut, DenseVariational, DenseMAP,
-                    InputLayer, EmbedVariational, RandomRBF, RandomMatern,
+                    InputLayer, EmbedVariational, RandomFourier,
                     RandomArcCosine)
 from .ops import stack, concat, slicecat, add, mean_impute
+from .kernels import RBF, Matern
 from .likelihood import normal, bernoulli, binomial
 from .distributions import (Normal, Gaussian, norm_prior, norm_posterior,
                             gaus_posterior)
@@ -21,8 +22,7 @@ __all__ = (
     'DenseVariational',
     'DenseMAP',
     'EmbedVariational',
-    'RandomRBF',
-    'RandomMatern',
+    'RandomFourier',
     'RandomArcCosine',
     'normal',
     'bernoulli',
@@ -43,5 +43,7 @@ __all__ = (
     'concat',
     'slicecat',
     'add',
-    'mean_impute'
+    'mean_impute',
+    'RBF',
+    'Matern'
 )

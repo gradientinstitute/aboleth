@@ -18,10 +18,11 @@ logger.setLevel(logging.INFO)
 NSAMPLES = 10
 VARIANCE = 10.0
 LENSCALE = tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
+KERNEL = ab.RBF(LENSCALE)
 
 net = ab.stack(
     ab.InputLayer(name='X', n_samples=NSAMPLES),
-    ab.RandomRBF(n_features=1000, lenscale=LENSCALE),
+    ab.RandomFourier(n_features=1000, kernel=KERNEL),
     ab.DenseVariational(output_dim=1, full=True)
 )
 
