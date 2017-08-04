@@ -551,7 +551,6 @@ class Conv2DVariational(DenseVariational):
 
     def _make_prior(self, prior_W, channels=None):
         """Check/make prior."""
-
         if channels is None:
             dim = (self.filters,)
         else:
@@ -566,7 +565,6 @@ class Conv2DVariational(DenseVariational):
 
     def _make_posterior(self, post_W, channels=None):
         """Check/make posterior."""
-
         if channels is None:
             dim = (self.filters,)
         else:
