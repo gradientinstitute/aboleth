@@ -1,0 +1,134 @@
+#! /usr/bin/env python3
+import tensorflow as tf
+import numpy as np
+
+import aboleth as ab
+
+from tensorflow.examples.tutorials.mnist import input_data as mnist_data
+
+from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score, log_loss
+
+from aboleth.likelihoods import Categorical
+
+
+RSEED = 100
+ab.set_hyperseed(RSEED)
+
+# Optimization
+NITER = 20000
+BSIZE = 100
+CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
+LSAMPLES = 10
+PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
+REG = 0.1
+
+# Network structure
+net = ab.stack(
+    ab.InputLayer(name='X', n_samples=LSAMPLES),
+
+    ab.Conv2DVariational(output_dim=1024, reg=REG, full=True),
+    ab.Activation(h=tf.nn.relu),
+    ab.MaxPool2D()
+
+    ab.Conv2DVariational(output_dim=1024, reg=REG, full=True),
+    ab.Activation(h=tf.nn.relu),
+    ab.MaxPool2D()
+
+    ab.Reshape(),
+
+    ab.DenseVariational(output_dim=1024, reg=REG, full=True),
+    ab.Activation(h=tf.nn.relu),
+    ab.DropOut(0.5),
+
+    ab.DenseVariational(output_dim=10, reg=REG, full=True),
+    ab.Activation(h=tf.nn.softmax)
+)
+
+
+def main():
+    """Run the demo."""
+    data = input_data.read_data_sets(FLAGS.data_dir,
+                                     one_hot=True,
+                                     reshape=False)
+    X = data.data.astype(np.float32)
+    y = data.target.astype(np.float32)[:, np.newaxis]
+    X = StandardScaler().fit_transform(X).astype(np.float32)
+    N, D = X.shape
+
+    # Benchmark classifier
+    bcl = RandomForestClassifier(random_state=RSEED)
+
+    # Data
+    with tf.name_scope("Input"):
+        X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
+        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
+        N_ = tf.placeholder(dtype=tf.float32)
+
+    with tf.name_scope("Likelihood"):
+        lkhood = Bernoulli()
+
+    with tf.name_scope("Deepnet"):
+        Phi, kl = net(X=X_)
+        loss = ab.elbo(Phi, Y_, N_, kl, lkhood)
+
+    with tf.name_scope("Train"):
+        optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
+        train = optimizer.minimize(loss)
+
+    kfold = KFold(n_splits=FOLDS, shuffle=True, random_state=RSEED)
+
+    # Launch the graph.
+    acc, acc_o, ll, ll_o = [], [], [], []
+    init = tf.global_variables_initializer()
+
+    with tf.Session(config=CONFIG):
+
+        for k, (r_ind, s_ind) in enumerate(kfold.split(X)):
+            init.run()
+
+            Xr, Yr = X[r_ind], y[r_ind]
+            Xs, Ys = X[s_ind], y[s_ind]
+
+            batches = ab.batch(
+                {X_: Xr, Y_: Yr},
+                batch_size=BSIZE,
+                n_iter=NITER,
+                N_=N_)
+            for i, data in enumerate(batches):
+                train.run(feed_dict=data)
+                if i % 1000 == 0:
+                    loss_val = loss.eval(feed_dict=data)
+                    print("Iteration {}, loss = {}".format(i, loss_val))
+
+            # Predict
+            Ey = ab.predict_expected(Phi, {X_: Xs}, PSAMPLES)
+
+            print("Fold {}:".format(k))
+            Ep = np.hstack((1. - Ey, Ey))
+
+            print_k_result(Ys, Ep, ll, acc, "BNN")
+
+            bcl.fit(Xr, Yr.flatten())
+            Ep_o = bcl.predict_proba(Xs)
+            print_k_result(Ys, Ep_o, ll_o, acc_o, "RF")
+            print("-----")
+
+        print_final_result(acc, ll, "BNN")
+        print_final_result(acc_o, ll_o, "RF")
+
+
+def print_k_result(ys, Ep, ll, acc, name):
+    acc.append(accuracy_score(ys, Ep.argmax(axis=1)))
+    ll.append(log_loss(ys, Ep))
+    print("{}: accuracy = {:.4g}, log-loss = {:.4g}"
+          .format(name, acc[-1], ll[-1]))
+
+
+def print_final_result(acc, ll, name):
+    print("{} final: accuracy = {:.4g} ({:.4g}), log-loss = {:.4g} ({:.4g})"
+          .format(name, np.mean(acc), np.std(acc), np.mean(ll), np.std(ll)))
+
+
+if __name__ == "__main__":
+    main()
