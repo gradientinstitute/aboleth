@@ -107,9 +107,11 @@ class SampleLayer3(SampleLayer):
         return Net, KL
 
     @staticmethod
-    def _get_X_dims(X):
-        """Get the dimensions of the rank 3 input tensor, X."""
-        n_samples, _, input_dim = X.shape.as_list()
+
+    def get_X_dims(X):
+        """Get the dimensions of the rank 3 input tensor."""
+        n_samples, (input_dim,) = SampleLayer.get_X_dims(X)
+
         return n_samples, input_dim
 
 
@@ -402,7 +404,7 @@ class DenseVariational(SampleLayer3):
         Net = tf.matmul(X, Wsamples)
 
         # Optional bias
-        if self.use_bias is True or self.prior_b or self.post_b:
+        if self.use_bias or not (self.prior_b is None and self.post_b is None):
             # Layer intercepts
             self.pb = self._make_prior(self.pb)
             self.qb = self._make_posterior(self.qb)
@@ -456,7 +458,7 @@ class DenseVariational(SampleLayer3):
         return samples
 
 
-class Conv2DVariational(DenseVariational):
+class Conv2DVariational(SampleLayer):
     """2D convolution layer, with variational inference.
 
     Currently does not support full covariance weights.
@@ -506,7 +508,7 @@ class Conv2DVariational(DenseVariational):
         """Initialize an instance of a variational Conv2D layer."""
         self.filters = filters
         self.kernel_size = kernel_size
-        self.strides = self.strides = [1] + list(strides) + [1]
+        self.strides = [1] + list(strides) + [1]
         self.padding = padding
         self.reg = reg
         self.use_bias = use_bias
@@ -517,7 +519,7 @@ class Conv2DVariational(DenseVariational):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, batch_size, height, width, channels = X.shape
+        n_samples, (batch_size, height, width, channels) = self.get_X_dims(X)
 
         # Layer weights
         self.pW = self._make_prior(self.pW, channels)
@@ -544,8 +546,8 @@ class Conv2DVariational(DenseVariational):
             KL += kl_qp(self.qb, self.pb)
 
             # Linear layer
-            bsamples = self._sample_W(self.qb, n_samples)
-            Net = tf.nn.bias_add(Net, bsamples)
+            bsamples = tf.expand_dims(self._sample_W(self.qb, n_samples), 1)
+            Net += bsamples
 
         return Net, KL
 
@@ -576,6 +578,11 @@ class Conv2DVariational(DenseVariational):
         assert _is_dim(post_W.mu, dim), "Posterior inconsistent dimension!"
 
         return post_W
+
+    @staticmethod
+    def _sample_W(dist, n_samples):
+        samples = tf.stack([dist.sample() for _ in range(n_samples)])
+        return samples
 
 
 class EmbedVariational(DenseVariational):
