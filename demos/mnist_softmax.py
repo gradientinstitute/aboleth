@@ -12,12 +12,13 @@ from sklearn.metrics import accuracy_score, log_loss
 from aboleth.likelihoods import Categorical
 
 
+FOLDS = 5
 RSEED = 100
 ab.set_hyperseed(RSEED)
 
 # Optimization
-NITER = 20000
-BSIZE = 100
+NITER = 20 # 20000
+BSIZE = 50
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 LSAMPLES = 10
 PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
@@ -25,97 +26,92 @@ REG = 0.1
 
 # Network structure
 net = ab.stack(
-    ab.InputLayer(name='X', n_samples=LSAMPLES),
+    ab.InputLayer(name='X', n_samples=LSAMPLES), # LSAMPLES, BATCH_SIZE, 28*28
+    ab.Reshape(target_shape=(28, 28, 1)), # LSAMPLES, BATCH_SIZE, 28, 28, 1
 
-    ab.Conv2DVariational(output_dim=1024, reg=REG, full=True),
+    ab.Conv2DVariational(filters=32,
+                         kernel_size=(5, 5),
+                         reg=REG), # LSAMPLES, BATCH_SIZE, 28, 28, 32
     ab.Activation(h=tf.nn.relu),
-    ab.MaxPool2D()
+    ab.MaxPool2D(pool_size=(2, 2),
+                 strides=(2, 2)), # LSAMPLES, BATCH_SIZE, 14, 14, 32
 
-    ab.Conv2DVariational(output_dim=1024, reg=REG, full=True),
+    ab.Conv2DVariational(filters=64,
+                         kernel_size=(5, 5),
+                         reg=REG), # LSAMPLES, BATCH_SIZE, 14, 14, 64
     ab.Activation(h=tf.nn.relu),
-    ab.MaxPool2D()
+    ab.MaxPool2D(pool_size=(2, 2),
+                 strides=(2, 2)), # LSAMPLES, BATCH_SIZE, 7, 7, 64
 
-    ab.Reshape(),
+    ab.Reshape(target_shape=(7*7*64,)), # LSAMPLES, BATCH_SIZE, 7*7*64
 
-    ab.DenseVariational(output_dim=1024, reg=REG, full=True),
+    ab.DenseVariational(output_dim=1024,
+                        reg=REG), # LSAMPLES, BATCH_SIZE, 1024
     ab.Activation(h=tf.nn.relu),
     ab.DropOut(0.5),
 
-    ab.DenseVariational(output_dim=10, reg=REG, full=True),
+    ab.DenseVariational(output_dim=10,
+                        reg=REG), # LSAMPLES, BATCH_SIZE, 10
     ab.Activation(h=tf.nn.softmax)
 )
 
 
 def main():
     """Run the demo."""
-    data = input_data.read_data_sets(FLAGS.data_dir,
-                                     one_hot=True,
-                                     reshape=False)
-    X = data.data.astype(np.float32)
-    y = data.target.astype(np.float32)[:, np.newaxis]
-    X = StandardScaler().fit_transform(X).astype(np.float32)
+    mnist = mnist_data.read_data_sets('./mnist_demo', one_hot=True)
+    X = mnist.train.images
+    y = mnist.train.labels
     N, D = X.shape
 
-    # Benchmark classifier
-    bcl = RandomForestClassifier(random_state=RSEED)
+    Xs = mnist.test.images
+    ys = mnist.test.labels
 
     # Data
     with tf.name_scope("Input"):
         X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
+        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 10))
         N_ = tf.placeholder(dtype=tf.float32)
 
     with tf.name_scope("Likelihood"):
-        lkhood = Bernoulli()
+        lkhood = Categorical()
 
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X=X_)
         loss = ab.elbo(Phi, Y_, N_, kl, lkhood)
 
     with tf.name_scope("Train"):
-        optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
+        optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
         train = optimizer.minimize(loss)
 
     kfold = KFold(n_splits=FOLDS, shuffle=True, random_state=RSEED)
 
     # Launch the graph.
-    acc, acc_o, ll, ll_o = [], [], [], []
+    acc, ll = [], []
     init = tf.global_variables_initializer()
 
     with tf.Session(config=CONFIG):
 
-        for k, (r_ind, s_ind) in enumerate(kfold.split(X)):
-            init.run()
+        init.run()
 
-            Xr, Yr = X[r_ind], y[r_ind]
-            Xs, Ys = X[s_ind], y[s_ind]
+        batches = ab.batch(
+            {X_: X, Y_: y},
+            batch_size=BSIZE,
+            n_iter=NITER,
+            N_=N_)
+        for i, data in enumerate(batches):
+            train.run(feed_dict=data)
+            if not i % 10:
+                loss_val = loss.eval(feed_dict=data)
+                print("Iteration {}, loss = {}".format(i, loss_val))
 
-            batches = ab.batch(
-                {X_: Xr, Y_: Yr},
-                batch_size=BSIZE,
-                n_iter=NITER,
-                N_=N_)
-            for i, data in enumerate(batches):
-                train.run(feed_dict=data)
-                if i % 1000 == 0:
-                    loss_val = loss.eval(feed_dict=data)
-                    print("Iteration {}, loss = {}".format(i, loss_val))
+        # Predict
+        Ey = ab.predict_expected(Phi, {X_: mnist.test.images}, PSAMPLES)
 
-            # Predict
-            Ey = ab.predict_expected(Phi, {X_: Xs}, PSAMPLES)
+        Ep = np.hstack((1. - Ey, Ey))
 
-            print("Fold {}:".format(k))
-            Ep = np.hstack((1. - Ey, Ey))
-
-            print_k_result(Ys, Ep, ll, acc, "BNN")
-
-            bcl.fit(Xr, Yr.flatten())
-            Ep_o = bcl.predict_proba(Xs)
-            print_k_result(Ys, Ep_o, ll_o, acc_o, "RF")
-            print("-----")
-
-        print_final_result(acc, ll, "BNN")
-        print_final_result(acc_o, ll_o, "RF")
+        print("BayesianConvNet: accuracy = {:.4g}, log-loss = {:.4g}"
+              .format(accuracy_score(ys, Ep.argmax(axis=1)), ll[-1]),
+                      log_loss(ys, Ep))
 
 
 def print_k_result(ys, Ep, ll, acc, name):

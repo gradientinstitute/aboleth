@@ -217,7 +217,7 @@ class Reshape(Layer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        new_shape = X.shape[:2].concatenate(tf.TensorShape(self.target_shape))
+        new_shape = (int(X.shape[0]), tf.shape(X)[1]) + self.target_shape
         Net = tf.reshape(X, new_shape)
         KL = 0.
         return Net, KL
@@ -519,7 +519,7 @@ class Conv2DVariational(SampleLayer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, (batch_size, height, width, channels) = self.get_X_dims(X)
+        n_samples, (height, width, channels) = self.get_X_dims(X)
 
         # Layer weights
         self.pW = self._make_prior(self.pW, channels)
@@ -546,7 +546,8 @@ class Conv2DVariational(SampleLayer):
             KL += kl_qp(self.qb, self.pb)
 
             # Linear layer
-            bsamples = tf.expand_dims(self._sample_W(self.qb, n_samples), 1)
+            bsamples = tf.reshape(self._sample_W(self.qb, n_samples),
+                                  [n_samples, 1, 1, 1, self.filters])
             Net += bsamples
 
         return Net, KL
