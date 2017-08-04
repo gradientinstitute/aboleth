@@ -456,6 +456,130 @@ class DenseVariational(SampleLayer3):
         return samples
 
 
+class Conv2DVariational(DenseVariational):
+    """2D convolution layer, with variational inference.
+
+    Currently does not support full covariance weights.
+
+    Parameters
+    ----------
+    filters : int
+        the dimension of the output of this layer (i.e. the number of filters
+        in the convolution).
+    kernel_size : int, tuple or list
+        width and height of the 2D convolution window. Can be a single integer
+        to specify the same value for all spatial dimensions.
+    strides : int, tuple or list
+        the strides of the convolution along the height and width. Can be a
+        single integer to specify the same value for all spatial dimensions
+    padding : str
+        One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
+        algorithm to use.
+    reg : float
+        the initial value of the weight prior, w ~ N(0, reg * I), this is
+        optimized (a la maximum likelihood type II).
+    use_bias : bool
+        If true, also learn a bias weight, e.g. a constant offset weight.
+    prior_W : {Normal, Gaussian}, optional
+        This is the prior distribution object to use on the layer weights. It
+        must have parameters compatible with ``(input_dim, output_dim)`` shaped
+        weights. This ignores the ``reg`` parameter.
+    prior_b : {Normal, Gaussian}, optional
+        This is the prior distribution object to use on the layer intercept. It
+        must have parameters compatible with ``(output_dim,)`` shaped weights.
+        This ignores the ``reg`` and ``use_bias`` parameters.
+    post_W : {Normal, Gaussian}, optional
+        This is the posterior distribution object to use on the layer weights.
+        It must have parameters compatible with ``(input_dim, output_dim)``
+        shaped weights. This ignores the ``full`` parameter. See
+        ``distributions.gaus_posterior``.
+    post_b : {Normal, Gaussian}, optional
+        This is the posterior distribution object to use on the layer
+        intercept. It must have parameters compatible with ``(output_dim,)``
+        shaped weights. This ignores the ``use_bias`` parameters.
+        See ``distributions.norm_posterior``.
+    """
+
+    def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
+                 reg=1., use_bias=True, prior_W=None, prior_b=None,
+                 post_W=None, post_b=None):
+        """Initialize an instance of a variational Conv2D layer."""
+        self.filters = filters
+        self.kernel_size = kernel_size
+        self.strides = strides
+        self.padding = padding
+        self.reg = reg
+        self.use_bias = use_bias
+        self.pW = prior_W
+        self.pb = prior_b
+        self.qW = post_W
+        self.qb = post_b
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, batch_size, height, width, channels = X.shape
+
+        # Layer weights
+        self.pW = self._make_prior(self.pW, channels)
+        self.qW = self._make_posterior(self.qW, channels)
+
+        # Regularizers
+        KL = kl_qp(self.qW, self.pW)
+
+        # Linear layer
+        Wsamples = self._sample_W(self.qW, n_samples)
+        Net = tf.map_fn(
+            lambda args: tf.nn.conv2d(*args,
+                                      padding=self.padding,
+                                      strides=self.strides),
+            elems=(X, Wsamples), dtype=tf.float32)
+
+        # Optional bias
+        if self.use_bias or not (self.prior_b is None and self.post_b is None):
+            # Layer intercepts
+            self.pb = self._make_prior(self.pb)
+            self.qb = self._make_posterior(self.qb)
+
+            # Regularizers
+            KL += kl_qp(self.qb, self.pb)
+
+            # Linear layer
+            bsamples = self._sample_W(self.qb, n_samples)
+            Net = tf.nn.bias_add(Net, bsamples)
+
+        return Net, KL
+
+    def _make_prior(self, prior_W, channels=None):
+        """Check/make prior."""
+
+        if channels is None:
+            dim = (self.filters,)
+        else:
+            dim = self.kernel_size + (channels, self.filters)
+
+        if prior_W is None:
+            prior_W = norm_prior(dim=dim, var=self.reg)
+
+        assert _is_dim(prior_W.mu, dim), "Prior inconsistent dimension!"
+
+        return prior_W
+
+    def _make_posterior(self, post_W, channels=None):
+        """Check/make posterior."""
+
+        if channels is None:
+            dim = (self.filters,)
+        else:
+            dim = self.kernel_size + (channels, self.filters)
+
+        if post_W is None:
+            post_W = norm_posterior(dim=dim, var0=self.reg)
+
+        assert _is_dim(post_W.mu, dim), "Posterior inconsistent dimension!"
+
+        return post_W
+
+
 class EmbedVariational(DenseVariational):
     r"""Dense (fully connected) embedding layer, with variational inference.
 
