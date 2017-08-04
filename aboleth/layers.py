@@ -128,6 +128,27 @@ class SampleLayer(Layer):
         return n_samples, input_shape
 
 
+class SampleLayer3(SampleLayer):
+    """Special case of Sample Layer restricted to *rank == 3* input Tensors."""
+
+    def __call__(self, X):
+        """Build the graph of this layer.
+
+        See: build
+
+        """
+        rank = len(X.shape)
+        assert rank == 3
+        Net, KL = super(SampleLayer3, self).__call__(X)
+        return Net, KL
+
+    @staticmethod
+    def get_X_dims(X):
+        """Get the dimensions of the rank 3 input tensor."""
+        n_samples, _, input_dim = X.shape.as_list()
+        return n_samples, input_dim
+
+
 #
 # Activation Layers
 #
@@ -237,7 +258,7 @@ class Reshape(Layer):
 # Kernel Approximation Layers
 #
 
-class RandomFourier(SampleLayer):
+class RandomFourier(SampleLayer3):
     """Random Fourier feature (RFF) kernel approximation layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
@@ -262,11 +283,7 @@ class RandomFourier(SampleLayer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_shape = self.get_X_dims(X)
-
-        assert len(input_shape) == 1
-
-        input_dim = input_shape[0]
+        n_samples, input_dim = self.get_X_dims(X)
 
         # Random weights, copy faster than map here
         P = self.kernel.weights(input_dim, self.n_features)
@@ -282,7 +299,7 @@ class RandomFourier(SampleLayer):
         return Net, KL
 
 
-class RandomArcCosine(SampleLayer):
+class RandomArcCosine(SampleLayer3):
     """Random arc-cosine kernel layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
@@ -329,11 +346,7 @@ class RandomArcCosine(SampleLayer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_shape = self.get_X_dims(X)
-
-        assert len(input_shape) == 1
-
-        input_dim = input_shape[0]
+        n_samples, input_dim = self.get_X_dims(X)
 
         # Random weights
         rand = np.random.RandomState(next(seedgen))
@@ -353,7 +366,7 @@ class RandomArcCosine(SampleLayer):
 # Weight layers
 #
 
-class DenseVariational(SampleLayer):
+class DenseVariational(SampleLayer3):
     """Dense (fully connected) linear layer, with variational inference.
 
     Parameters
@@ -404,11 +417,11 @@ class DenseVariational(SampleLayer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_shape = self.get_X_dims(X)
+        n_samples, input_dim = self.get_X_dims(X)
 
         # Layer weights
-        self.pW = self._make_prior(self.pW, input_shape)
-        self.qW = self._make_posterior(self.qW, input_shape)
+        self.pW = self._make_prior(self.pW, input_dim)
+        self.qW = self._make_posterior(self.qW, input_dim)
 
         # Regularizers
         KL = kl_qp(self.qW, self.pW)
@@ -432,12 +445,12 @@ class DenseVariational(SampleLayer):
 
         return Net, KL
 
-    def _make_prior(self, prior_W, input_shape=None):
+    def _make_prior(self, prior_W, input_dim=None):
         """Check/make prior."""
-        if input_shape is None:
+        if input_dim is None:
             output_shape = (self.output_dim,)
         else:
-            output_shape = tuple(input_shape) + (self.output_dim,)
+            output_shape = (input_dim, self.output_dim,)
 
         if prior_W is None:
             prior_W = norm_prior(dim=output_shape, var=self.reg)
@@ -447,16 +460,16 @@ class DenseVariational(SampleLayer):
 
         return prior_W
 
-    def _make_posterior(self, post_W, input_shape=None):
+    def _make_posterior(self, post_W, input_dim=None):
         """Check/make posterior."""
-        if input_shape is None:
+        if input_dim is None:
             output_shape = (self.output_dim,)
         else:
-            output_shape = tuple(input_shape) + (self.output_dim,)
+            output_shape = (input_dim, self.output_dim,)
 
         if post_W is None:
             # We don't want a full-covariance on an intercept, check input_dim
-            if self.full and input_shape is not None:
+            if self.full and input_dim is not None:
                 post_W = gaus_posterior(dim=output_shape, var0=self.reg)
             else:
                 post_W = norm_posterior(dim=output_shape, var0=self.reg)
@@ -516,17 +529,13 @@ class EmbedVariational(DenseVariational):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_shape = self.get_X_dims(X)
-
-        assert len(input_shape) == 1
-
-        input_dim = input_shape[0]
+        n_samples, input_dim = self.get_X_dims(X)
 
         assert input_dim == 1, "X must be a *column* of indices!"
 
         # Layer weights
-        self.pW = self._make_prior(self.pW, (self.n_categories,))
-        self.qW = self._make_posterior(self.qW, (self.n_categories,))
+        self.pW = self._make_prior(self.pW, self.n_categories)
+        self.qW = self._make_posterior(self.qW, self.n_categories)
 
         # Embedding layer -- gather only works on the first dim hence transpose
         Wsamples = tf.transpose(self._sample_W(self.qW, n_samples), [1, 2, 0])
