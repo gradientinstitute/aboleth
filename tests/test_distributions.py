@@ -6,6 +6,7 @@ from scipy.linalg import cho_solve
 from scipy.stats import wishart
 
 from aboleth.distributions import (Normal, Gaussian, kl_qp, _chollogdet)
+from .conftest import SEED
 
 
 def test_kl_normal_normal():
@@ -39,16 +40,16 @@ def test_kl_normal_normal():
         assert np.allclose(KL2.eval(), rKL2)
 
 
-def test_kl_gaussian_normal():
+def test_kl_gaussian_normal(random):
     """Test Gaussian/Normal KL."""
     dim = (10, 5)
     Dim = (5, 10, 10)
 
-    mu0 = np.random.randn(*dim).astype(np.float32)
+    mu0 = random.randn(*dim).astype(np.float32)
     L0 = random_chol(Dim)
     q = Gaussian(mu0, L0)
 
-    mu1 = np.random.randn(*dim).astype(np.float32)
+    mu1 = random.randn(*dim).astype(np.float32)
     var1 = 1.0
     L1 = [(np.sqrt(var1) * np.eye(dim[0])).astype(np.float32)
           for _ in range(dim[1])]
@@ -62,16 +63,16 @@ def test_kl_gaussian_normal():
         assert np.allclose(KL.eval(), KLr)
 
 
-def test_kl_gaussian_gaussian():
+def test_kl_gaussian_gaussian(random):
     """Test Gaussian/Gaussian KL."""
     dim = (10, 5)
     Dim = (5, 10, 10)
 
-    mu0 = np.random.randn(*dim).astype(np.float32)
+    mu0 = random.randn(*dim).astype(np.float32)
     L0 = random_chol(Dim)
     q = Gaussian(mu0, L0)
 
-    mu1 = np.random.randn(*dim).astype(np.float32)
+    mu1 = random.randn(*dim).astype(np.float32)
     L1 = random_chol(Dim)
     p = Gaussian(mu1, L1)
 
@@ -129,7 +130,9 @@ def random_chol(dim):
     """Generate random pos def matrices."""
     D = dim[1]
     n = dim[0]
+    np.random.seed(SEED)
     C = wishart.rvs(df=D, scale=10 * np.eye(D), size=n)
+    np.random.seed(None)
     L = np.array([np.linalg.cholesky(c).astype(np.float32) for c in C])
     return L
 

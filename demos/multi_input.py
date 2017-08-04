@@ -47,16 +47,16 @@ def main():
     X_con, X_cat, n_cats, Y = input_fn(df)
 
     # Define our graph
-    con_layer = ab.stack(ab.InputLayer(name='con', n_samples=T_SAMPLES),
+    con_layer = ab.Stack(ab.InputLayer(name='con', n_samples=T_SAMPLES),
                          ab.DenseVariational(output_dim=5, full=True))
 
     # Note every embed_var call can be different
     cat_layer_list = [ab.EmbedVariational(EMBED_DIMS, i) for i in n_cats]
 
-    cat_layer = ab.stack(ab.InputLayer(name='cat', n_samples=T_SAMPLES),
-                         ab.slicecat(*cat_layer_list))
+    cat_layer = ab.Stack(ab.InputLayer(name='cat', n_samples=T_SAMPLES),
+                         ab.SliceCat(*cat_layer_list))
 
-    net = ab.stack(ab.concat(con_layer, cat_layer),
+    net = ab.Stack(ab.Concat(con_layer, cat_layer),
                    ab.RandomArcCosine(100, 1.),
                    ab.DenseVariational(output_dim=1, full=True),
                    ab.Activation(tf.sigmoid))
