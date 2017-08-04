@@ -588,7 +588,8 @@ class DenseMAP(SampleLayer):
 
         # Optional Bias
         if self.use_bias is True:
-            b = tf.Variable(tf.zeros(self.output_dim), name="b_map")
+            b = tf.Variable(tf.random_normal(shape=(1, self.output_dim),
+                                             seed=next(seedgen)), name="b_map")
             Net += b
             penalty += self.l2 * tf.nn.l2_loss(b) + self.l1 * _l1_loss(b)
 
