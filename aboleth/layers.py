@@ -506,7 +506,7 @@ class Conv2DVariational(DenseVariational):
         """Initialize an instance of a variational Conv2D layer."""
         self.filters = filters
         self.kernel_size = kernel_size
-        self.strides = strides
+        self.strides = self.strides = [1] + list(strides) + [1]
         self.padding = padding
         self.reg = reg
         self.use_bias = use_bias
