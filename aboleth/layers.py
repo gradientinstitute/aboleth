@@ -106,7 +106,7 @@ class SampleLayer(Layer):
     """Sample Layer base class.
 
     This is the base class for layers that build upon stochastic (variational)
-    nets. These expect *rank 3* input Tensors, where the first dimension
+    nets. These expect *rank >= 3* input Tensors, where the first dimension
     indexes the random samples of the stochastic net.
     """
 
@@ -117,14 +117,35 @@ class SampleLayer(Layer):
 
         """
         rank = len(X.shape)
-        assert rank == 3
+        assert rank > 2
         Net, KL = self._build(X)
         return Net, KL
 
     @staticmethod
     def get_X_dims(X):
+        """Get the dimensions of the rank >= 3 input tensor."""
+        n_samples, _, *input_shape = X.shape.as_list()
+        return n_samples, input_shape
+
+
+class SampleLayer3(SampleLayer):
+    """Special case of Sample Layer restricted to *rank == 3* input Tensors."""
+
+    def __call__(self, X):
+        """Build the graph of this layer.
+
+        See: build
+
+        """
+        rank = len(X.shape)
+        assert rank == 3
+        Net, KL = super(SampleLayer3, self).__call__(X)
+        return Net, KL
+
+    @staticmethod
+    def get_X_dims(X):
         """Get the dimensions of the rank 3 input tensor."""
-        n_samples, input_dim = int(X.shape[0]), int(X.shape[2])
+        n_samples, _, input_dim = X.shape.as_list()
         return n_samples, input_dim
 
 
@@ -237,7 +258,7 @@ class Reshape(Layer):
 # Kernel Approximation Layers
 #
 
-class RandomFourier(SampleLayer):
+class RandomFourier(SampleLayer3):
     """Random Fourier feature (RFF) kernel approximation layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
@@ -278,7 +299,7 @@ class RandomFourier(SampleLayer):
         return Net, KL
 
 
-class RandomArcCosine(SampleLayer):
+class RandomArcCosine(SampleLayer3):
     """Random arc-cosine kernel layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
@@ -345,7 +366,7 @@ class RandomArcCosine(SampleLayer):
 # Weight layers
 #
 
-class DenseVariational(SampleLayer):
+class DenseVariational(SampleLayer3):
     """Dense (fully connected) linear layer, with variational inference.
 
     Parameters
@@ -426,23 +447,36 @@ class DenseVariational(SampleLayer):
 
     def _make_prior(self, prior_W, input_dim=None):
         """Check/make prior."""
-        dim = (input_dim, self.output_dim) if input_dim else (self.output_dim,)
-        if prior_W:
-            assert _is_dim(prior_W.mu, dim), "Prior inconsistent dimension!"
+        if input_dim is None:
+            output_shape = (self.output_dim,)
         else:
-            prior_W = norm_prior(dim=dim, var=self.reg)
+            output_shape = (input_dim, self.output_dim,)
+
+        if prior_W is None:
+            prior_W = norm_prior(dim=output_shape, var=self.reg)
+
+        assert _is_dim(prior_W.mu, output_shape), \
+            "Prior inconsistent dimension!"
+
         return prior_W
 
     def _make_posterior(self, post_W, input_dim=None):
         """Check/make posterior."""
-        dim = (input_dim, self.output_dim) if input_dim else (self.output_dim,)
-        if post_W:
-            assert _is_dim(post_W.mu, dim), "Posterior inconsistent dimension!"
+        if input_dim is None:
+            output_shape = (self.output_dim,)
         else:
+            output_shape = (input_dim, self.output_dim,)
+
+        if post_W is None:
             # We don't want a full-covariance on an intercept, check input_dim
-            fullcov = self.full and input_dim
-            post_W = (gaus_posterior(dim=dim, var0=self.reg) if fullcov else
-                      norm_posterior(dim=dim, var0=self.reg))
+            if self.full and input_dim is not None:
+                post_W = gaus_posterior(dim=output_shape, var0=self.reg)
+            else:
+                post_W = norm_posterior(dim=output_shape, var0=self.reg)
+
+        assert _is_dim(post_W.mu, output_shape), \
+            "Posterior inconsistent dimension!"
+
         return post_W
 
     @staticmethod
@@ -496,6 +530,7 @@ class EmbedVariational(DenseVariational):
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self.get_X_dims(X)
+
         assert input_dim == 1, "X must be a *column* of indices!"
 
         # Layer weights
@@ -538,8 +573,9 @@ class DenseMAP(SampleLayer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_dim = self.get_X_dims(X)
-        Wdim = (input_dim, self.output_dim)
+        n_samples, input_shape = self.get_X_dims(X)
+
+        Wdim = tuple(input_shape) + (self.output_dim,)
 
         W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
                         name="W_map")
