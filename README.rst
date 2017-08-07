@@ -12,23 +12,8 @@ Aboleth
     :align: center
 
 
-*A bare-bones TensorFlow framework for supervised Bayesian deep learning with
-stochastic gradient variational Bayes (SGVB, Kingma and Welling 2014).*
-
-
-Dependencies
-------------
-
-Minimal:
-
-- numpy
-- scipy
-- tensorflow
-
-Demos:
-
-- bokeh
-- scikit-learn
+*A bare-bones TensorFlow framework for supervised Bayesian deep learning and
+Gaussian process approximation with stochastic gradient variational Bayes.*
 
 
 Installation
@@ -57,4 +42,7 @@ folder for some examples of creating and training algorithms with Aboleth.
 References
 ----------
 
-Kingma, D. P. and Welling, M. Auto-encoding variational Bayes. In ICLR, 2014.
+.. [1] Kingma, D. P. and Welling, M. Auto-encoding variational Bayes. In ICLR,
+       2014.
+.. [2] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. Random Feature 
+       Expansions for Deep Gaussian Processes. In ICML, 2017.

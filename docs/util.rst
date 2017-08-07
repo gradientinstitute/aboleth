@@ -1,5 +1,5 @@
-Helper utility functions
-========================
+Utility functions
+=================
 
 .. automodule:: aboleth.util
     :members:
