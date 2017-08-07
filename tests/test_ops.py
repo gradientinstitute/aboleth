@@ -3,8 +3,6 @@ import numpy as np
 import tensorflow as tf
 import aboleth as ab
 
-from .conftest import SEED
-
 
 def test_stack2():
     """Test base implementation of stack."""
@@ -177,11 +175,8 @@ def test_resnet_layer_layer(make_data):
     def f(X):
         return X, 0.0
 
-    def g(X):
-        return X, 0.0
-
-    l1 = ab.Stack(f, g)
-    l2 = ab.Stack(g, g)
+    l1 = ab.Stack(f, f)
+    l2 = ab.Stack(f, f)
     l12 = ab.Stack(l1, l2)
     short = ab.Add(l12, l1)  # short-circuit l2
 
