@@ -1,4 +1,4 @@
-"""Operations for composing layers."""
+"""Operations on neural network layers."""
 
 from functools import reduce
 
@@ -8,7 +8,7 @@ from aboleth.distributions import Normal
 
 
 class LayerOp:
-    """Base class for an operation on Layers that return new layers.
+    r"""Base class for an operation on Layers that return new layers.
 
     The functions can take ``X`` or ``**kwargs``. In the latter case they can
     pull from this dictionary as required. This is intended to work on any
@@ -43,7 +43,7 @@ class LayerOp:
 
 
 class Stack(LayerOp):
-    """Stack multiple layers together (function composition).
+    r"""Stack multiple layers together (function composition).
 
     When called stack(f, g) stack returns h(.) = g(f(.)), ie the functions
     will be evaluated on the input in order from left to right in the call.
@@ -66,7 +66,7 @@ class Stack(LayerOp):
 
 
 class Concat(LayerOp):
-    """Concatenate multiple layers by concatenating their outputs.
+    r"""Concatenate multiple layers by concatenating their outputs.
 
     The functions can take ``X`` or ``**kwargs``. In the latter case they can
     pull from this dictionary as required. This is intended to work on any
@@ -88,9 +88,9 @@ class Concat(LayerOp):
 
 
 class Add(LayerOp):
-    """Concatenate multiple layers by adding their outputs.
+    r"""Concatenate multiple layers by adding their outputs.
 
-    Similar to concatenate, the functions must take (only) **kwargs. The
+    Similar to concatenate, the functions must take (only) ``**kwargs``. The
     outputs of the functions will be added element-wise. Intended to work
     on input layers or layers composed with input layers.
 
@@ -110,7 +110,7 @@ class Add(LayerOp):
 
 
 class SliceCat(LayerOp):
-    """Concatenate multiple layers with sliced inputs.
+    r"""Concatenate multiple layers with sliced inputs.
 
     Each layer will recieve a slice along the last axis of the input to the
     new function. In other words, slicecat(l1, l2)(X) will call
@@ -149,7 +149,7 @@ class SliceCat(LayerOp):
 
 
 class ImputeOp(LayerOp):
-    """Impute operations are specialisations of Layer ops.
+    r"""Impute operations are specialisations of Layer ops.
 
     They expect a data InputLayer and a mask InputLayer. They return layers in
     which the masked values have been imputed.
@@ -157,11 +157,11 @@ class ImputeOp(LayerOp):
     Parameters
     ----------
     datalayer : callable
-        A layer that returns a data tensor. Must be of form f(**kwargs).
+        A layer that returns a data tensor. Must be of form ``f(**kwargs)``.
 
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
-        masked. Must be of form f(**kwargs).
+        masked. Must be of form ``f(**kwargs)``.
     """
 
     def __init__(self, datalayer, masklayer):
@@ -188,7 +188,7 @@ class ImputeOp(LayerOp):
         return Net, loss
 
     def _impute2D(self, X_2D):
-        """Impute a rank 2 tensor.
+        r"""Impute a rank 2 tensor.
 
         This function is mapped over the rank 3 data tensors, additionally it
         has access to two properties:
@@ -211,7 +211,7 @@ class ImputeOp(LayerOp):
 
 
 class MeanImpute(ImputeOp):
-    """Impute the missing values using the stochastic mean of their column.
+    r"""Impute the missing values using the stochastic mean of their column.
 
     Takes two layers, one the returns a data tensor and the other returns a
     mask layer.  Returns a layer that returns a tensor in which the masked
@@ -220,16 +220,16 @@ class MeanImpute(ImputeOp):
     Parameters
     ----------
     datalayer : callable
-        A layer that returns a data tensor. Must be of form f(**kwargs).
+        A layer that returns a data tensor. Must be of form ``f(**kwargs)``.
 
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
-        masked. Must be of form f(**kwargs).
+        masked. Must be of form ``f(**kwargs)``.
 
     """
 
     def _impute2D(self, X_2D):
-        """Mean impute a rank 2 tensor.
+        r"""Mean impute a rank 2 tensor.
 
         Parameters
         ----------
@@ -266,20 +266,20 @@ class MeanImpute(ImputeOp):
 
 
 class RandomGaussImpute(ImputeOp):
-    """Impute the missing values using the marginal gaussians over each column.
+    r"""Impute the missing values using marginal gaussians over each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
-    mask layer.  Returns a layer that returns a tensor in which the masked
+    mask layer. Returns a layer that returns a tensor in which the masked
     values have been imputed as the column means calculated from the batch.
 
     Parameters
     ----------
     datalayer : callable
-        A layer that returns a data tensor. Must be of form f(**kwargs).
+        A layer that returns a data tensor. Must be of form ``f(**kwargs)``.
 
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
-        masked. Must be of form f(**kwargs).
+        masked. Must be of form ``f(**kwargs)``.
 
     mu_array : array-like
         A list of the global mean values of each dat column
@@ -295,7 +295,7 @@ class RandomGaussImpute(ImputeOp):
         self.normal_array = [Normal(m, v) for m, v in zip(mu_array, var_array)]
 
     def _impute2D(self, X_2D):
-        """Randomly impute a rank 2 tensor.
+        r"""Randomly impute a rank 2 tensor.
 
         Parameters
         ----------

@@ -28,7 +28,7 @@ class MultiLayer:
 
 
 class InputLayer(MultiLayer):
-    """Create an input layer.
+    r"""Create an input layer.
 
     This layer defines input kwargs so that a user may easily provide the right
     inputs to a complex set of layers. It takes a 2D tensor of shape (k, d).
@@ -83,7 +83,7 @@ class Layer:
         return Net, KL
 
     def _build(self, X):
-        """Build the graph of this layer.
+        r"""Build the graph of this layer.
 
         Parameters
         ----------
@@ -94,7 +94,7 @@ class Layer:
         -------
         Net : Tensor
             the output of this layer
-        KL : {float, Tensor}
+        KL : float, Tensor
             the regularizer/Kullback Liebler 'cost' of the parameters in this
             layer.
 
@@ -103,7 +103,7 @@ class Layer:
 
 
 class SampleLayer(Layer):
-    """Sample Layer base class.
+    r"""Sample Layer base class.
 
     This is the base class for layers that build upon stochastic (variational)
     nets. These expect *rank >= 3* input Tensors, where the first dimension
@@ -123,13 +123,13 @@ class SampleLayer(Layer):
 
     @staticmethod
     def get_X_dims(X):
-        """Get the dimensions of the rank >= 3 input tensor."""
+        r"""Get the dimensions of the rank >= 3 input tensor."""
         n_samples, _, *input_shape = X.shape.as_list()
         return n_samples, input_shape
 
 
 class SampleLayer3(SampleLayer):
-    """Special case of Sample Layer restricted to *rank == 3* input Tensors."""
+    r"""Special case of SampleLayer restricted to *rank == 3* input Tensors."""
 
     def __call__(self, X):
         """Build the graph of this layer.
@@ -175,7 +175,7 @@ class Activation(Layer):
 
 
 class DropOut(Layer):
-    """Dropout layer, Bernoulli probability of not setting an input to zero.
+    r"""Dropout layer, Bernoulli probability of not setting an input to zero.
 
     This is just a thin wrapper around `tf.dropout
     <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_
@@ -201,7 +201,7 @@ class DropOut(Layer):
 
 
 class MaxPool2D(Layer):
-    """Max pooling layer for 2D inputs (e.g. images).
+    r"""Max pooling layer for 2D inputs (e.g. images).
 
     This is just a thin wrapper around `tf.nn.max_pool
     <https://www.tensorflow.org/api_docs/python/tf/nn/max_pool>`_
@@ -259,7 +259,7 @@ class Reshape(Layer):
 #
 
 class RandomFourier(SampleLayer3):
-    """Random Fourier feature (RFF) kernel approximation layer.
+    r"""Random Fourier feature (RFF) kernel approximation layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
         kernel approximation.
@@ -300,7 +300,7 @@ class RandomFourier(SampleLayer3):
 
 
 class RandomArcCosine(SampleLayer3):
-    """Random arc-cosine kernel layer.
+    r"""Random arc-cosine kernel layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
         kernel approximation.
@@ -367,7 +367,7 @@ class RandomArcCosine(SampleLayer3):
 #
 
 class DenseVariational(SampleLayer3):
-    """Dense (fully connected) linear layer, with variational inference.
+    r"""Dense (fully connected) linear layer, with variational inference.
 
     Parameters
     ----------
@@ -486,7 +486,7 @@ class DenseVariational(SampleLayer3):
 
 
 class EmbedVariational(DenseVariational):
-    """Dense (fully connected) embedding layer, with variational inference.
+    r"""Dense (fully connected) embedding layer, with variational inference.
 
     This layer works directly on shape (N, 1) inputs of category *indices*
     rather than one-hot representations, for efficiency.
@@ -549,7 +549,7 @@ class EmbedVariational(DenseVariational):
 
 
 class DenseMAP(SampleLayer):
-    """Dense (fully connected) linear layer, with MAP inference.
+    r"""Dense (fully connected) linear layer, with MAP inference.
 
     Parameters
     ----------
@@ -607,6 +607,6 @@ def _l1_loss(X):
 
 
 def _is_dim(X, dims):
-    """Check if ``X``'s dimension is the same as the tuple ``dims``."""
+    r"""Check if ``X``'s dimension is the same as the tuple ``dims``."""
     shape = tuple([int(d) for d in X.get_shape()])
     return shape == dims

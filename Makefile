@@ -32,9 +32,6 @@ coverage:
 	py.test -s --junit-xml=test_output/pytest/results.xml --cov=./aboleth --cov-report=html:test_output/coverage --cache-clear --cov-fail-under=80 .
 
 docs:
-	rm -f docs/aboleth.rst
-	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ aboleth
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 

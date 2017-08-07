@@ -2,11 +2,11 @@
 import tensorflow as tf
 import numpy as np
 
-from aboleth.random import seedgen
+from aboleth.random import endless_permutations
 
 
 def pos(X, minval=1e-15):
-    """Constrain a ``tf.Variable`` to be positive only.
+    r"""Constrain a ``tf.Variable`` to be positive only.
 
     At the moment this is implemented as:
 
@@ -45,7 +45,7 @@ def pos(X, minval=1e-15):
 
 
 def batch(feed_dict, batch_size, n_iter=10000, N_=None):
-    """
+    r"""
     Create random batches for Stochastic gradients.
 
     Feed dict data generator for SGD that will yeild random batches for a
@@ -87,7 +87,7 @@ def batch(feed_dict, batch_size, n_iter=10000, N_=None):
 
 
 def batch_prediction(feed_dict, batch_size):
-    """
+    r"""
     Split the data in a feed_dict into contiguous batches for prediction.
 
     Parameters
@@ -101,8 +101,8 @@ def batch_prediction(feed_dict, batch_size):
     Yields
     ------
     ndarray :
-        an array of shape (approx_batch_size_,) of indices into the original
-        data for the current batch
+        an array of shape approximately (``batch_size``,) of indices into the
+        original data for the current batch
     dict :
         with each element an array length ``batch_size``, i.e. a subset of
         data, and an element for ``N_``. Use this as your feed-dict when
@@ -122,45 +122,8 @@ def batch_prediction(feed_dict, batch_size):
         yield ind, batch_dict
 
 
-def endless_permutations(N):
-    """
-    Generate an endless sequence of permutations of the set [0, ..., N).
-
-    If we call this N times, we will sweep through the entire set without
-    replacement, on the (N+1)th call a new permutation will be created, etc.
-
-    Parameters
-    ----------
-    N: int
-        the length of the set
-
-    Yields
-    ------
-    int :
-        yeilds a random int from the set [0, ..., N)
-
-    Examples
-    -------
-    >>> perm = endless_permutations(5)
-    >>> type(perm)
-    <class 'generator'>
-    >>> p = next(perm)
-    >>> p < 5
-    True
-    >>> p2 = next(perm)
-    >>> p2 != p
-    True
-    """
-    generator = np.random.RandomState(next(seedgen))
-
-    while True:
-        batch_inds = generator.permutation(N)
-        for b in batch_inds:
-            yield b
-
-
 def predict_samples(predictor, feed_dict, n_groups=1, session=None):
-    """A helper for getting samples from a predictor.
+    r"""A helper for getting samples from a predictor.
 
     Parameters
     ----------
@@ -193,7 +156,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
 
 
 def predict_expected(predictor, feed_dict, n_groups=1, session=None):
-    """A helper for getting the expected value from a predictor.
+    r"""A helper for getting the expected value from a predictor.
 
     Parameters
     ----------

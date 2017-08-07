@@ -1,5 +1,5 @@
 Likelihood models
 =================
 
-.. automodule:: aboleth.likelihood
+.. automodule:: aboleth.likelihoods
     :members:
