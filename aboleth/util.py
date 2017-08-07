@@ -10,7 +10,7 @@ def pos(X, minval=1e-15):
 
     At the moment this is implemented as:
 
-        :math:`max(|X|, minval)`
+        :math:`\max(|\mathbf{X}|, \text{minval})`
 
     This is fast and does not result in vanishing gradients, but will lead to
     non-smooth gradients and more local minima. In practice we haven't noticed
@@ -36,6 +36,7 @@ def pos(X, minval=1e-15):
     ...     xp = Xp.eval()
     >>> xp
     array([  1.00000000e+00,   1.00000000e+00,   1.00000000e-15])
+
     """
     # Other alternatives could be:
     # Xp = tf.exp(X)  # Medium speed, but gradients tend to explode
@@ -45,8 +46,7 @@ def pos(X, minval=1e-15):
 
 
 def batch(feed_dict, batch_size, n_iter=10000, N_=None):
-    r"""
-    Create random batches for Stochastic gradients.
+    r"""Create random batches for Stochastic gradients.
 
     Feed dict data generator for SGD that will yeild random batches for a
     a defined number of iterations, which can be infinite. This generator makes
@@ -72,6 +72,7 @@ def batch(feed_dict, batch_size, n_iter=10000, N_=None):
         with each element an array length ``batch_size``, i.e. a subset of
         data, and an element for ``N_``. Use this as your feed-dict when
         evaluating a loss, training, etc.
+
     """
     N = __data_len(feed_dict)
     perms = endless_permutations(N)
@@ -87,8 +88,7 @@ def batch(feed_dict, batch_size, n_iter=10000, N_=None):
 
 
 def batch_prediction(feed_dict, batch_size):
-    r"""
-    Split the data in a feed_dict into contiguous batches for prediction.
+    r"""Split the data in a feed_dict into contiguous batches for prediction.
 
     Parameters
     ----------
@@ -112,6 +112,7 @@ def batch_prediction(feed_dict, batch_size):
     ----
     The exact size of the batch may not be ``batch_size``, but the nearest size
     that splits the size of the data most evenly.
+
     """
     N = __data_len(feed_dict)
     n_batches = max(np.round(N / batch_size), 1)
@@ -123,7 +124,7 @@ def batch_prediction(feed_dict, batch_size):
 
 
 def predict_samples(predictor, feed_dict, n_groups=1, session=None):
-    r"""A helper for getting samples from a predictor.
+    r"""Help to get samples from a predictor.
 
     Parameters
     ----------
@@ -148,6 +149,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
     Note
     ----
     This has to be called in an *active* tensorflow session!
+
     """
     pred = [predictor.eval(feed_dict=feed_dict, session=session)
             for _ in range(n_groups)]
@@ -156,7 +158,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
 
 
 def predict_expected(predictor, feed_dict, n_groups=1, session=None):
-    r"""A helper for getting the expected value from a predictor.
+    r"""Help to get the expected value from a predictor.
 
     Parameters
     ----------
@@ -182,6 +184,7 @@ def predict_expected(predictor, feed_dict, n_groups=1, session=None):
     Note
     ----
     This has to be called in an *active* tensorflow session!
+
     """
     pred = 0
     for _ in range(n_groups):

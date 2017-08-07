@@ -1,3 +1,5 @@
+.. _kernels:
+
 Random Kernel approximation
 ===========================
 

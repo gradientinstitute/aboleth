@@ -8,6 +8,15 @@ from aboleth.util import pos
 class Likelihood:
     """Abstract base class for likelihood objects."""
 
+    def __call__(self, y, f):
+        """Build the log likelihood.
+
+        See: _loglike.
+
+        """
+        ll = self._loglike(y, f)
+        return ll
+
     def _loglike(self, y, f):
         """Build the log likelihood.
 
@@ -17,17 +26,9 @@ class Likelihood:
             the target variable of shape (N, tasks)
         f : Tensor
             the latent function output from the network of shape (N, tasks)
+
         """
         raise NotImplementedError('Abstract base class only.')
-
-    def __call__(self, y, f):
-        """Build the log likelihood.
-
-        See: _loglike.
-
-        """
-        ll = self._loglike(y, f)
-        return ll
 
 
 class Normal(Likelihood):
@@ -38,6 +39,7 @@ class Normal(Likelihood):
     variance : float, Tensor
         the variance of the Normal likelihood, this can be made a tf.Variable
         if you want to learn this.
+
     """
 
     def __init__(self, variance):
@@ -53,6 +55,7 @@ class Normal(Likelihood):
             the target variable of shape (N, tasks)
         f : Tensor
             the latent function output from the network of shape (N, tasks)
+
         """
         ll = -0.5 * (tf.log(2 * self.variance * np.pi) +
                      (y - f)**2 / self.variance)
@@ -71,6 +74,7 @@ class Bernoulli(Likelihood):
             the target variable of shape (N, tasks)
         f : Tensor
             the latent function output from the network of shape (N, tasks)
+
         """
         ll = y * tf.log(pos(f)) + (1 - y) * tf.log(pos(1 - f))
         return ll
@@ -88,6 +92,7 @@ class Categorical(Likelihood):
             the target variable of shape (N, tasks)
         f : Tensor
             the latent function output from the network of shape (N, tasks)
+
         """
         # sum along last axis, which is assumed to be the `tasks` axis
         ll = tf.reduce_sum(y * tf.log(pos(f)), axis=-1)
@@ -117,6 +122,7 @@ class Binomial(Likelihood):
             the target variable of shape (N, tasks)
         f : Tensor
             the latent function output from the network of shape (N, tasks)
+
         """
         bincoef = tf.lgamma(self.n + 1) - tf.lgamma(y + 1) \
             - tf.lgamma(self.n - y + 1)

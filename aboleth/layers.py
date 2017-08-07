@@ -18,12 +18,28 @@ class MultiLayer:
         """Build the multiple input layer.
 
         See: _build() for the implementation details.
+
         """
         Net, KL = self._build(**kwargs)
         return Net, KL
 
     def _build(self, **kwargs):
-        """Build the multiple input layer."""
+        """Build the multiple input layer.
+
+        Parameters
+        ----------
+        **kwargs :
+            the inputs to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         raise NotImplementedError("Base class for MultiLayers only!")
 
 
@@ -31,10 +47,10 @@ class InputLayer(MultiLayer):
     r"""Create an input layer.
 
     This layer defines input kwargs so that a user may easily provide the right
-    inputs to a complex set of layers. It takes a 2D tensor of shape (k, d).
+    inputs to a complex set of layers. It takes a 2D tensor of shape (N, D).
     If n_samples is specified, the input is tiled along a new first axis
-    creating a (n,k,d) tensor for propogating samples through a variational
-    deep net.
+    creating a (n_samples, N, D) tensor for propogating samples through a
+    variational deep net.
 
     Parameters
     ----------
@@ -52,7 +68,22 @@ class InputLayer(MultiLayer):
         self.n_samples = n_samples
 
     def _build(self, **kwargs):
-        """Build the tiling input layer."""
+        """Build the tiling input layer.
+
+        Parameters
+        ----------
+        **kwargs :
+            the inputs to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         X = kwargs[self.name]
         if self.n_samples is not None:
             # (n_samples, N, D)
@@ -95,7 +126,7 @@ class Layer:
         Net : Tensor
             the output of this layer
         KL : float, Tensor
-            the regularizer/Kullback Liebler 'cost' of the parameters in this
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
             layer.
 
         """
@@ -123,7 +154,7 @@ class SampleLayer(Layer):
 
     @staticmethod
     def get_X_dims(X):
-        r"""Get the dimensions of the rank >= 3 input tensor."""
+        r"""Get the dimensions of the rank >= 3 input tensor, X."""
         n_samples, _, *input_shape = X.shape.as_list()
         return n_samples, input_shape
 
@@ -144,7 +175,7 @@ class SampleLayer3(SampleLayer):
 
     @staticmethod
     def get_X_dims(X):
-        """Get the dimensions of the rank 3 input tensor."""
+        """Get the dimensions of the rank 3 input tensor, X."""
         n_samples, _, input_dim = X.shape.as_list()
         return n_samples, input_dim
 
@@ -168,7 +199,22 @@ class Activation(Layer):
         self.h = h
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         Net = self.h(X)
         KL = 0.
         return Net, KL
@@ -193,7 +239,22 @@ class DropOut(Layer):
         self.keep_prob = keep_prob
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         noise_shape = None  # equivalent to different samples from posterior
         Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
@@ -224,7 +285,22 @@ class MaxPool2D(Layer):
         self.padding = padding
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         Net = tf.map_fn(lambda inputs: tf.nn.max_pool(inputs,
                                                       ksize=self.ksize,
                                                       strides=self.strides,
@@ -236,10 +312,13 @@ class MaxPool2D(Layer):
 class Reshape(Layer):
     """Reshape layer.
 
+    Reshape and output an tensor to a specified shape.
+
     Parameters
     ----------
     targe_shape : tuple of ints
         Does not include the samples or batch axes.
+
     """
 
     def __init__(self, target_shape):
@@ -247,7 +326,22 @@ class Reshape(Layer):
         self.target_shape = target_shape
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         new_shape = X.shape[:2].concatenate(tf.TensorShape(self.target_shape))
         Net = tf.reshape(X, new_shape)
         KL = 0.
@@ -271,8 +365,8 @@ class RandomFourier(SampleLayer3):
         this layer will be ``2 * n_features``.
     kernel : kernels.ShiftInvariant
         the kernel object that yeilds the random samples from the fourier
-        spectrum of a particular kernel to approximate. See ``RBF`` and
-        ``Matern`` etc.
+        spectrum of a particular kernel to approximate. See the :ref:`kernels`
+        module.
 
     """
 
@@ -282,7 +376,22 @@ class RandomFourier(SampleLayer3):
         self.kernel = kernel
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         n_samples, input_dim = self.get_X_dims(X)
 
         # Random weights, copy faster than map here
@@ -345,7 +454,22 @@ class RandomArcCosine(SampleLayer3):
         self.lenscale = lenscale
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         n_samples, input_dim = self.get_X_dims(X)
 
         # Random weights
@@ -374,32 +498,32 @@ class DenseVariational(SampleLayer3):
     output_dim : int
         the dimension of the output of this layer
     reg : float
-        the initial value of the weight prior, w ~ N(0, reg * I), this is
-        optimized (a la maximum likelihood type II).
+        the initial value of the weight prior, which defaults to
+        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{reg} \mathbf{I})`,
+        this is optimized (a la maximum likelihood type II).
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
-    prior_W : {Normal, Gaussian}, optional
+    prior_W : distributions.Normal, distributions.Gaussian, optional
         This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with ``(input_dim, output_dim)`` shaped
+        must have parameters compatible with (input_dim, output_dim) shaped
         weights. This ignores the ``reg`` parameter.
-    prior_b : {Normal, Gaussian}, optional
+    prior_b : distributions.Normal, distributions.Gaussian, optional
         This is the prior distribution object to use on the layer intercept. It
-        must have parameters compatible with ``(output_dim,)`` shaped weights.
+        must have parameters compatible with (output_dim,) shaped weights.
         This ignores the ``reg`` and ``use_bias`` parameters.
-    post_W : {Normal, Gaussian}, optional
-        This is the posterior distribution object to use on the layer weights.
-        It must have parameters compatible with ``(input_dim, output_dim)``
-        shaped weights. This ignores the ``full`` parameter. See
+    post_W : distributions.Normal, distributions.Gaussian, optional
+        It must have parameters compatible with (input_dim, output_dim) shaped
+        weights. This ignores the ``full`` parameter. See also
         ``distributions.gaus_posterior``.
-    post_b : {Normal, Gaussian}, optional
+    post_b : distributions.Normal, distributions.Gaussian, optional
         This is the posterior distribution object to use on the layer
-        intercept. It must have parameters compatible with ``(output_dim,)``
-        shaped weights. This ignores the ``use_bias`` parameters.
-        See ``distributions.norm_posterior``.
+        intercept. It must have parameters compatible with (output_dim,) shaped
+        weights. This ignores the ``use_bias`` parameters.  See also
+        ``distributions.norm_posterior``.
 
     """
 
@@ -416,7 +540,22 @@ class DenseVariational(SampleLayer3):
         self.qb = post_b
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         n_samples, input_dim = self.get_X_dims(X)
 
         # Layer weights
@@ -498,20 +637,21 @@ class EmbedVariational(DenseVariational):
     n_categories : int
         the number of categories in the input variable
     reg : float
-        the initial value of the weight prior, w ~ N(0, reg * I), this is
-        optimized (a la maximum likelihood type II)
+        the initial value of the weight prior, which defaults to
+        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{reg} \mathbf{I})`,
+        this is optimized (a la maximum likelihood type II).
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
-    prior_W : {Normal, Gaussian}, optional
+    prior_W : distributions.Normal, distributions.Gaussian, optional
         This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with ``(input_dim, output_dim)`` shaped
+        must have parameters compatible with (input_dim, output_dim) shaped
         weights. This ignores the ``reg`` parameter.
-    post_W : {Normal, Gaussian}, optional
+    post_W : distributions.Normal, distributions.Gaussian, optional
         This is the posterior distribution object to use on the layer weights.
-        It must have parameters compatible with ``(input_dim, output_dim)``
-        shaped weights. This ignores the ``full`` parameter. See
+        It must have parameters compatible with (input_dim, output_dim) shaped
+        weights. This ignores the ``full`` parameter. See also
         ``distributions.gaus_posterior``.
 
     """
@@ -528,7 +668,22 @@ class EmbedVariational(DenseVariational):
         self.qW = post_W
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         n_samples, input_dim = self.get_X_dims(X)
 
         assert input_dim == 1, "X must be a *column* of indices!"
@@ -556,9 +711,11 @@ class DenseMAP(SampleLayer):
     output_dim : int
         the dimension of the output of this layer
     l1_reg : float
-        the value of the l1 weight regularizer, reg * ||w||_1
+        the value of the l1 weight regularizer,
+        :math:`\text{l1_reg} \times \|\mathbf{W}\|_1`
     l2_reg : float
-        the value of the l2 weight regularizer, reg * 0.5 * ||w||^2_2
+        the value of the l2 weight regularizer,
+        :math:`\frac{1}{2} \text{l2_reg} \times \|\mathbf{W}\|^2_2`
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
 
@@ -572,7 +729,22 @@ class DenseMAP(SampleLayer):
         self.use_bias = use_bias
 
     def _build(self, X):
-        """Build the graph of this layer."""
+        """Build the graph of this layer.
+
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
+
+        """
         n_samples, input_shape = self.get_X_dims(X)
 
         Wdim = tuple(input_shape) + (self.output_dim,)
@@ -601,7 +773,7 @@ class DenseMAP(SampleLayer):
 #
 
 def _l1_loss(X):
-    """Calculate the L1 loss, |X|."""
+    r"""Calculate the L1 loss of X, :math:`\|X\|_1`."""
     l1 = tf.reduce_sum(tf.abs(X))
     return l1
 

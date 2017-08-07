@@ -10,14 +10,16 @@ from aboleth.distributions import Normal
 class LayerOp:
     r"""Base class for an operation on Layers that return new layers.
 
-    The functions can take ``X`` or ``**kwargs``. In the latter case they can
-    pull from this dictionary as required. This is intended to work on any
-    Layer or MultiLayer type.
+    The layer functions can take a Tensor or ``**kwargs``. In the latter case
+    they can pull from this dictionary as required. This is intended to work on
+    any layers.Layer or layers.MultiLayer type (See :ref:`layers`).
 
     Parameters
     ----------
     layers : [callable]
-        The layers to compose.
+        The layers to operate on, these layers must return a return signature
+        ``f(Tensor or **kwargs) -> (Tensor, Tensor or float)`` like
+        layers.Layers.
 
     """
 
@@ -26,7 +28,7 @@ class LayerOp:
         self.layers = layers
 
     def __call__(self, X=None, **kwargs):
-        """This calls the graph building method (with extra checking).
+        """Call the graph building method (with extra checking).
 
         See: _build
 
@@ -38,20 +40,22 @@ class LayerOp:
         return Net, KL
 
     def _build(self, **kwargs):
-        """Build the LayerOp graph, this can take ``**kwargs`` or ``X``."""
+        """Build the LayerOp graph, this can take ``**kwargs`` or a Tensor."""
         raise NotImplementedError("Abstract base class for layer operations!")
 
 
 class Stack(LayerOp):
     r"""Stack multiple layers together (function composition).
 
-    When called stack(f, g) stack returns h(.) = g(f(.)), ie the functions
-    will be evaluated on the input in order from left to right in the call.
+    When called ``stack(f, g)`` stack returns ``h(.) = g(f(.))``, i.e. the
+    functions will be evaluated on the input in order from left to right in the
+    call.
 
     Parameters
     ----------
     layers : [callable]
         The layers to compose.
+
     """
 
     def __init__(self, *layers):
@@ -60,7 +64,7 @@ class Stack(LayerOp):
         self.stack = reduce(_stack2, layers)  # foldl
 
     def _build(self, **kwargs):
-        """Build the stack, this can take ``**kwargs`` or ``X``."""
+        """Build the stack, this can take ``**kwargs`` or a Tensor."""
         Net, KL = self.stack(**kwargs)
         return Net, KL
 
@@ -68,9 +72,9 @@ class Stack(LayerOp):
 class Concat(LayerOp):
     r"""Concatenate multiple layers by concatenating their outputs.
 
-    The functions can take ``X`` or ``**kwargs``. In the latter case they can
-    pull from this dictionary as required. This is intended to work on any
-    Layer or MultiLayer type.
+    The functions can take a Tensor or ``**kwargs``. In the latter case they
+    can pull from this dictionary as required. This is intended to work on any
+    layers.Layer or layers.MultiLayer type (See :ref:`layers`).
 
     Parameters
     ----------
@@ -80,7 +84,7 @@ class Concat(LayerOp):
     """
 
     def _build(self, **kwargs):
-        """Build the concatenation, this can take ``**kwargs`` or ``X``."""
+        """Build the concatenation, this can take ``**kwargs`` or a Tensor."""
         tensors, losses = zip(*map(lambda l: l(**kwargs), self.layers))
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
@@ -90,19 +94,20 @@ class Concat(LayerOp):
 class Add(LayerOp):
     r"""Concatenate multiple layers by adding their outputs.
 
-    Similar to concatenate, the functions must take (only) ``**kwargs``. The
-    outputs of the functions will be added element-wise. Intended to work
-    on input layers or layers composed with input layers.
+    The functions can take a  Tensor or ``**kwargs``. In the latter case they
+    can pull from this dictionary as required. The outputs of the functions
+    will be added element-wise. This is intended to work on any layers.Layer or
+    layers.MultiLayer type (See :ref:`layers`).
 
     Parameters
     ----------
     layers : [callable]
-        The layers to concatenate.
+        The layers to add.
 
     """
 
     def _build(self, **kwargs):
-        """Build the add operation, this can take ``**kwargs`` or ``X``."""
+        """Build the add operation, this can take ``**kwargs`` or a Tensor."""
         tensors, losses = zip(*map(lambda l: l(**kwargs), self.layers))
         result = tf.add_n(tensors)
         loss = tf.add_n(losses)
@@ -112,11 +117,11 @@ class Add(LayerOp):
 class SliceCat(LayerOp):
     r"""Concatenate multiple layers with sliced inputs.
 
-    Each layer will recieve a slice along the last axis of the input to the
-    new function. In other words, slicecat(l1, l2)(X) will call
-    l1(X[..., 0]) and l2(X[..., 1]) then concatenate their outputs into a
-    single tensor. This is mostly useful for simplifying embedding multiple
-    categorical inputs that are stored columnwise in the same 2D tensor.
+    Each layer will recieve a slice along the last axis of the input to the new
+    function. In other words, ``slicecat(l1, l2)(X)`` will call ``l1(X[..., 0])
+    and l2(X[..., 1])`` then concatenate their outputs into a single tensor.
+    This is mostly useful for simplifying embedding multiple categorical inputs
+    that are stored columnwise in the same 2D tensor.
 
     This function assumes the tensor being provided is 3D.
 
@@ -124,15 +129,6 @@ class SliceCat(LayerOp):
     ----------
     layers : [callable]
         The layers to concatenate. Supports layers with a single argument only.
-
-    Returns
-    -------
-    slicefunc : callable
-        A layer function of the concatenated input layers, that will take
-        an single 3D tensor as input of size (-1, -1, n) where n is the number
-        of input layers, and output a tensor of size (-1,-1,n) where each of
-        the kth < n  slice has been processed by the corresponding  kth layer
-        provided in input.
 
     """
 
@@ -149,7 +145,7 @@ class SliceCat(LayerOp):
 
 
 class ImputeOp(LayerOp):
-    r"""Impute operations are specialisations of Layer ops.
+    r"""Abstract Base Impute operation. These specialise LayerOps.
 
     They expect a data InputLayer and a mask InputLayer. They return layers in
     which the masked values have been imputed.
@@ -162,6 +158,7 @@ class ImputeOp(LayerOp):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form ``f(**kwargs)``.
+
     """
 
     def __init__(self, datalayer, masklayer):
@@ -204,6 +201,7 @@ class ImputeOp(LayerOp):
         -------
         X_imputed : Tensor
             a rank 2 Tensor with imputed data
+
         """
         raise NotImplementedError("Abstract base class for imputation ops!")
         X_imputed = None  # You imputation implementation
@@ -214,7 +212,7 @@ class MeanImpute(ImputeOp):
     r"""Impute the missing values using the stochastic mean of their column.
 
     Takes two layers, one the returns a data tensor and the other returns a
-    mask layer.  Returns a layer that returns a tensor in which the masked
+    mask layer. Returns a layer that returns a tensor in which the masked
     values have been imputed as the column means calculated from the batch.
 
     Parameters
@@ -240,6 +238,7 @@ class MeanImpute(ImputeOp):
         -------
         X_imputed : Tensor
             a rank 2 Tensor with imputed data
+
         """
         # Fill zeros in for missing data initially
         data_zeroed_missing_tf = X_2D * self.real_val_mask
@@ -306,6 +305,7 @@ class RandomGaussImpute(ImputeOp):
         -------
         X_imputed : Tensor
             a rank 2 Tensor with imputed data
+
         """
         # Fill zeros in for missing data initially
         data_zeroed_missing_tf = X_2D * self.real_val_mask

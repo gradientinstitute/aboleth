@@ -1,3 +1,5 @@
+.. _likelihoods:
+
 Likelihood models
 =================
 

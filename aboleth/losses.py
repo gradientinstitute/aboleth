@@ -15,16 +15,17 @@ def elbo(Net, Y, N, KL, likelihood, like_weights=None):
         the total size of the dataset (i.e. number of observations).
     likelihood : Tensor
         the likelihood model to use on the output of the last layer of the
-        neural net, see the ``likelihood`` module.
+        neural net, see the :ref:`likelihoods` module.
     like_weights : callable, ndarray, Tensor
-        weights to apply to each sample in the expected log likelihood. This
-        should be an array of shape (samples, 1) or can be called as
-        ``like_weights(Y)`` and should return a (samples, 1) array.
+        weights to apply to each observation in the expected log likelihood.
+        This should be an array of shape (N, 1) or can be called as
+        ``like_weights(Y)`` and should return a (N, 1) array.
 
     Returns
     -------
     elbo : Tensor
         the loss function of the Bayesian neural net.
+
     """
     B = N / tf.to_float(tf.shape(Net)[1])  # Batch amplification factor
     n_samples = tf.to_float(tf.shape(Net)[0])
