@@ -4,7 +4,7 @@ from .losses import elbo
 from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
                      DenseMAP, InputLayer, EmbedVariational, RandomFourier,
                      RandomArcCosine)
-from .ops import stack, concat, slicecat, add, mean_impute, gaussian_impute
+from .ops import Stack, Concat, Add, SliceCat, MeanImpute, RandomGaussImpute
 from .kernels import RBF, Matern
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
 from .util import (batch, pos, predict_expected, predict_samples,
@@ -33,12 +33,12 @@ __all__ = (
     'batch_prediction',
     'set_hyperseed',
     'InputLayer',
-    'stack',
-    'concat',
-    'add',
-    'slicecat',
-    'mean_impute',
-    'gaussian_impute',
+    'Stack',
+    'Add',
+    'Concat',
+    'SliceCat',
+    'MeanImpute',
+    'RandomGaussImpute',
     'RBF',
     'Matern'
 )

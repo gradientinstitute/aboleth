@@ -44,7 +44,7 @@ def test_stack(mocker):
     f = mocker.MagicMock()
     g = mocker.MagicMock()
     h = mocker.MagicMock()
-    ab.stack(f, g, h)
+    ab.Stack(f, g, h)
     mocked_reduce.assert_called_once_with(ab.ops._stack2, (f, g, h))
 
 
@@ -59,7 +59,7 @@ def test_stack_real():
     def h(X):
         return "h({})".format(X), 5.0
 
-    h = ab.stack(f, g, h)
+    h = ab.Stack(f, g, h)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -79,7 +79,7 @@ def test_concat(make_data):
     def g(**kwargs):
         return kwargs['Y'], 0.0
 
-    catlayer = ab.concat(f, g)
+    catlayer = ab.Concat(f, g)
 
     F, KL = catlayer(X=X, Y=X)
 
@@ -93,7 +93,7 @@ def test_concat(make_data):
 
 
 def test_slicecat(make_data):
-    """Test concatenation  of slices op."""
+    """Test concatenation of slices op."""
     x, _, X = make_data
 
     def make_idxlayer(i):
@@ -101,7 +101,7 @@ def test_slicecat(make_data):
             return X + i, float(i)
         return idlayer
 
-    catlayer = ab.slicecat(make_idxlayer(2), make_idxlayer(3))
+    catlayer = ab.SliceCat(make_idxlayer(2), make_idxlayer(3))
     F, KL = catlayer(X)
 
     tc = tf.test.TestCase()
@@ -125,7 +125,7 @@ def test_add(make_data):
     def g(**kwargs):
         return kwargs['Y'], 0.0
 
-    addlayer = ab.add(f, g)
+    addlayer = ab.Add(f, g)
 
     F, KL = addlayer(X=X, Y=X)
 
@@ -135,6 +135,59 @@ def test_add(make_data):
         orig = X.eval()
         assert forked.shape == orig.shape
         assert np.all(forked == 2 * orig)
+        assert KL.eval() == 0.0
+
+
+def test_resnet_multilayer_layer(make_data):
+    """Test we can make a resnet with an input using the current set of ops."""
+    # This also demonstrates how multi layers behave like layers
+    x, _, X = make_data
+
+    # This replicates the input layer behaviour
+    def f(**kwargs):
+        return kwargs['X'], 0.0
+
+    # This replicates layer behaviour
+    def g(X):
+        return X, 0.0
+
+    l1 = ab.Stack(f, g)
+    l2 = ab.Stack(g, g)
+    l12 = ab.Stack(l1, l2)
+    short = ab.Add(l12, l1)  # short-circuit l2
+
+    F, KL = short(X=X)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        resnet = F.eval()
+        orig = X.eval()
+        assert resnet.shape == orig.shape
+        assert np.all(resnet == 2 * orig)
+        assert KL.eval() == 0.0
+
+
+def test_resnet_layer_layer(make_data):
+    """Test we can make a resnet using the current set of ops."""
+    x, _, X = make_data
+
+    # This replicates layer behaviour
+    def f(X):
+        return X, 0.0
+
+    l1 = ab.Stack(f, f)
+    l2 = ab.Stack(f, f)
+    l12 = ab.Stack(l1, l2)
+    short = ab.Add(l12, l1)  # short-circuit l2
+
+    F, KL = short(X)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        resnet = F.eval()
+        orig = X.eval()
+        assert resnet.shape == orig.shape
+        assert np.all(resnet == 2 * orig)
         assert KL.eval() == 0.0
 
 
@@ -149,7 +202,7 @@ def test_mean_impute(make_missing_data):
     def mask_layer(**kwargs):
         return kwargs['M'], 0.0
 
-    impute = ab.mean_impute(data_layer, mask_layer)
+    impute = ab.MeanImpute(data_layer, mask_layer)
 
     F, KL = impute(X=X, M=m)
 
@@ -161,10 +214,9 @@ def test_mean_impute(make_missing_data):
         assert KL.eval() == 0.0
 
 
-def test_gaussian_impute(make_missing_data):
+def test_random_gaussian_impute(make_missing_data):
     """Test the impute_mean."""
-    RSEED=100
-    ab.set_hyperseed(RSEED)
+    ab.set_hyperseed(100)
     _, m, X = make_missing_data
 
     # This replicates the input layer behaviour
@@ -177,7 +229,8 @@ def test_gaussian_impute(make_missing_data):
     n, N, D = X.shape
     mean_array = 2 * np.ones(D).astype(np.float32)
     var_array = 0.001 * np.ones(D).astype(np.float32)
-    impute = ab.gaussian_impute(data_layer, mask_layer, mean_array, var_array)
+    impute = ab.RandomGaussImpute(data_layer, mask_layer, mean_array,
+                                  var_array)
 
     F, KL = impute(X=X, M=m)
 

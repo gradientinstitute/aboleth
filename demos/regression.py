@@ -37,7 +37,7 @@ lenscale = tf.Variable(1.)
 kern = ab.RBF(lenscale=ab.pos(lenscale))
 
 
-net = ab.stack(
+net = ab.Stack(
     ab.InputLayer(name="X", n_samples=n_samples),
     ab.RandomFourier(n_features=200, kernel=kern),
     ab.DenseVariational(output_dim=1, reg=reg, full=True)

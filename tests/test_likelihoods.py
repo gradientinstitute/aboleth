@@ -22,11 +22,11 @@ from aboleth.likelihoods import Normal, Bernoulli, Binomial, Categorical
      lambda x, f: ss.bernoulli.logpmf(x, p=f)),
 
 ])
-def test_log_likelihoods(likelihood):
+def test_log_likelihoods(likelihood, random):
 
     alike, rvs, logprob = likelihood
 
-    f = expit(np.random.randn(100).astype(np.float32))
+    f = expit(random.randn(100).astype(np.float32))
     x = rvs(f, size=100).astype(np.float32)
 
     tc = tf.test.TestCase()
@@ -39,11 +39,11 @@ def test_log_likelihoods(likelihood):
      lambda f, size: ss.multinomial.rvs(n=1, p=f, size=size),
      lambda x, f: ss.multinomial.logpmf(x, n=1, p=f)),
 ])
-def test_log_likelihoods_multitask(likelihood):
+def test_log_likelihoods_multitask(likelihood, random):
 
     alike, rvs, logprob = likelihood
 
-    f = expit(np.random.randn(100, 5))
+    f = expit(random.randn(100, 5))
     f /= np.sum(f, axis=-1).reshape(-1, 1)  # normalize
     f = f.astype(np.float32)
 

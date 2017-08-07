@@ -7,7 +7,42 @@ import tensorflow as tf
 from aboleth.distributions import Normal
 
 
-def stack(*layers):
+class LayerOp:
+    """Base class for an operation on Layers that return new layers.
+
+    The functions can take ``X`` or ``**kwargs``. In the latter case they can
+    pull from this dictionary as required. This is intended to work on any
+    Layer or MultiLayer type.
+
+    Parameters
+    ----------
+    layers : [callable]
+        The layers to compose.
+
+    """
+
+    def __init__(self, *layers):
+        """Template constructor for LayerOps."""
+        self.layers = layers
+
+    def __call__(self, X=None, **kwargs):
+        """This calls the graph building method (with extra checking).
+
+        See: _build
+
+        """
+        # Make this work for Layer and MultiLayer types
+        if X is not None:
+            kwargs.update({'X': X})
+        Net, KL = self._build(**kwargs)
+        return Net, KL
+
+    def _build(self, **kwargs):
+        """Build the LayerOp graph, this can take ``**kwargs`` or ``X``."""
+        raise NotImplementedError("Abstract base class for layer operations!")
+
+
+class Stack(LayerOp):
     """Stack multiple layers together (function composition).
 
     When called stack(f, g) stack returns h(.) = g(f(.)), ie the functions
@@ -16,45 +51,65 @@ def stack(*layers):
     Parameters
     ----------
     layers : [callable]
-        The layers to compose. The first layer can have multiple inputs.
-
-    Returns
-    -------
-    stackfunc : callable
-        A layer function of the stacked input layers.
-
+        The layers to compose.
     """
-    stackfunc = reduce(_stack2, layers)
-    return stackfunc
+
+    def __init__(self, *layers):
+        """Create an instance of a Stack operation."""
+        super().__init__(*layers)
+        self.stack = reduce(_stack2, layers)  # foldl
+
+    def _build(self, **kwargs):
+        """Build the stack, this can take ``**kwargs`` or ``X``."""
+        Net, KL = self.stack(**kwargs)
+        return Net, KL
 
 
-def concat(*layers):
+class Concat(LayerOp):
     """Concatenate multiple layers by concatenating their outputs.
 
-    The functions must all take (only) **kwargs. They can pull from
-    this dictionary as required. It is intended to work
-    on input layers, or functions composed with input layers.
+    The functions can take ``X`` or ``**kwargs``. In the latter case they can
+    pull from this dictionary as required. This is intended to work on any
+    Layer or MultiLayer type.
 
     Parameters
     ----------
     layers : [callable]
-        The layers to concatenate. Must be f(**kwargs).
-
-    Returns
-    -------
-    concatfunc : callable
-        A layer function of the concatenated input layers.
+        The layers to concatenate.
 
     """
-    def concatfunc(**kwargs):
-        tensors, losses = zip(*map(lambda l: l(**kwargs), layers))
+
+    def _build(self, **kwargs):
+        """Build the concatenation, this can take ``**kwargs`` or ``X``."""
+        tensors, losses = zip(*map(lambda l: l(**kwargs), self.layers))
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
         return result, loss
-    return concatfunc
 
 
-def slicecat(*layers):
+class Add(LayerOp):
+    """Concatenate multiple layers by adding their outputs.
+
+    Similar to concatenate, the functions must take (only) **kwargs. The
+    outputs of the functions will be added element-wise. Intended to work
+    on input layers or layers composed with input layers.
+
+    Parameters
+    ----------
+    layers : [callable]
+        The layers to concatenate.
+
+    """
+
+    def _build(self, **kwargs):
+        """Build the add operation, this can take ``**kwargs`` or ``X``."""
+        tensors, losses = zip(*map(lambda l: l(**kwargs), self.layers))
+        result = tf.add_n(tensors)
+        loss = tf.add_n(losses)
+        return result, loss
+
+
+class SliceCat(LayerOp):
     """Concatenate multiple layers with sliced inputs.
 
     Each layer will recieve a slice along the last axis of the input to the
@@ -80,42 +135,82 @@ def slicecat(*layers):
         provided in input.
 
     """
-    def slicefunc(X):
+
+    def _build(self, X):
+        """Build slice concatenation operation. ``X`` is a rank 3 Tensor."""
+        rank = len(X.shape)
+        assert rank == 3
+
         tensors, losses = zip(*[l(X[..., i:i + 1])
-                                for i, l in enumerate(layers)])
+                                for i, l in enumerate(self.layers)])
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
         return result, loss
-    return slicefunc
 
 
-def add(*layers):
-    """Concatenate multiple layers by adding their outputs.
+class ImputeOp(LayerOp):
+    """Impute operations are specialisations of Layer ops.
 
-    Similar to concatenate, the functions must take (only) **kwargs. The
-    outputs of the functions will be added element-wise. Intended to work
-    on input layers or layers composed with input layers.
+    They expect a data InputLayer and a mask InputLayer. They return layers in
+    which the masked values have been imputed.
 
     Parameters
     ----------
-    layers : [callable]
-        The layers to concatenate. Must be of form f(**kwargs).
+    datalayer : callable
+        A layer that returns a data tensor. Must be of form f(**kwargs).
 
-    Returns
-    -------
-    concatfunc : callable
-        A layer function that adds the outputs of its component layers.
-
+    masklayer : callable
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be of form f(**kwargs).
     """
-    def addfunc(**kwargs):
-        tensors, losses = zip(*map(lambda l: l(**kwargs), layers))
-        result = tf.add_n(tensors)
-        loss = tf.add_n(losses)
-        return result, loss
-    return addfunc
+
+    def __init__(self, datalayer, masklayer):
+        """Construct and instance of an ImputeOp operation."""
+        self.datalayer = datalayer
+        self.masklayer = masklayer
+
+    def _build(self, **kwargs):
+        """Build an impute operation graph, this needs ``**kwargs`` input."""
+        X_ND, loss1 = self.datalayer(**kwargs)
+        M, loss2 = self.masklayer(**kwargs)
+
+        rank = len(X_ND.shape)
+        assert rank == 3
+
+        # Identify indices of the missing datapoints
+        self.missing_ind = tf.where(M)
+        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+
+        # Map over the samples layer
+        Net = tf.map_fn(self._impute2D, X_ND)
+
+        loss = tf.add(loss1, loss2)
+        return Net, loss
+
+    def _impute2D(self, X_2D):
+        """Impute a rank 2 tensor.
+
+        This function is mapped over the rank 3 data tensors, additionally it
+        has access to two properties:
+        - ``self.missing_ind`` a row and column index of the missing data
+        - ``self.real_val_mask`` a tf.float32 mask of the non missing values
+
+        Parameters
+        ----------
+        X_2D : Tensor
+            a rank 2 Tensor with missing data
+
+        Returns
+        -------
+        X_imputed : Tensor
+            a rank 2 Tensor with imputed data
+        """
+        raise NotImplementedError("Abstract base class for imputation ops!")
+        X_imputed = None  # You imputation implementation
+        return X_imputed
 
 
-def mean_impute(datalayer, masklayer):
+class MeanImpute(ImputeOp):
     """Impute the missing values using the stochastic mean of their column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -124,61 +219,53 @@ def mean_impute(datalayer, masklayer):
 
     Parameters
     ----------
-    datalayer : [callable]
+    datalayer : callable
         A layer that returns a data tensor. Must be of form f(**kwargs).
 
-    masklayer : [callable]
+    masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form f(**kwargs).
 
-    Returns
-    -------
-    build_impute : callable
-        A layer function that imputes missing values using their column mean.
-
     """
-    def build_impute(**kwargs):
-        X_ND, loss1 = datalayer(**kwargs)
-        M, loss2 = masklayer(**kwargs)
 
-        # Identify indices of the missing datapoints
-        missing_ind = tf.where(M)
-        real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+    def _impute2D(self, X_2D):
+        """Mean impute a rank 2 tensor.
 
-        def mean_impute_2D(X_2D):
-            # Fill zeros in for missing data initially
-            data_zeroed_missing_tf = X_2D * real_val_mask
+        Parameters
+        ----------
+        X_2D : Tensor
+            a rank 2 Tensor with missing data
 
-            # Sum the real values in each column
-            col_tot = tf.reduce_sum(data_zeroed_missing_tf, 0)
+        Returns
+        -------
+        X_imputed : Tensor
+            a rank 2 Tensor with imputed data
+        """
+        # Fill zeros in for missing data initially
+        data_zeroed_missing_tf = X_2D * self.real_val_mask
 
-            # Divide column totals by the number of non-nan values
-            num_values_col = tf.reduce_sum(real_val_mask, 0)
-            num_values_col = tf.maximum(num_values_col,
-                                        tf.ones(tf.shape(num_values_col)))
-            col_nan_means = tf.div(col_tot, num_values_col)
+        # Sum the real values in each column
+        col_tot = tf.reduce_sum(data_zeroed_missing_tf, 0)
 
-            # Make an vector of the impute values for each missing point
-            imputed_vals = tf.gather(col_nan_means, missing_ind[:, 1])
+        # Divide column totals by the number of non-nan values
+        num_values_col = tf.reduce_sum(self.real_val_mask, 0)
+        num_values_col = tf.maximum(num_values_col,
+                                    tf.ones(tf.shape(num_values_col)))
+        col_nan_means = tf.div(col_tot, num_values_col)
 
-            # Fill the imputed values into the data tensor of zeros
-            shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
-            missing_imputed = tf.scatter_nd(missing_ind, imputed_vals,
-                                            shape)
+        # Make an vector of the impute values for each missing point
+        imputed_vals = tf.gather(col_nan_means, self.missing_ind[:, 1])
 
-            X_with_impute = data_zeroed_missing_tf + missing_imputed
+        # Fill the imputed values into the data tensor of zeros
+        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
 
-            return X_with_impute
+        X_with_impute = data_zeroed_missing_tf + missing_imputed
 
-        Net = tf.map_fn(mean_impute_2D, X_ND)
-
-        loss = tf.add(loss1, loss2)
-        return Net, loss
-
-    return build_impute
+        return X_with_impute
 
 
-def gaussian_impute(datalayer, masklayer, mu_array, var_array):
+class RandomGaussImpute(ImputeOp):
     """Impute the missing values using the marginal gaussians over each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -187,10 +274,10 @@ def gaussian_impute(datalayer, masklayer, mu_array, var_array):
 
     Parameters
     ----------
-    datalayer : [callable]
+    datalayer : callable
         A layer that returns a data tensor. Must be of form f(**kwargs).
 
-    masklayer : [callable]
+    masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form f(**kwargs).
 
@@ -200,56 +287,47 @@ def gaussian_impute(datalayer, masklayer, mu_array, var_array):
     var_array : array-like
         A list of the global variance of each data column
 
-    Returns
-    -------
-    build_impute : callable
-        A layer function that imputes missing values using their draws from
-        user-provided Gaussians mean.
-
     """
-    def build_impute(**kwargs):
-        X_ND, loss1 = datalayer(**kwargs)
-        M, loss2 = masklayer(**kwargs)
-        input_dim = int(X_ND.shape[2])
 
-        assert(len(mu_array) == input_dim)
-        assert(len(var_array) == input_dim)
+    def __init__(self, datalayer, masklayer, mu_array, var_array):
+        """Construct and instance of a RandomGaussImpute operation."""
+        super().__init__(datalayer, masklayer)
+        self.normal_array = [Normal(m, v) for m, v in zip(mu_array, var_array)]
 
-        normal_array = [Normal(m, v) for m, v in zip(mu_array, var_array)]
+    def _impute2D(self, X_2D):
+        """Randomly impute a rank 2 tensor.
 
-        # Identify indices of the missing datapoints
-        missing_ind = tf.where(M)
-        real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+        Parameters
+        ----------
+        X_2D : Tensor
+            a rank 2 Tensor with missing data
 
-        def gauss_impute_2D(X_2D):
-            # Fill zeros in for missing data initially
-            data_zeroed_missing_tf = X_2D * real_val_mask
+        Returns
+        -------
+        X_imputed : Tensor
+            a rank 2 Tensor with imputed data
+        """
+        # Fill zeros in for missing data initially
+        data_zeroed_missing_tf = X_2D * self.real_val_mask
 
-            # Divide column totals by the number of non-nan values
-            col_draws = [n.sample() for n in normal_array]
-            # Make an vector of the impute values for each missing point
-            imputed_vals = tf.gather(col_draws, missing_ind[:, 1])
+        # Divide column totals by the number of non-nan values
+        col_draws = [n.sample() for n in self.normal_array]
+        # Make an vector of the impute values for each missing point
+        imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])
 
-            # Fill the imputed values into the data tensor of zeros
-            shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
-            missing_imputed = tf.scatter_nd(missing_ind, imputed_vals,
-                                            shape)
+        # Fill the imputed values into the data tensor of zeros
+        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
 
-            X_with_impute = data_zeroed_missing_tf + missing_imputed
+        X_with_impute = data_zeroed_missing_tf + missing_imputed
 
-            return X_with_impute
-
-        Net = tf.map_fn(gauss_impute_2D, X_ND)
-
-        loss = tf.add(loss1, loss2)
-        return Net, loss
-
-    return build_impute
+        return X_with_impute
 
 
 #
 # Private utility functions
 #
+
 def _stack2(layer1, layer2):
     """Stack 2 functions, by composing w.r.t tensor, adding w.r.t losses."""
     def stackfunc(**kwargs):
