@@ -1,5 +1,6 @@
 """Random kernel classes for use with the RandomKernel layers."""
 import numpy as np
+import tensorflow as tf
 
 from aboleth.random import seedgen
 
@@ -24,11 +25,13 @@ class ShiftInvariant:
         """Constuct a shift invariant kernel object."""
         self.lenscale = lenscale
 
-    def weights(self, input_dim, n_features):
+    def weights(self, n_samples, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
 
         Parameters
         ----------
+        n_samples : int
+            the number of random samples for stochastic variational bayes.
         input_dim : int
             the input dimension to this layer.
         n_features : int
@@ -39,7 +42,7 @@ class ShiftInvariant:
         -------
         P : ndarray
             the random weights of the fourier features of shape
-            ``(input_dim, n_features)``.
+            ``(n_samples, input_dim, n_features)``.
 
         """
         raise NotImplementedError("Abstract base class for shift invariant"
@@ -58,11 +61,13 @@ class RBF(ShiftInvariant):
 
     """
 
-    def weights(self, input_dim, n_features):
+    def weights(self, n_samples, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
 
         Parameters
         ----------
+        n_samples : int
+            the number of random samples for stochastic variational bayes.
         input_dim : int
             the input dimension to this layer.
         n_features : int
@@ -73,12 +78,14 @@ class RBF(ShiftInvariant):
         -------
         P : ndarray
             the random weights of the fourier features of shape
-            ``(input_dim, n_features)``.
+            ``(n_samples, input_dim, n_features)``.
 
         """
         rand = np.random.RandomState(next(seedgen))
         P = rand.randn(input_dim, n_features).astype(np.float32)
-        return P / self.lenscale
+        P = P / self.lenscale
+        Ps = _tile_weights(n_samples, P)
+        return Ps
 
 
 class Matern(ShiftInvariant):
@@ -98,11 +105,13 @@ class Matern(ShiftInvariant):
         super().__init__(lenscale)
         self.p = p
 
-    def weights(self, input_dim, n_features):
+    def weights(self, n_samples, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
 
         Parameters
         ----------
+        n_samples : int
+            the number of random samples for stochastic variational bayes.
         input_dim : int
             the input dimension to this layer.
         n_features : int
@@ -113,7 +122,7 @@ class Matern(ShiftInvariant):
         -------
         P : ndarray
             the random weights of the fourier features of shape
-            ``(input_dim, n_features)``.
+            ``(n_samples, input_dim, n_features)``.
 
         """
         # p is the matern number (v = p + .5) and the two is a transformation
@@ -129,6 +138,15 @@ class Matern(ShiftInvariant):
         rand = np.random.RandomState(next(seedgen))
         y = rand.randn(input_dim, n_features)
         u = rand.chisquare(df, size=(n_features,))
-        P = y * np.sqrt(df / u)
-        P = P.astype(np.float32)
-        return P / self.lenscale
+        P = (y * np.sqrt(df / u)).astype(np.float32) / self.lenscale
+        Ps = _tile_weights(n_samples, P)
+        return Ps
+
+
+#
+# Private module utilities
+#
+
+def _tile_weights(n_samples, P):
+    Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
+    return Ps

@@ -16,5 +16,5 @@ def test_shift_invariant_kernels(kernels, make_data):
     k = kern(D, **p)
 
     # Check dim
-    P = k.weights(input_dim=d, n_features=D)
-    assert P.shape == (d, D)
+    P = k.weights(1, input_dim=d, n_features=D)
+    assert P.shape == (1, d, D)

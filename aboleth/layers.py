@@ -2,6 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
+from aboleth.kernels import RBF
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
@@ -392,23 +393,25 @@ class RandomFourier(SampleLayer3):
             layer.
 
         """
+        # Random weights
         n_samples, input_dim = self.get_X_dims(X)
-
-        # Random weights, copy faster than map here
-        P = self.kernel.weights(input_dim, self.n_features)
-        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
+        Ps = self.kernel.weights(n_samples, input_dim, self.n_features)
+        KL = 0.
 
         # Random features
         XP = tf.matmul(X, Ps)
+        Net = self._transformation(XP)
+        return Net, KL
+
+    def _transformation(self, XP):
+        """Build the kernel feature space transformation."""
         real = tf.cos(XP)
         imag = tf.sin(XP)
         Net = tf.concat([real, imag], axis=-1) / np.sqrt(self.n_features)
-        KL = 0.
-
-        return Net, KL
+        return Net
 
 
-class RandomArcCosine(SampleLayer3):
+class RandomArcCosine(RandomFourier):
     r"""Random arc-cosine kernel layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
@@ -442,6 +445,7 @@ class RandomArcCosine(SampleLayer3):
 
     def __init__(self, n_features, lenscale=1.0, p=1):
         """Create an instance of an arc cosine kernel layer."""
+        super().__init__(n_features=n_features, kernel=RBF(lenscale=lenscale))
         assert isinstance(p, int) and p >= 0
         if p == 0:
             self.pfunc = tf.sign
@@ -450,40 +454,10 @@ class RandomArcCosine(SampleLayer3):
         else:
             self.pfunc = lambda x: tf.pow(x, p)
 
-        self.n_features = n_features
-        self.lenscale = lenscale
-
-    def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        n_samples, input_dim = self.get_X_dims(X)
-
-        # Random weights
-        rand = np.random.RandomState(next(seedgen))
-        P = rand.randn(input_dim, self.n_features).astype(np.float32) \
-            / self.lenscale
-        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
-
-        # Random features
-        XP = tf.matmul(X, Ps)
+    def _transformation(self, XP):
+        """Build the kernel feature space transformation."""
         Net = np.sqrt(2. / self.n_features) * tf.nn.relu(self.pfunc(XP))
-        KL = 0.
-
-        return Net, KL
+        return Net
 
 
 #
