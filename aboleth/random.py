@@ -1,9 +1,9 @@
-"""Random State."""
+"""Random generators and state."""
 import numpy as np
 
 
 class SeedGenerator:
-    """Make new random seeds deterministically from a base random seed."""
+    r"""Make new random seeds deterministically from a base random seed."""
 
     def __init__(self):
         """Construct a SeedGenerator object."""
@@ -42,7 +42,7 @@ seedgen = SeedGenerator()
 
 
 def set_hyperseed(hs):
-    """Set the global hyperseed from which to generate all other seeds.
+    r"""Set the global hyperseed from which to generate all other seeds.
 
     Parameters
     ----------
@@ -51,3 +51,40 @@ def set_hyperseed(hs):
         numpy.random.RandomState for valid inputs.
     """
     seedgen.set_hyperseed(hs)
+
+
+def endless_permutations(N):
+    r"""
+    Generate an endless sequence of permutations of the set [0, ..., N).
+
+    If we call this N times, we will sweep through the entire set without
+    replacement, on the (N+1)th call a new permutation will be created, etc.
+
+    Parameters
+    ----------
+    N: int
+        the length of the set
+
+    Yields
+    ------
+    int :
+        yeilds a random int from the set [0, ..., N)
+
+    Examples
+    -------
+    >>> perm = endless_permutations(5)
+    >>> type(perm)
+    <class 'generator'>
+    >>> p = next(perm)
+    >>> p < 5
+    True
+    >>> p2 = next(perm)
+    >>> p2 != p
+    True
+    """
+    generator = np.random.RandomState(next(seedgen))
+
+    while True:
+        batch_inds = generator.permutation(N)
+        for b in batch_inds:
+            yield b

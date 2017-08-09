@@ -13,11 +13,8 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
-import os
-import shlex
-
 import aboleth
+
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -123,6 +120,11 @@ pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+
+# Autodoc options
+autodoc_default_flags = ['members', 'undoc-members', 'private-members',
+                         'inherited-members', 'show-inheritance']
 
 
 # -- Options for HTML output ----------------------------------------------

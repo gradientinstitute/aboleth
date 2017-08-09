@@ -2,15 +2,15 @@
 import tensorflow as tf
 import numpy as np
 
-from aboleth.random import seedgen
+from aboleth.random import endless_permutations
 
 
 def pos(X, minval=1e-15):
-    """Constrain a ``tf.Variable`` to be positive only.
+    r"""Constrain a ``tf.Variable`` to be positive only.
 
     At the moment this is implemented as:
 
-        :math:`max(|X|, minval)`
+        :math:`\max(|\mathbf{X}|, \text{minval})`
 
     This is fast and does not result in vanishing gradients, but will lead to
     non-smooth gradients and more local minima. In practice we haven't noticed
@@ -36,6 +36,7 @@ def pos(X, minval=1e-15):
     ...     xp = Xp.eval()
     >>> xp
     array([  1.00000000e+00,   1.00000000e+00,   1.00000000e-15])
+
     """
     # Other alternatives could be:
     # Xp = tf.exp(X)  # Medium speed, but gradients tend to explode
@@ -45,8 +46,7 @@ def pos(X, minval=1e-15):
 
 
 def batch(feed_dict, batch_size, n_iter=10000, N_=None):
-    """
-    Create random batches for Stochastic gradients.
+    r"""Create random batches for Stochastic gradients.
 
     Feed dict data generator for SGD that will yeild random batches for a
     a defined number of iterations, which can be infinite. This generator makes
@@ -72,6 +72,7 @@ def batch(feed_dict, batch_size, n_iter=10000, N_=None):
         with each element an array length ``batch_size``, i.e. a subset of
         data, and an element for ``N_``. Use this as your feed-dict when
         evaluating a loss, training, etc.
+
     """
     N = __data_len(feed_dict)
     perms = endless_permutations(N)
@@ -87,8 +88,7 @@ def batch(feed_dict, batch_size, n_iter=10000, N_=None):
 
 
 def batch_prediction(feed_dict, batch_size):
-    """
-    Split the data in a feed_dict into contiguous batches for prediction.
+    r"""Split the data in a feed_dict into contiguous batches for prediction.
 
     Parameters
     ----------
@@ -101,8 +101,8 @@ def batch_prediction(feed_dict, batch_size):
     Yields
     ------
     ndarray :
-        an array of shape (approx_batch_size_,) of indices into the original
-        data for the current batch
+        an array of shape approximately (``batch_size``,) of indices into the
+        original data for the current batch
     dict :
         with each element an array length ``batch_size``, i.e. a subset of
         data, and an element for ``N_``. Use this as your feed-dict when
@@ -112,6 +112,7 @@ def batch_prediction(feed_dict, batch_size):
     ----
     The exact size of the batch may not be ``batch_size``, but the nearest size
     that splits the size of the data most evenly.
+
     """
     N = __data_len(feed_dict)
     n_batches = max(np.round(N / batch_size), 1)
@@ -122,45 +123,8 @@ def batch_prediction(feed_dict, batch_size):
         yield ind, batch_dict
 
 
-def endless_permutations(N):
-    """
-    Generate an endless sequence of permutations of the set [0, ..., N).
-
-    If we call this N times, we will sweep through the entire set without
-    replacement, on the (N+1)th call a new permutation will be created, etc.
-
-    Parameters
-    ----------
-    N: int
-        the length of the set
-
-    Yields
-    ------
-    int :
-        yeilds a random int from the set [0, ..., N)
-
-    Examples
-    -------
-    >>> perm = endless_permutations(5)
-    >>> type(perm)
-    <class 'generator'>
-    >>> p = next(perm)
-    >>> p < 5
-    True
-    >>> p2 = next(perm)
-    >>> p2 != p
-    True
-    """
-    generator = np.random.RandomState(next(seedgen))
-
-    while True:
-        batch_inds = generator.permutation(N)
-        for b in batch_inds:
-            yield b
-
-
 def predict_samples(predictor, feed_dict, n_groups=1, session=None):
-    """A helper for getting samples from a predictor.
+    r"""Help to get samples from a predictor.
 
     Parameters
     ----------
@@ -185,6 +149,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
     Note
     ----
     This has to be called in an *active* tensorflow session!
+
     """
     pred = [predictor.eval(feed_dict=feed_dict, session=session)
             for _ in range(n_groups)]
@@ -193,7 +158,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
 
 
 def predict_expected(predictor, feed_dict, n_groups=1, session=None):
-    """A helper for getting the expected value from a predictor.
+    r"""Help to get the expected value from a predictor.
 
     Parameters
     ----------
@@ -219,6 +184,7 @@ def predict_expected(predictor, feed_dict, n_groups=1, session=None):
     Note
     ----
     This has to be called in an *active* tensorflow session!
+
     """
     pred = 0
     for _ in range(n_groups):

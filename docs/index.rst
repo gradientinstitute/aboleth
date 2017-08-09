@@ -7,21 +7,25 @@ Documentation Contents
    :maxdepth: 2
 
    installation
-   usage
+   quickstart
    authors
 
-   model
-   layer
-   likelihood
+   losses
+   layers
+   ops
+   kernels
+   likelihoods
    distributions
+   random
    util
+   datasets
 
 
 Feedback
 --------
 
 If you have any suggestions or questions about **Aboleth** feel free to email
-us at lachlan.mccalman@data61.csiro.au.
+us at lachlan.mccalman@data61.csiro.au or daniel.steinberg@data61.csiro.au.
 
 If you encounter any errors or problems with **Aboleth**, please let us know!
 Open an Issue at the GitHub http://github.com/determinant-io/aboleth main

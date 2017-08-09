@@ -1,17 +1,17 @@
-Credits
+Authors
 =======
 
 Development Leads
 -----------------
 
-Daniel Steinberg
-Lachlan McCalman
-Louis Tiao
+* Daniel Steinberg
+* Lachlan McCalman
+* Louis Tiao
 
 
 Contributors
 ------------
 
-Simon O'Callaghan
-Alistair Reid
-Joyce Wang
+* Simon O'Callaghan
+* Alistair Reid
+* Joyce Wang

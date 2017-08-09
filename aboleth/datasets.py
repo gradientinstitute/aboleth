@@ -14,7 +14,7 @@ DEFAULT_DATA_PATH = os.path.join(os.path.dirname(__file__), '../data/')
 
 def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, xmin=-10,
              xmax=10):
-    """Generate a random (noisy) draw from a Gaussian Process.
+    r"""Generate a random (noisy) draw from a Gaussian Process.
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def gp_draws(ntrain, ntest, kern=RBF(length_scale=0.5), noise=0.1, xmin=-10,
 
 
 def fetch_gpml_sarcos_data():
-    """Fetch the SARCOS dataset.
+    r"""Fetch the SARCOS dataset.
 
     Fetch the SARCOS dataset from the internet and parse appropriately into
     python arrays

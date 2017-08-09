@@ -30,9 +30,10 @@ class Normal(ParameterDistribution):
     Parameters
     ----------
     mu : Tensor
-        mean, shape [d_i, d_o]
+        mean, shape (d_in, d_out)
     var : Tensor
-        variance, shape [d_i, d_o]
+        variance, shape (d_in, d_out)
+
     """
 
     def __init__(self, mu=0., var=1.):
@@ -43,7 +44,14 @@ class Normal(ParameterDistribution):
         self.d = tf.shape(mu)
 
     def sample(self):
-        """Draw a random sample from this object."""
+        """Draw a random sample from this object.
+
+        Returns
+        -------
+        x : Tensor
+            a sample of shape (d_in, d_out).
+
+        """
         # Reparameterisation trick
         e = tf.random_normal(self.d, seed=next(seedgen))
         x = self.mu + e * self.sigma
@@ -57,9 +65,10 @@ class Gaussian(ParameterDistribution):
     Parameters
     ----------
     mu : Tensor
-        mean, shape [d_i, d_o]
+        mean, shape (d_in, d_out)
     L : Tensor
-        Cholesky of the covariance matrix, shape [d_o, d_i, d_i]
+        Cholesky of the covariance matrix, shape (d_out, d_in, d_in)
+
     """
 
     def __init__(self, mu, L):
@@ -69,7 +78,14 @@ class Gaussian(ParameterDistribution):
         self.d = tf.shape(mu)
 
     def sample(self):
-        """Construct a Normal distribution object."""
+        """Draw a random sample from this object.
+
+        Returns
+        -------
+        x : Tensor
+            a sample of shape (d_in, d_out).
+
+        """
         # Reparameterisation trick
         mu = self.transform_w(self.mu)
         e = tf.random_normal(tf.shape(mu), seed=next(seedgen))
@@ -78,13 +94,13 @@ class Gaussian(ParameterDistribution):
 
     @staticmethod
     def transform_w(w):
-        """Transform a weight matrix, [d_i, d_o] -> [d_o, d_i, 1]."""
+        """Transform a weight matrix, (d_in, d_out) -> (d_out, d_in, 1)."""
         wt = tf.expand_dims(tf.transpose(w), 2)  # O x I x 1
         return wt
 
     @staticmethod
     def itransform_w(wt):
-        """Un-transform a weight matrix, [d_o, d_i, 1] -> [d_i, d_o]."""
+        """Un-transform a weight matrix, (d_out, d_in, 1) -> (d_in, d_out)."""
         w = tf.transpose(wt[:, :, 0])
         return w
 
@@ -105,8 +121,9 @@ def norm_prior(dim, var):
 
     Returns
     -------
-    Q : Normal
+    P : Normal
         the initialised prior Normal object.
+
     """
     mu = tf.zeros(dim)
     var = pos(tf.Variable(var, name="W_mu_p"))
@@ -128,6 +145,7 @@ def norm_posterior(dim, var0):
     -------
     Q : Normal
         the initialised posterior Normal object.
+
     """
     mu_0 = tf.random_normal(dim, stddev=np.sqrt(var0), seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
@@ -156,6 +174,7 @@ def gaus_posterior(dim, var0):
     -------
     Q : Gaussian
         the initialised posterior Gaussian object.
+
     """
     I, O = dim
     sig0 = np.sqrt(var0)
@@ -195,6 +214,7 @@ def kl_qp(q, p):
     -------
     KL : Tensor
         the result of KL[q||p].
+
     """
     KL = 0.5 * (tf.log(p.var) - tf.log(q.var) + q.var / p.var - 1. +
                 (q.mu - p.mu)**2 / p.var)
@@ -217,6 +237,7 @@ def kl_qp(q, p):
     -------
     KL : Tensor
         the result of KL[q||p].
+
     """
     D, n = tf.to_float(q.d[0]), tf.to_float(q.d[1])
     tr = tf.reduce_sum(q.L * q.L) / p.var
@@ -241,6 +262,7 @@ def kl_qp(q, p):
     -------
     KL : Tensor
         the result of KL[q||p].
+
     """
     D, n = tf.to_float(q.d[0]), tf.to_float(q.d[1])
     qCipC = tf.cholesky_solve(p.L, tf.matmul(q.L, q.L, transpose_b=True))
@@ -257,7 +279,7 @@ def kl_qp(q, p):
 #
 
 def _chollogdet(L):
-    """Log det of a cholesky, where L is [..., D, D]."""
+    """Log det of a cholesky, where L is (..., D, D)."""
     l = tf.maximum(tf.matrix_diag_part(L), 1e-15)  # Make sure we don't go to 0
     logdet = 2. * tf.reduce_sum(tf.log(l))
     return logdet
