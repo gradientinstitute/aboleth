@@ -196,6 +196,7 @@ def test_sample_layer_input_exception(layer_args, make_data):
 
 @pytest.mark.parametrize('kernels', [
     (ab.RBF, {}),
+    # (ab.RBFVariational, {}),
     (ab.Matern, {'p': 1}),
     (ab.Matern, {'p': 2})
 ])

@@ -395,7 +395,8 @@ class RandomFourier(SampleLayer3):
         """
         # Random weights
         n_samples, input_dim = self.get_X_dims(X)
-        Ps, KL = self.kernel.weights(n_samples, input_dim, self.n_features)
+        P, KL = self.kernel.weights(input_dim, self.n_features)
+        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
         XP = tf.matmul(X, Ps)

@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from aboleth.random import seedgen
-from aboleth.distributions import norm_prior, norm_posterior, kl_qp
+from aboleth.distributions import Normal, norm_posterior, kl_qp
 
 
 #
@@ -26,13 +26,11 @@ class ShiftInvariant:
         """Constuct a shift invariant kernel object."""
         self.lenscale = lenscale
 
-    def weights(self, n_samples, input_dim, n_features):
+    def weights(self, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
 
         Parameters
         ----------
-        n_samples : int
-            the number of random samples for stochastic variational bayes.
         input_dim : int
             the input dimension to this layer.
         n_features : int
@@ -43,7 +41,7 @@ class ShiftInvariant:
         -------
         P : ndarray
             the random weights of the fourier features of shape
-            ``(n_samples, input_dim, n_features)``.
+            ``(input_dim, n_features)``.
         KL : Tensor, float
             the KL penalty associated with the parameters in this kernel.
 
@@ -64,13 +62,11 @@ class RBF(ShiftInvariant):
 
     """
 
-    def weights(self, n_samples, input_dim, n_features):
+    def weights(self, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
 
         Parameters
         ----------
-        n_samples : int
-            the number of random samples for stochastic variational bayes.
         input_dim : int
             the input dimension to this layer.
         n_features : int
@@ -81,20 +77,15 @@ class RBF(ShiftInvariant):
         -------
         P : ndarray
             the random weights of the fourier features of shape
-            ``(n_samples, input_dim, n_features)``.
+            ``(input_dim, n_features)``.
         KL : Tensor, float
             the KL penalty associated with the parameters in this kernel (0.0).
 
         """
         rand = np.random.RandomState(next(seedgen))
-        # FIXME should we be using MORE random draws from the priors instead of
-        # tiling?
-        P = rand.randn(input_dim, n_features).astype(np.float32)
-        # P = rand.randn(n_samples, input_dim, n_features).astype(np.float32)
-        P = P / self.lenscale
-        Ps = _tile_weights(n_samples, P)
-        return Ps, 0.
-        # return P, 0.
+        e = rand.randn(input_dim, n_features).astype(np.float32)
+        P = e / self.lenscale
+        return P, 0.
 
 
 class RBFVariational(ShiftInvariant):
@@ -112,13 +103,11 @@ class RBFVariational(ShiftInvariant):
 
     """
 
-    def weights(self, n_samples, input_dim, n_features):
+    def weights(self, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
 
         Parameters
         ----------
-        n_samples : int
-            the number of random samples for stochastic variational bayes.
         input_dim : int
             the input dimension to this layer.
         n_features : int
@@ -129,24 +118,29 @@ class RBFVariational(ShiftInvariant):
         -------
         P : ndarray
             the random weights of the fourier features of shape
-            ``(n_samples, input_dim, n_features)``.
+            ``(input_dim, n_features)``.
         KL : Tensor, float
             the KL penalty associated with the parameters in this kernel.
 
         """
-        var = 1. / self.lenscale**2
         dim = (input_dim, n_features)
-        pP = norm_prior(dim=dim, var=var)
-        # FIXME var0 should be the 1 / lenscale**2!
-        # FIXME why aren't we using lenscale as std?
-        # FIXME should we be using MORE random draws from the priors in the
-        #   other kernel objects?
-        qP = norm_posterior(dim=dim, var0=1.)
+
+        # Setup the prior, lenscale may be a variable, so dont use prior_normal
+        var = 1. / self.lenscale**2
+        pP = Normal(mu=tf.zeros(dim), var=var)
+
+        # Initialise the posterior
+        qP = norm_posterior(dim=dim, var0=1.)  # can't get a constant from var
 
         KL = kl_qp(qP, pP)
-        Ps = tf.stack([qP.sample() for _ in range(n_samples)])
 
-        return Ps, KL
+        # We implement the VAR-FIXED method here from Cutajar et. al 2017, so
+        # we pre-generate and fix the standard normal samples
+        rand = np.random.RandomState(next(seedgen))
+        e = rand.randn(input_dim, n_features).astype(np.float32)
+        P = qP.sample(e)
+
+        return P, KL
 
 
 class Matern(ShiftInvariant):
@@ -166,13 +160,11 @@ class Matern(ShiftInvariant):
         super().__init__(lenscale)
         self.p = p
 
-    def weights(self, n_samples, input_dim, n_features):
+    def weights(self, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
 
         Parameters
         ----------
-        n_samples : int
-            the number of random samples for stochastic variational bayes.
         input_dim : int
             the input dimension to this layer.
         n_features : int
@@ -183,7 +175,7 @@ class Matern(ShiftInvariant):
         -------
         P : ndarray
             the random weights of the fourier features of shape
-            ``(n_samples, input_dim, n_features)``.
+            ``(input_dim, n_features)``.
         KL : Tensor, float
             the KL penalty associated with the parameters in this kernel (0.0).
 
@@ -199,20 +191,7 @@ class Matern(ShiftInvariant):
         # u ~ chi2(df), then x ~ mvt(0, I, df)
         df = 2 * (self.p + 0.5)
         rand = np.random.RandomState(next(seedgen))
-        # FIXME should we be using MORE random draws from the priors instead of
-        # tiling?
         y = rand.randn(input_dim, n_features)
         u = rand.chisquare(df, size=(n_features,))
         P = (y * np.sqrt(df / u)).astype(np.float32) / self.lenscale
-        Ps = _tile_weights(n_samples, P)
-        return Ps, 0.
-
-
-#
-# Private module utilities
-#
-
-# FIXME should we be using MORE random draws from the priors instead of tiling?
-def _tile_weights(n_samples, P):
-    Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
-    return Ps
+        return P, 0.

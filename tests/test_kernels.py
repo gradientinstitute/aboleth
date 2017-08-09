@@ -17,8 +17,8 @@ def test_shift_invariant_kernels(kernels):
     k = kern(D, **p)
 
     # Check dim
-    P, KL = k.weights(1, input_dim=d, n_features=D)
-    assert P.shape == (1, d, D)
+    P, KL = k.weights(input_dim=d, n_features=D)
+    assert P.shape == (d, D)
 
 
 @pytest.mark.parametrize('kernels', [

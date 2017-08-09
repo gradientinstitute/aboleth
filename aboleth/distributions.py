@@ -41,10 +41,17 @@ class Normal(ParameterDistribution):
         self.mu = mu
         self.var = var
         self.sigma = tf.sqrt(var)
-        self.d = tf.shape(mu)
+        self.d = mu.shape
 
-    def sample(self):
+    def sample(self, e=None):
         """Draw a random sample from this object.
+
+        Parameters
+        ----------
+        e : ndarray, Tensor, optional
+            the random standard-Normal samples to transform to yeild samples
+            from this distrubution. These must be of shape (d_in, d_out). If
+            this is none, these are generated in this method.
 
         Returns
         -------
@@ -53,8 +60,11 @@ class Normal(ParameterDistribution):
 
         """
         # Reparameterisation trick
-        e = tf.random_normal(self.d, seed=next(seedgen))
+        if e is None:
+            e = tf.random_normal(self.d, seed=next(seedgen))
+        assert e.shape == self.d
         x = self.mu + e * self.sigma
+
         return x
 
 
@@ -68,6 +78,10 @@ class Gaussian(ParameterDistribution):
         mean, shape (d_in, d_out)
     L : Tensor
         Cholesky of the covariance matrix, shape (d_out, d_in, d_in)
+    eps : ndarray, Tensor, optional
+        random draw from a unit normal if you want to "fix" the sampling, this
+        should be of shape (d_in, d_out). If this is ``None`` then a new random
+        draw is used for every call to sample().
 
     """
 
@@ -75,10 +89,17 @@ class Gaussian(ParameterDistribution):
         """Construct a Normal distribution object."""
         self.mu = mu
         self.L = L  # O x I x I
-        self.d = tf.shape(mu)
+        self.d = mu.shape
 
-    def sample(self):
+    def sample(self, e=None):
         """Draw a random sample from this object.
+
+        Parameters
+        ----------
+        e : ndarray, Tensor, optional
+            the random standard-Normal samples to transform to yeild samples
+            from this distrubution. These must be of shape (d_in, d_out). If
+            this is none, these are generated in this method.
 
         Returns
         -------
@@ -88,8 +109,13 @@ class Gaussian(ParameterDistribution):
         """
         # Reparameterisation trick
         mu = self.transform_w(self.mu)
-        e = tf.random_normal(tf.shape(mu), seed=next(seedgen))
+        if e is None:
+            e = tf.random_normal(mu.shape, seed=next(seedgen))
+        else:
+            assert e.shape == self.d
+            e = self.transform_w(e)
         x = self.itransform_w(mu + tf.matmul(self.L, e))
+
         return x
 
     @staticmethod
@@ -147,7 +173,7 @@ def norm_posterior(dim, var0):
         the initialised posterior Normal object.
 
     """
-    mu_0 = tf.random_normal(dim, stddev=np.sqrt(var0), seed=next(seedgen))
+    mu_0 = tf.random_normal(dim, stddev=tf.sqrt(var0), seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
 
     var_0 = tf.random_gamma(alpha=var0, shape=dim, seed=next(seedgen))
