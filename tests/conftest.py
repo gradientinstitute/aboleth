@@ -55,7 +55,9 @@ def make_missing_data():
     x[mask] = 666.
     X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
     X = tf.cast(X, tf.float32)
-    return x, mask, X
+    w = np.linspace(1, 5, 5)[np.newaxis, :]
+    y = np.sum(x * w, axis=1)
+    return x, mask, X, y
 
 
 @pytest.fixture

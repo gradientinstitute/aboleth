@@ -31,7 +31,8 @@ datanet = ab.InputLayer(name='X_nan', n_samples=LSAMPLES)
 masknet = ab.InputLayer(name='M')
 
 net = ab.Stack(
-    ab.MeanImpute(datanet, masknet),
+    # ab.MeanImpute(datanet, masknet),
+    ab.VarNormalImpute(datanet, masknet),
     ab.DropOut(0.95),
     ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.Activation(h=tf.nn.relu),
