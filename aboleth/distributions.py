@@ -50,19 +50,18 @@ class Normal(ParameterDistribution):
         ----------
         e : ndarray, Tensor, optional
             the random standard-Normal samples to transform to yeild samples
-            from this distrubution. These must be of shape (d_in, d_out). If
+            from this distrubution. These must be of shape (d_in, ...). If
             this is none, these are generated in this method.
 
         Returns
         -------
         x : Tensor
-            a sample of shape (d_in, d_out).
+            a sample of shape (d_in, d_out), or ``e.shape`` if provided
 
         """
         # Reparameterisation trick
         if e is None:
             e = tf.random_normal(self.d, seed=next(seedgen))
-        assert e.shape == self.d
         x = self.mu + e * self.sigma
 
         return x
@@ -98,13 +97,13 @@ class Gaussian(ParameterDistribution):
         ----------
         e : ndarray, Tensor, optional
             the random standard-Normal samples to transform to yeild samples
-            from this distrubution. These must be of shape (d_in, d_out). If
+            from this distrubution. These must be of shape (d_in, ...). If
             this is none, these are generated in this method.
 
         Returns
         -------
         x : Tensor
-            a sample of shape (d_in, d_out).
+            a sample of shape (d_in, d_out), or ``e.shape`` if provided
 
         """
         # Reparameterisation trick
@@ -112,7 +111,6 @@ class Gaussian(ParameterDistribution):
         if e is None:
             e = tf.random_normal(mu.shape, seed=next(seedgen))
         else:
-            assert e.shape == self.d
             e = self.transform_w(e)
         x = self.itransform_w(mu + tf.matmul(self.L, e))
 

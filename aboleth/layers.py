@@ -2,7 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
-from aboleth.kernels import RBF
+from aboleth.kernels import RBF, RBFVariational
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
@@ -430,22 +430,24 @@ class RandomArcCosine(RandomFourier):
         The order of the arc-cosine kernel, this must be an integer greater
         than, or eual to zero. 0 will lead to sigmoid-like kernels, 1 will lead
         to relu-like kernels, 2 quadratic-relu kernels etc.
+    variational : bool
+        use variational features instead of random features, (i.e.  VAR-FIXED
+        in [2]).
 
     See Also
     --------
     [1] Cho, Youngmin, and Lawrence K. Saul. "Analysis and extension of
         arc-cosine kernels for large margin classification." arXiv preprint
         arXiv:1112.3712 (2011).
-    [2] Cutajar, Kurt, Edwin V. Bonilla, Pietro Michiardi, and Maurizio
-        Filippone. "Accelerating Deep Gaussian Processes Inference with
-        Arc-Cosine Kernels." Bayesian Deep Learning Workshop, Advances in
-        Neural Information Processing Systems, NIPS 2016, Barcelona
+    [2] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. Random Feature
+        Expansions for Deep Gaussian Processes. In ICML, 2017.
 
     """
 
-    def __init__(self, n_features, lenscale=1.0, p=1):
+    def __init__(self, n_features, lenscale=1.0, p=1, variational=False):
         """Create an instance of an arc cosine kernel layer."""
-        super().__init__(n_features=n_features, kernel=RBF(lenscale=lenscale))
+        kern = RBFVariational if variational else RBF
+        super().__init__(n_features=n_features, kernel=kern(lenscale=lenscale))
         assert isinstance(p, int) and p >= 0
         if p == 0:
             self.pfunc = tf.sign

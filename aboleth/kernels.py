@@ -15,10 +15,12 @@ class ShiftInvariant:
 
     Parameters
     ----------
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the shift invariant kernel, this can be a scalar
-        for an isotropic kernel, or a vector for an automatic relevance
-        detection (ARD) kernel.
+    lenscale : float, ndarray, Tensor, Variable
+        the length scales of the shift invariant kernel, this can be a scalar
+        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        automatic relevance detection (ARD) kernel. If you wish to learn this
+        parameter, make it a Variable (or ``ab.pos(tf.Variable(...))`` to keep
+        it positively constrained).
 
     """
 
@@ -55,10 +57,12 @@ class RBF(ShiftInvariant):
 
     Parameters
     ----------
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the radial basis kernel, this can be a scalar for
-        an isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
+    lenscale : float, ndarray, Tensor, Variable
+        the length scales of the shift invariant kernel, this can be a scalar
+        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        automatic relevance detection (ARD) kernel. If you wish to learn this
+        parameter, make it a Variable (or ``ab.pos(tf.Variable(...))`` to keep
+        it positively constrained).
 
     """
 
@@ -96,12 +100,25 @@ class RBFVariational(ShiftInvariant):
 
     Parameters
     ----------
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the radial basis kernel, this can be a scalar for
-        an isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
+    lenscale : float, ndarray, Tensor, Variable
+        the length scales of the shift invariant kernel, this can be a scalar
+        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        automatic relevance detection (ARD) kernel. If you wish to learn this
+        parameter, make it a Variable (or ``ab.pos(tf.Variable(...))`` to keep
+        it positively constrained).
+    lenscale_poserior : float, ndarray, optional
+        the *initial* value for the posteror length scale, this can be a scalar
+        or vector (different initial value per input dimension). If this is
+        left as none, it will be set to ``sqrt(1 / input_dim)`` (this is
+        similar to the 'auto' setting for a scikit learn SVM with a RBF
+        kernel).
 
     """
+
+    def __init__(self, lenscale=1.0, lenscale_posterior=None):
+        """Constuct an instance of the RBFVariational kernel."""
+        super().__init__(lenscale)
+        self.lenscale_post = lenscale_posterior
 
     def weights(self, input_dim, n_features):
         """Generate the random fourier weights for this kernel.
@@ -126,11 +143,12 @@ class RBFVariational(ShiftInvariant):
         dim = (input_dim, n_features)
 
         # Setup the prior, lenscale may be a variable, so dont use prior_normal
-        var = 1. / self.lenscale**2
-        pP = Normal(mu=tf.zeros(dim), var=var)
+        pP = Normal(mu=tf.zeros(dim), var=self.__len2var(self.lenscale))
 
         # Initialise the posterior
-        qP = norm_posterior(dim=dim, var0=1.)  # can't get a constant from var
+        if self.lenscale_post is None:
+            self.lenscale_post = np.sqrt(1 / input_dim)
+        qP = norm_posterior(dim=dim, var0=self.__len2var(self.lenscale_post))
 
         KL = kl_qp(qP, pP)
 
@@ -142,22 +160,34 @@ class RBFVariational(ShiftInvariant):
 
         return P, KL
 
+    @staticmethod
+    def __len2var(lenscale):
+        var = tf.to_float(1. / lenscale**2)
+        return var
+
 
 class Matern(ShiftInvariant):
     """Matern kernel approximation.
 
     Parameters
     ----------
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the Matern kernel, this can be a scalar for an
-        isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
+    lenscale : float, ndarray, Tensor, Variable
+        the length scales of the shift invariant kernel, this can be a scalar
+        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        automatic relevance detection (ARD) kernel. If you wish to learn this
+        parameter, make it a Variable (or ``ab.pos(tf.Variable(...))`` to keep
+        it positively constrained).
+    p : int
+        a zero or positive integer specifying the number of the Matern kernel,
+        e.g. ``p == 0`` results int a Matern 1/2 kernel, ``p == 1``  results in
+        the Matern 3/2 kernel etc.
 
     """
 
     def __init__(self, lenscale=1.0, p=1):
         """Constuct a Matern kernel object."""
         super().__init__(lenscale)
+        assert isinstance(p, int) and p >= 0
         self.p = p
 
     def weights(self, input_dim, n_features):
