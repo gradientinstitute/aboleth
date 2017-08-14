@@ -106,10 +106,10 @@ class RBFVariational(ShiftInvariant):
         automatic relevance detection (ARD) kernel. If you wish to learn this
         parameter, make it a Variable (or ``ab.pos(tf.Variable(...))`` to keep
         it positively constrained).
-    lenscale_poserior : float, ndarray, optional
-        the *initial* value for the posteror length scale, this can be a scalar
-        or vector (different initial value per input dimension). If this is
-        left as none, it will be set to ``sqrt(1 / input_dim)`` (this is
+    lenscale_posterior : float, ndarray, optional
+        the *initial* value for the posterior length scale, this can be a
+        scalar or vector (different initial value per input dimension). If this
+        is left as None, it will be set to ``sqrt(1 / input_dim)`` (this is
         similar to the 'auto' setting for a scikit learn SVM with a RBF
         kernel).
 

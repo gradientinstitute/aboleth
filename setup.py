@@ -20,9 +20,7 @@ setup(
         'numpy>=1.12.0',
         'scipy>=0.18.1',
         'tensorflow>=1.1.0',
-        'scikit-learn>=0.18.1',
         'six>=1.10.0',
-        'bokeh>=0.12.4',
         'multipledispatch>=0.4.9',
     ],
     extras_require={
@@ -33,6 +31,11 @@ setup(
             'pytest-cov>=2.5.1',
             'pytest-flake8>=0.8.1',
             'flake8-docstrings>=1.1.0',
+        ],
+        'demos': [
+            'bokeh>=0.12.4',
+            'pandas>=0.20.3',
+            'scikit-learn>=0.18.1',
         ]
     },
     license="All Right Reserved",

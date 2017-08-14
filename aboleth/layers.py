@@ -431,8 +431,14 @@ class RandomArcCosine(RandomFourier):
         than, or eual to zero. 0 will lead to sigmoid-like kernels, 1 will lead
         to relu-like kernels, 2 quadratic-relu kernels etc.
     variational : bool
-        use variational features instead of random features, (i.e.  VAR-FIXED
-        in [2]).
+        use variational features instead of random features, (i.e. VAR-FIXED in
+        [2]).
+    lenscale_posterior : float, ndarray, optional
+        the *initial* value for the posterior length scale. This is only used
+        if ``variational==True``. This can be a scalar or vector (different
+        initial value per input dimension). If this is left as None, it will be
+        set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto' setting
+        for a scikit learn SVM with a RBF kernel).
 
     See Also
     --------
@@ -444,10 +450,18 @@ class RandomArcCosine(RandomFourier):
 
     """
 
-    def __init__(self, n_features, lenscale=1.0, p=1, variational=False):
+    def __init__(self, n_features, lenscale=1.0, p=1, variational=False,
+                 lenscale_posterior=None):
         """Create an instance of an arc cosine kernel layer."""
-        kern = RBFVariational if variational else RBF
-        super().__init__(n_features=n_features, kernel=kern(lenscale=lenscale))
+        # Setup random weights
+        if variational:
+            kern = RBFVariational(lenscale=lenscale,
+                                  lenscale_posterior=lenscale_posterior)
+        else:
+            kern = RBF(lenscale=lenscale)
+        super().__init__(n_features=n_features, kernel=kern)
+
+        # Kernel order
         assert isinstance(p, int) and p >= 0
         if p == 0:
             self.pfunc = tf.sign

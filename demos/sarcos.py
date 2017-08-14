@@ -17,13 +17,20 @@ logger.setLevel(logging.INFO)
 
 
 NSAMPLES = 10
+NFEATURES = 1000
 VARIANCE = 10.0
-LENSCALE = tf.exp(tf.Variable(2. * np.ones((21, 1), dtype=np.float32)))
-KERNEL = ab.RBF(LENSCALE)
+
+# Random Fourier Features
+# LENSCALE = ab.pos(tf.Variable(10 * np.ones((21, 1), dtype=np.float32)))
+# KERNEL = ab.RBF(LENSCALE)
+
+# Variational Fourier Features -- length-scale setting here is the "prior"
+LENSCALE = 10.
+KERNEL = ab.RBFVariational(lenscale=LENSCALE, lenscale_posterior=LENSCALE)
 
 net = ab.Stack(
     ab.InputLayer(name='X', n_samples=NSAMPLES),
-    ab.RandomFourier(n_features=1000, kernel=KERNEL),
+    ab.RandomFourier(n_features=NFEATURES, kernel=KERNEL),
     ab.DenseVariational(output_dim=1, full=True)
 )
 
