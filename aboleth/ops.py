@@ -242,10 +242,10 @@ class MeanImpute(ImputeOp):
 
         """
         # Fill zeros in for missing data initially
-        data_zeroed_missing_tf = X_2D * self.real_val_mask
+        data_zeroed_missing = X_2D * self.real_val_mask
 
         # Sum the real values in each column
-        col_tot = tf.reduce_sum(data_zeroed_missing_tf, 0)
+        col_tot = tf.reduce_sum(data_zeroed_missing, 0)
 
         # Divide column totals by the number of non-nan values
         num_values_col = tf.reduce_sum(self.real_val_mask, 0)
@@ -257,10 +257,10 @@ class MeanImpute(ImputeOp):
         imputed_vals = tf.gather(col_nan_means, self.missing_ind[:, 1])
 
         # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
         missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
 
-        X_with_impute = data_zeroed_missing_tf + missing_imputed
+        X_with_impute = data_zeroed_missing + missing_imputed
 
         return X_with_impute
 
@@ -309,7 +309,7 @@ class FixedNormalImpute(ImputeOp):
 
         """
         # Fill zeros in for missing data initially
-        data_zeroed_missing_tf = X_2D * self.real_val_mask
+        data_zeroed_missing = X_2D * self.real_val_mask
 
         # Divide column totals by the number of non-nan values
         col_draws = [n.sample() for n in self.normal_array]
@@ -317,10 +317,10 @@ class FixedNormalImpute(ImputeOp):
         imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])
 
         # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
         missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
 
-        X_with_impute = data_zeroed_missing_tf + missing_imputed
+        X_with_impute = data_zeroed_missing + missing_imputed
 
         return X_with_impute
 
@@ -388,16 +388,16 @@ class VarScalarImpute(ImputeOp):
 
         """
         # Fill zeros in for missing data initially
-        data_zeroed_missing_tf = X_2D * self.real_val_mask
+        data_zeroed_missing = X_2D * self.real_val_mask
 
         # Make an vector of the impute values for each missing point
         imputed_vals = tf.gather(scalars[0, :], self.missing_ind[:, 1])
 
         # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
         missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
 
-        X_with_impute = data_zeroed_missing_tf + missing_imputed
+        X_with_impute = data_zeroed_missing + missing_imputed
 
         return X_with_impute
 
@@ -463,7 +463,7 @@ class VarNormalImpute(ImputeOp):
 
         """
         # Fill zeros in for missing data initially
-        data_zeroed_missing_tf = X_2D * self.real_val_mask
+        data_zeroed_missing = X_2D * self.real_val_mask
 
         # Divide column totals by the number of non-nan values
         col_draws = tf.transpose(self.normal.sample())
@@ -471,10 +471,10 @@ class VarNormalImpute(ImputeOp):
         imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])[:, 0]
 
         # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
+        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
         missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
 
-        X_with_impute = data_zeroed_missing_tf + missing_imputed
+        X_with_impute = data_zeroed_missing + missing_imputed
 
         return X_with_impute
 
