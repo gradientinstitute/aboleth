@@ -5,7 +5,7 @@ from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
                      DenseMAP, InputLayer, EmbedVariational, RandomFourier,
                      RandomArcCosine)
 from .ops import Stack, Concat, Add, SliceCat, MeanImpute, RandomGaussImpute
-from .kernels import RBF, Matern
+from .kernels import RBF, Matern, RBFVariational
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
 from .util import (batch, pos, predict_expected, predict_samples,
                    batch_prediction)
@@ -40,5 +40,6 @@ __all__ = (
     'MeanImpute',
     'RandomGaussImpute',
     'RBF',
+    'RBFVariational',
     'Matern'
 )

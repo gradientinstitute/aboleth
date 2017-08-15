@@ -2,6 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
+from aboleth.kernels import RBF, RBFVariational
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
@@ -392,23 +393,25 @@ class RandomFourier(SampleLayer3):
             layer.
 
         """
+        # Random weights
         n_samples, input_dim = self.get_X_dims(X)
-
-        # Random weights, copy faster than map here
-        P = self.kernel.weights(input_dim, self.n_features)
+        P, KL = self.kernel.weights(input_dim, self.n_features)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
         XP = tf.matmul(X, Ps)
+        Net = self._transformation(XP)
+        return Net, KL
+
+    def _transformation(self, XP):
+        """Build the kernel feature space transformation."""
         real = tf.cos(XP)
         imag = tf.sin(XP)
         Net = tf.concat([real, imag], axis=-1) / np.sqrt(self.n_features)
-        KL = 0.
-
-        return Net, KL
+        return Net
 
 
-class RandomArcCosine(SampleLayer3):
+class RandomArcCosine(RandomFourier):
     r"""Random arc-cosine kernel layer.
 
     NOTE: This should be followed by a dense layer to properly implement a
@@ -427,21 +430,38 @@ class RandomArcCosine(SampleLayer3):
         The order of the arc-cosine kernel, this must be an integer greater
         than, or eual to zero. 0 will lead to sigmoid-like kernels, 1 will lead
         to relu-like kernels, 2 quadratic-relu kernels etc.
+    variational : bool
+        use variational features instead of random features, (i.e. VAR-FIXED in
+        [2]).
+    lenscale_posterior : float, ndarray, optional
+        the *initial* value for the posterior length scale. This is only used
+        if ``variational==True``. This can be a scalar or vector (different
+        initial value per input dimension). If this is left as None, it will be
+        set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto' setting
+        for a scikit learn SVM with a RBF kernel).
 
     See Also
     --------
     [1] Cho, Youngmin, and Lawrence K. Saul. "Analysis and extension of
         arc-cosine kernels for large margin classification." arXiv preprint
         arXiv:1112.3712 (2011).
-    [2] Cutajar, Kurt, Edwin V. Bonilla, Pietro Michiardi, and Maurizio
-        Filippone. "Accelerating Deep Gaussian Processes Inference with
-        Arc-Cosine Kernels." Bayesian Deep Learning Workshop, Advances in
-        Neural Information Processing Systems, NIPS 2016, Barcelona
+    [2] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. Random Feature
+        Expansions for Deep Gaussian Processes. In ICML, 2017.
 
     """
 
-    def __init__(self, n_features, lenscale=1.0, p=1):
+    def __init__(self, n_features, lenscale=1.0, p=1, variational=False,
+                 lenscale_posterior=None):
         """Create an instance of an arc cosine kernel layer."""
+        # Setup random weights
+        if variational:
+            kern = RBFVariational(lenscale=lenscale,
+                                  lenscale_posterior=lenscale_posterior)
+        else:
+            kern = RBF(lenscale=lenscale)
+        super().__init__(n_features=n_features, kernel=kern)
+
+        # Kernel order
         assert isinstance(p, int) and p >= 0
         if p == 0:
             self.pfunc = tf.sign
@@ -450,40 +470,10 @@ class RandomArcCosine(SampleLayer3):
         else:
             self.pfunc = lambda x: tf.pow(x, p)
 
-        self.n_features = n_features
-        self.lenscale = lenscale
-
-    def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        n_samples, input_dim = self.get_X_dims(X)
-
-        # Random weights
-        rand = np.random.RandomState(next(seedgen))
-        P = rand.randn(input_dim, self.n_features).astype(np.float32) \
-            / self.lenscale
-        Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
-
-        # Random features
-        XP = tf.matmul(X, Ps)
+    def _transformation(self, XP):
+        """Build the kernel feature space transformation."""
         Net = np.sqrt(2. / self.n_features) * tf.nn.relu(self.pfunc(XP))
-        KL = 0.
-
-        return Net, KL
+        return Net
 
 
 #
