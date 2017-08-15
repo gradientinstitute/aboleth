@@ -9,7 +9,7 @@ At the command line via pip in the project directory::
 
     $ pip install .
 
-To install with working `demos <https://github.com/determinant-io/aboleth/tree/develop/demos>`_::
+To install additional dependencies required by the `demos <https://github.com/determinant-io/aboleth/tree/develop/demos>`_::
 
     $ pip install .[demos]
 

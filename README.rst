@@ -20,21 +20,15 @@ Gaussian process [1]_ approximation with stochastic gradient variational Bayes
 Installation
 ------------
 
-For a minimal install, at the command line via pip in the project directory:
-
-.. code:: console
+For a minimal install, at the command line via pip in the project directory::
 
     $ pip install .
 
-To install with working `demos <https://github.com/determinant-io/aboleth/tree/develop/demos>`_:
-
-.. code:: console
+To install additional dependencies required by the `demos <https://github.com/determinant-io/aboleth/tree/develop/demos>`_::
 
     $ pip install .[demos]
 
-To install in develop mode with packages required for development:
-
-.. code:: console
+To install in develop mode with packages required for development::
 
     $ pip install -e .[dev]
 

@@ -196,7 +196,7 @@ def test_sample_layer_input_exception(layer_args, make_data):
 
 @pytest.mark.parametrize('kernels', [
     (ab.RBF, {}),
-    # (ab.RBFVariational, {}),
+    (ab.RBFVariational, {}),
     (ab.Matern, {'p': 1}),
     (ab.Matern, {'p': 2})
 ])
@@ -215,13 +215,17 @@ def test_fourier_features(kernels, make_data):
 
     tc = tf.test.TestCase()
     with tc.test_session():
+        tf.global_variables_initializer().run()
         P = Phi.eval(feed_dict={x_: x})
         for i in range(P.shape[0]):
             p = P[i]
             assert p.shape == (N, 2 * D)
             # Check behaving properly with k(x, x) ~ 1.0
             assert np.allclose((p**2).sum(axis=1), np.ones(N))
-        assert KL == 0
+
+        # Make sure we get a valid KL
+        kl = KL.eval() if isinstance(KL, tf.Tensor) else KL
+        assert kl >= 0
 
 
 @pytest.mark.parametrize('dists', [
