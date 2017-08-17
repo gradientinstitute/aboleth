@@ -36,6 +36,9 @@ class Layer:
         """Implement graph construction. Should be over-ridden."""
         return X, 0.0
 
+    def __rshift__(self, other):
+        return LayerComposite(self, other)
+
 
 class MultiLayer:
     """Base class for layers that take multiple inputs as kwargs.
@@ -68,6 +71,9 @@ class MultiLayer:
     def _build(self, **kwargs):
         """Implement graph construction. Should be over-ridden."""
         raise NotImplementedError("Base class for MultiLayers only!")
+
+    def __rshift__(self, other):
+        return MultiLayerComposite(self, other)
 
 
 class MultiLayerComposite(MultiLayer):
@@ -111,21 +117,6 @@ class LayerComposite(Layer):
         return Net, KL
 
 
-# Get around circular dependencies by adding stack to base claseses
-# after their composite subclasses have been defined
-
-def _layerstack2(layer1, layer2):
-    return LayerComposite(layer1, layer2)
-
-
-def _multilayerstack2(layer1, layer2):
-    return MultiLayerComposite(layer1, layer2)
-
-
-Layer.__rshift__ = _layerstack2
-MultiLayer.__rshift__ = _multilayerstack2
-
-
 def stack(l, *layers):
     """Stack multiple Layers.
 
@@ -140,7 +131,7 @@ def stack(l, *layers):
     ----------
     l : Layer or MultiLayer
         The first layer to stack. The type of this layer determines the type
-    of the output; MultiLayerComposite or LayerComposite.
+        of the output; MultiLayerComposite or LayerComposite.
 
     *layers :
         list of additional layers to stack. Must all be of type Layer,
