@@ -12,22 +12,23 @@ Aboleth
     :align: center
 
 
-*A bare-bones TensorFlow framework for supervised Bayesian deep learning and
-Gaussian process approximation with stochastic gradient variational Bayes.*
+A bare-bones TensorFlow framework for supervised Bayesian deep learning and
+Gaussian process [1]_ approximation with stochastic gradient variational Bayes
+[2]_.
 
 
 Installation
 ------------
 
-At the command line via pip in the project directory:
-
-.. code:: console
+For a minimal install, at the command line via pip in the project directory::
 
     $ pip install .
 
-To install in develop mode with packages required for development:
+To install additional dependencies required by the `demos <https://github.com/determinant-io/aboleth/tree/develop/demos>`_::
 
-.. code:: console
+    $ pip install .[demos]
+
+To install in develop mode with packages required for development::
 
     $ pip install -e .[dev]
 
@@ -42,7 +43,7 @@ folder for some examples of creating and training algorithms with Aboleth.
 References
 ----------
 
-.. [1] Kingma, D. P. and Welling, M. Auto-encoding variational Bayes. In ICLR,
-       2014.
-.. [2] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. Random Feature 
+.. [1] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. Random Feature 
        Expansions for Deep Gaussian Processes. In ICML, 2017.
+.. [2] Kingma, D. P. and Welling, M. Auto-encoding variational Bayes. In ICLR,
+       2014.

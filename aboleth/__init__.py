@@ -1,12 +1,14 @@
 """Package init."""
 from .version import __version__
 from .losses import elbo
+from .baselayers import stack
 from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
                      DenseMAP, InputLayer, EmbedVariational, RandomFourier,
                      RandomArcCosine)
-from .ops import (Stack, Concat, Add, SliceCat, MeanImpute, FixedNormalImpute,
-                  VarScalarImpute, VarNormalImpute)
-from .kernels import RBF, Matern
+from .hlayers import Concat, Sum, PerFeature
+from .impute import (MeanImpute, FixedNormalImpute, VarScalarImpute,
+                     VarNormalImpute)
+from .kernels import RBF, Matern, RBFVariational
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
 from .util import (batch, pos, predict_expected, predict_samples,
                    batch_prediction)
@@ -34,14 +36,15 @@ __all__ = (
     'batch_prediction',
     'set_hyperseed',
     'InputLayer',
-    'Stack',
-    'Add',
+    'stack',
+    'Sum',
     'Concat',
-    'SliceCat',
+    'PerFeature',
     'MeanImpute',
     'FixedNormalImpute',
     'VarScalarImpute',
     'VarNormalImpute',
     'RBF',
+    'RBFVariational',
     'Matern'
 )

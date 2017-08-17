@@ -30,7 +30,7 @@ REG = 0.1
 datanet = ab.InputLayer(name='X_nan', n_samples=LSAMPLES)
 masknet = ab.InputLayer(name='M')
 
-net = ab.Stack(
+net = ab.stack(
     # ab.MeanImpute(datanet, masknet),
     ab.VarNormalImpute(datanet, masknet),
     ab.DropOut(0.95),
