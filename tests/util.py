@@ -21,6 +21,7 @@ class StringMultiLayer(MultiLayer):
         self.kl = kl
 
     def _build(self, **kwargs):
-        call_sig = ",".join(kwargs)
+        l = [kwargs[i] for i in sorted(kwargs)]
+        call_sig = ",".join(l)
         result = "{}({})".format(self.name, call_sig)
         return result, self.kl
