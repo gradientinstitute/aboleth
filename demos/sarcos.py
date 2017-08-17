@@ -28,7 +28,7 @@ VARIANCE = 10.0
 LENSCALE = 10.
 KERNEL = ab.RBFVariational(lenscale=LENSCALE, lenscale_posterior=LENSCALE)
 
-net = ab.Stack(
+net = ab.stack(
     ab.InputLayer(name='X', n_samples=NSAMPLES),
     ab.RandomFourier(n_features=NFEATURES, kernel=KERNEL),
     ab.DenseVariational(output_dim=1, full=True)

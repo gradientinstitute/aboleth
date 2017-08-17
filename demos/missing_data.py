@@ -30,7 +30,7 @@ REG = 0.1
 datanet = ab.InputLayer(name='X_nan', n_samples=LSAMPLES)
 masknet = ab.InputLayer(name='M')
 
-net = ab.Stack(
+net = ab.stack(
     ab.MeanImpute(datanet, masknet),
     ab.DropOut(0.95),
     ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
@@ -42,7 +42,6 @@ net = ab.Stack(
     ab.DenseMAP(output_dim=1, l1_reg=0., l2_reg=REG),
     ab.Activation(h=tf.nn.sigmoid)
 )
-
 
 def main():
 
