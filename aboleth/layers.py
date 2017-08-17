@@ -5,42 +5,7 @@ import tensorflow as tf
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_qp)
-
-
-#
-# Multi layers
-#
-
-class MultiLayer:
-    """Base class for MultiLayers, or layers that take in multiple inputs."""
-
-    def __call__(self, **kwargs):
-        """Build the multiple input layer.
-
-        See: _build() for the implementation details.
-
-        """
-        Net, KL = self._build(**kwargs)
-        return Net, KL
-
-    def _build(self, **kwargs):
-        """Build the multiple input layer.
-
-        Parameters
-        ----------
-        **kwargs :
-            the inputs to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        raise NotImplementedError("Base class for MultiLayers only!")
+from aboleth.baselayers import Layer, MultiLayer
 
 
 class InputLayer(MultiLayer):
@@ -68,22 +33,7 @@ class InputLayer(MultiLayer):
         self.n_samples = n_samples
 
     def _build(self, **kwargs):
-        """Build the tiling input layer.
-
-        Parameters
-        ----------
-        **kwargs :
-            the inputs to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
+        """Build the tiling input layer."""
         X = kwargs[self.name]
         if self.n_samples is not None:
             # (n_samples, N, D)
@@ -93,28 +43,16 @@ class InputLayer(MultiLayer):
         return Xs, 0.0
 
 
-#
-# Generic Layers
-#
+class SampleLayer(Layer):
+    r"""Sample Layer base class.
 
-class Layer:
-    """Layer base class.
-
-    This is an identity layer, and is primarily meant to be subclassed to
-    construct more intersting layers.
+    This is the base class for layers that build upon stochastic (variational)
+    nets. These expect *rank >= 3* input Tensors, where the first dimension
+    indexes the random samples of the stochastic net.
     """
 
     def __call__(self, X):
-        """Build the graph of this layer.
-
-        See: _build
-
-        """
-        Net, KL = self._build(X)
-        return Net, KL
-
-    def _build(self, X):
-        r"""Build the graph of this layer.
+        r"""Construct the subgraph for this layer.
 
         Parameters
         ----------
@@ -130,30 +68,13 @@ class Layer:
             layer.
 
         """
-        return X, 0.0
-
-
-class SampleLayer(Layer):
-    r"""Sample Layer base class.
-
-    This is the base class for layers that build upon stochastic (variational)
-    nets. These expect *rank >= 3* input Tensors, where the first dimension
-    indexes the random samples of the stochastic net.
-    """
-
-    def __call__(self, X):
-        """Build the graph of this layer.
-
-        See: build
-
-        """
         rank = len(X.shape)
         assert rank > 2
         Net, KL = self._build(X)
         return Net, KL
 
     @staticmethod
-    def get_X_dims(X):
+    def _get_X_dims(X):
         r"""Get the dimensions of the rank >= 3 input tensor, X."""
         n_samples, _, *input_shape = X.shape.as_list()
         return n_samples, input_shape
@@ -163,9 +84,20 @@ class SampleLayer3(SampleLayer):
     r"""Special case of SampleLayer restricted to *rank == 3* input Tensors."""
 
     def __call__(self, X):
-        """Build the graph of this layer.
+        r"""Construct the subgraph for this layer.
 
-        See: build
+        Parameters
+        ----------
+        X : Tensor
+            the input to this layer
+
+        Returns
+        -------
+        Net : Tensor
+            the output of this layer
+        KL : float, Tensor
+            the regularizer/Kullback Leibler 'cost' of the parameters in this
+            layer.
 
         """
         rank = len(X.shape)
@@ -174,7 +106,7 @@ class SampleLayer3(SampleLayer):
         return Net, KL
 
     @staticmethod
-    def get_X_dims(X):
+    def _get_X_dims(X):
         """Get the dimensions of the rank 3 input tensor, X."""
         n_samples, _, input_dim = X.shape.as_list()
         return n_samples, input_dim
@@ -199,22 +131,7 @@ class Activation(Layer):
         self.h = h
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
+        """Build the graph of this layer."""
         Net = self.h(X)
         KL = 0.
         return Net, KL
@@ -239,22 +156,7 @@ class DropOut(Layer):
         self.keep_prob = keep_prob
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
+        """Build the graph of this layer."""
         noise_shape = None  # equivalent to different samples from posterior
         Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
@@ -285,22 +187,7 @@ class MaxPool2D(Layer):
         self.padding = padding
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
+        """Build the graph of this layer."""
         Net = tf.map_fn(lambda inputs: tf.nn.max_pool(inputs,
                                                       ksize=self.ksize,
                                                       strides=self.strides,
@@ -326,22 +213,7 @@ class Reshape(Layer):
         self.target_shape = target_shape
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
+        """Build the graph of this layer."""
         new_shape = X.shape[:2].concatenate(tf.TensorShape(self.target_shape))
         Net = tf.reshape(X, new_shape)
         KL = 0.
@@ -376,23 +248,8 @@ class RandomFourier(SampleLayer3):
         self.kernel = kernel
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        n_samples, input_dim = self.get_X_dims(X)
+        """Build the graph of this layer."""
+        n_samples, input_dim = self._get_X_dims(X)
 
         # Random weights, copy faster than map here
         P = self.kernel.weights(input_dim, self.n_features)
@@ -454,23 +311,8 @@ class RandomArcCosine(SampleLayer3):
         self.lenscale = lenscale
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        n_samples, input_dim = self.get_X_dims(X)
+        """Build the graph of this layer."""
+        n_samples, input_dim = self._get_X_dims(X)
 
         # Random weights
         rand = np.random.RandomState(next(seedgen))
@@ -540,23 +382,8 @@ class DenseVariational(SampleLayer3):
         self.qb = post_b
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        n_samples, input_dim = self.get_X_dims(X)
+        """Build the graph of this layer."""
+        n_samples, input_dim = self._get_X_dims(X)
 
         # Layer weights
         self.pW = self._make_prior(self.pW, input_dim)
@@ -668,23 +495,8 @@ class EmbedVariational(DenseVariational):
         self.qW = post_W
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        n_samples, input_dim = self.get_X_dims(X)
+        """Build the graph of this layer."""
+        n_samples, input_dim = self._get_X_dims(X)
 
         assert input_dim == 1, "X must be a *column* of indices!"
 
@@ -729,23 +541,8 @@ class DenseMAP(SampleLayer):
         self.use_bias = use_bias
 
     def _build(self, X):
-        """Build the graph of this layer.
-
-        Parameters
-        ----------
-        X : Tensor
-            the input to this layer
-
-        Returns
-        -------
-        Net : Tensor
-            the output of this layer
-        KL : float, Tensor
-            the regularizer/Kullback Leibler 'cost' of the parameters in this
-            layer.
-
-        """
-        n_samples, input_shape = self.get_X_dims(X)
+        """Build the graph of this layer."""
+        n_samples, input_shape = self._get_X_dims(X)
 
         Wdim = tuple(input_shape) + (self.output_dim,)
 

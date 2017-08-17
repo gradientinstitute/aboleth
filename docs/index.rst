@@ -11,8 +11,10 @@ Documentation Contents
    authors
 
    losses
+   baselayers
    layers
-   ops
+   hlayers
+   impute
    kernels
    likelihoods
    distributions

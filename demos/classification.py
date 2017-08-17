@@ -25,7 +25,7 @@ PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
 REG = 0.1
 
 # Network structure
-net = ab.Stack(
+net = ab.stack(
     ab.InputLayer(name='X', n_samples=LSAMPLES),
     ab.DropOut(0.95),
     ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
