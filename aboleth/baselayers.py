@@ -37,6 +37,7 @@ class Layer:
         return X, 0.0
 
     def __rshift__(self, other):
+        """Implement layer composition, other(self(x))."""
         return LayerComposite(self, other)
 
 
@@ -73,6 +74,7 @@ class MultiLayer:
         raise NotImplementedError("Base class for MultiLayers only!")
 
     def __rshift__(self, other):
+        """Implement multi-layer composition, other(self(x))."""
         return MultiLayerComposite(self, other)
 
 
