@@ -6,7 +6,8 @@ from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
                      DenseMAP, InputLayer, EmbedVariational, RandomFourier,
                      RandomArcCosine)
 from .hlayers import Concat, Sum, PerFeature
-from .impute import MeanImpute, RandomGaussImpute
+from .impute import (MeanImpute, FixedNormalImpute, VarScalarImpute,
+                     VarNormalImpute)
 from .kernels import RBF, Matern, RBFVariational
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
 from .util import (batch, pos, predict_expected, predict_samples,
@@ -40,7 +41,9 @@ __all__ = (
     'Concat',
     'PerFeature',
     'MeanImpute',
-    'RandomGaussImpute',
+    'FixedNormalImpute',
+    'VarScalarImpute',
+    'VarNormalImpute',
     'RBF',
     'RBFVariational',
     'Matern'

@@ -2,6 +2,7 @@
 import tensorflow as tf
 from aboleth.baselayers import MultiLayer
 from aboleth.distributions import Normal
+from aboleth.random import seedgen
 
 
 class ImputeOp(MultiLayer):
@@ -112,7 +113,7 @@ class MeanImpute(ImputeOp):
         return X_with_impute
 
 
-class RandomGaussImpute(ImputeOp):
+class FixedNormalImpute(ImputeOp):
     r"""Impute the missing values using marginal gaussians over each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -156,5 +157,159 @@ class RandomGaussImpute(ImputeOp):
         missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
 
         X_with_impute = data_zeroed_missing_tf + missing_imputed
+
+        return X_with_impute
+
+
+class VarScalarImpute(ImputeOp):
+    """Impute the missing values using learnt scalar for each column.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer.  Returns a layer that returns a tensor in which the masked
+    values have been imputed with a learnt different scalar per colum.
+
+    Parameters
+    ----------
+    datalayer : callable
+        A layer that returns a data tensor. Must be of form f(**kwargs).
+
+    masklayer : callable
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be of form f(**kwargs).
+
+    """
+
+    def __init__(self, datalayer, masklayer):
+        r"""Construct and instance of a VarScalarImpute operation."""
+        super().__init__(datalayer, masklayer)
+
+    def _build(self, **kwargs):
+        r"""Build an impute operation graph, this needs ``**kwargs`` input."""
+        X_ND, loss1 = self.datalayer(**kwargs)
+        M, loss2 = self.masklayer(**kwargs)
+
+        rank = len(X_ND.shape)
+        assert rank == 3
+
+        # Identify indices of the missing datapoints
+        self.missing_ind = tf.where(M)
+        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+
+        # Initialise the impute variables
+        datadim = int(X_ND.shape[2])
+        impute_scalars = tf.Variable(tf.random_normal(shape=(1, datadim),
+                                                      seed=next(seedgen)),
+                                     name="impute_scalars")
+
+        # Map over the samples layer
+        Net = tf.map_fn(lambda x: self._impute2D(x, impute_scalars), X_ND)
+
+        loss = tf.add(loss1, loss2)
+        return Net, loss
+
+    def _impute2D(self, X_2D, scalars):
+        r"""Randomly impute a rank 2 tensor.
+
+        Parameters
+        ----------
+        X_2D : Tensor
+            a rank 2 Tensor with missing data
+        scalars : Tensor 1 x D
+            these values are filled into the missing elements (per column)
+
+        Returns
+        -------
+        X_imputed : Tensor
+            a rank 2 Tensor with imputed data
+
+        """
+        # Fill zeros in for missing data initially
+        data_zeroed_missing = X_2D * self.real_val_mask
+
+        # Make an vector of the impute values for each missing point
+        imputed_vals = tf.gather(scalars[0, :], self.missing_ind[:, 1])
+
+        # Fill the imputed values into the data tensor of zeros
+        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
+        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
+
+        X_with_impute = data_zeroed_missing + missing_imputed
+
+        return X_with_impute
+
+
+class VarNormalImpute(ImputeOp):
+    r"""Impute the missing values with draws from learnt normal distributions.
+
+    Parameters
+    ----------
+    datalayer : callable
+        A layer that returns a data tensor. Must be of form f(**kwargs).
+
+    masklayer : callable
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be of form f(**kwargs).
+
+    """
+
+    def __init__(self, datalayer, masklayer):
+        r"""Construct and instance of a VarScalarImpute operation."""
+        super().__init__(datalayer, masklayer)
+
+    def _build(self, **kwargs):
+        r"""Build an impute operation graph, this needs ``**kwargs`` input."""
+        X_ND, loss1 = self.datalayer(**kwargs)
+        M, loss2 = self.masklayer(**kwargs)
+
+        rank = len(X_ND.shape)
+        assert rank == 3
+
+        # Identify indices of the missing datapoints
+        self.missing_ind = tf.where(M)
+        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+
+        # Initialise the impute variables
+        datadim = int(X_ND.shape[2])
+        impute_means = tf.Variable(tf.random_normal(shape=(1, datadim),
+                                                    seed=next(seedgen)),
+                                   name="impute_scalars")
+
+        impute_variances = tf.abs(tf.Variable(tf.random_normal(
+            shape=(1, datadim), seed=next(seedgen)), name="impute_scalars"))
+
+        self.normal = Normal(impute_means, impute_variances)
+        # Map over the samples layer
+        Net = tf.map_fn(lambda x: self._impute2D(x), X_ND)
+
+        loss = tf.add(loss1, loss2)
+        return Net, loss
+
+    def _impute2D(self, X_2D):
+        r"""Impute a rank 2 tensor with draws from normal distributions.
+
+        Parameters
+        ----------
+        X_2D : Tensor
+            a rank 2 Tensor with missing data
+
+        Returns
+        -------
+        X_imputed : Tensor
+            a rank 2 Tensor with imputed data
+
+        """
+        # Fill zeros in for missing data initially
+        data_zeroed_missing = X_2D * self.real_val_mask
+
+        # Divide column totals by the number of non-nan values
+        col_draws = tf.transpose(self.normal.sample())
+        # Make an vector of the impute values for each missing point
+        imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])[:, 0]
+
+        # Fill the imputed values into the data tensor of zeros
+        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
+        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
+
+        X_with_impute = data_zeroed_missing + missing_imputed
 
         return X_with_impute
