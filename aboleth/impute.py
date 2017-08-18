@@ -32,12 +32,8 @@ class ImputeOp(MultiLayer):
         X_ND, loss1 = self.datalayer(**kwargs)
         M, loss2 = self.masklayer(**kwargs)
 
-        rank = len(X_ND.shape)
-        assert rank == 3
-
-        # Identify indices of the missing datapoints
-        self.missing_ind = tf.where(M)
-        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+        self._check_rank(X_ND)
+        self._set_mask(M)
 
         # Map over the samples layer
         Net = tf.map_fn(self._impute2D, X_ND)
@@ -67,6 +63,17 @@ class ImputeOp(MultiLayer):
         raise NotImplementedError("Abstract base class for imputation ops!")
         X_imputed = None  # You imputation implementation
         return X_imputed
+
+    def _check_rank(self, X):
+
+        rank = len(X.shape)
+        assert rank == 3
+
+    def _set_mask(self, M):
+
+        # Identify indices of the missing datapoints
+        self.missing_ind = tf.where(M)
+        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
 
 
 class MeanImpute(ImputeOp):
@@ -188,12 +195,8 @@ class VarScalarImpute(ImputeOp):
         X_ND, loss1 = self.datalayer(**kwargs)
         M, loss2 = self.masklayer(**kwargs)
 
-        rank = len(X_ND.shape)
-        assert rank == 3
-
-        # Identify indices of the missing datapoints
-        self.missing_ind = tf.where(M)
-        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+        self._check_rank(X_ND)
+        self._set_mask(M)
 
         # Initialise the impute variables
         datadim = int(X_ND.shape[2])
@@ -261,12 +264,8 @@ class VarNormalImpute(ImputeOp):
         X_ND, loss1 = self.datalayer(**kwargs)
         M, loss2 = self.masklayer(**kwargs)
 
-        rank = len(X_ND.shape)
-        assert rank == 3
-
-        # Identify indices of the missing datapoints
-        self.missing_ind = tf.where(M)
-        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+        self._check_rank(X_ND)
+        self._set_mask(M)
 
         # Initialise the impute variables
         datadim = int(X_ND.shape[2])
@@ -278,6 +277,7 @@ class VarNormalImpute(ImputeOp):
             shape=(1, datadim), seed=next(seedgen)), name="impute_scalars"))
 
         self.normal = Normal(impute_means, impute_variances)
+
         # Map over the samples layer
         Net = tf.map_fn(lambda x: self._impute2D(x), X_ND)
 
