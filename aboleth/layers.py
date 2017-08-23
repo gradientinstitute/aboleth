@@ -9,6 +9,10 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
 from aboleth.baselayers import Layer, MultiLayer
 
 
+#
+# Layer type base classes
+#
+
 class InputLayer(MultiLayer):
     r"""Create an input layer.
 
@@ -509,10 +513,9 @@ class EmbedVariational(DenseVariational):
         self.pW = self._make_prior(self.pW, self.n_categories)
         self.qW = self._make_posterior(self.qW, self.n_categories)
 
-        # Embedding layer -- gather only works on the first dim hence transpose
-        Wsamples = tf.transpose(self._sample_W(self.qW, n_samples), [1, 2, 0])
-        embedding = tf.gather(Wsamples, X[0, :, 0])  # X ind is just replicated
-        Net = tf.transpose(embedding, [2, 0, 1])  # reshape after index 1st dim
+        # Index into the relevant weights rather than using sparse matmul
+        Wsamples = self._sample_W(self.qW, n_samples)
+        Net = tf.gather(Wsamples, X[0, :, 0], axis=1)
 
         # Regularizers
         KL = kl_qp(self.qW, self.pW)
