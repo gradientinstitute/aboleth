@@ -169,7 +169,7 @@ class FixedNormalImpute(ImputeOp):
 
 
 class VarScalarImpute(ImputeOp):
-    """Impute the missing values using learnt scalar for each column.
+    r"""Impute the missing values using learnt scalar for each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
     mask layer.  Returns a layer that returns a tensor in which the masked
@@ -178,11 +178,10 @@ class VarScalarImpute(ImputeOp):
     Parameters
     ----------
     datalayer : callable
-        A layer that returns a data tensor. Must be of form f(**kwargs).
-
+        A layer that returns a data tensor. Must be an InputLayer.
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
-        masked. Must be of form f(**kwargs).
+        masked. Must be an InputLayer.
 
     """
 
@@ -191,7 +190,7 @@ class VarScalarImpute(ImputeOp):
         super().__init__(datalayer, masklayer)
 
     def _build(self, **kwargs):
-        r"""Build an impute operation graph, this needs ``**kwargs`` input."""
+        r"""Build an impute operation graph."""
         X_ND, loss1 = self.datalayer(**kwargs)
         M, loss2 = self.masklayer(**kwargs)
 
@@ -247,11 +246,10 @@ class VarNormalImpute(ImputeOp):
     Parameters
     ----------
     datalayer : callable
-        A layer that returns a data tensor. Must be of form f(**kwargs).
-
+        A layer that returns a data tensor. Must be an InputLayer.
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
-        masked. Must be of form f(**kwargs).
+        masked. Must be an InputLayer.
 
     """
 
@@ -260,7 +258,7 @@ class VarNormalImpute(ImputeOp):
         super().__init__(datalayer, masklayer)
 
     def _build(self, **kwargs):
-        r"""Build an impute operation graph, this needs ``**kwargs`` input."""
+        r"""Build an impute operation graph."""
         X_ND, loss1 = self.datalayer(**kwargs)
         M, loss2 = self.masklayer(**kwargs)
 

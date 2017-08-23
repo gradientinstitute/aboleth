@@ -1,4 +1,6 @@
 """Package init."""
+from . import likelihoods
+from . import distributions
 from .version import __version__
 from .losses import elbo
 from .baselayers import stack
@@ -15,6 +17,8 @@ from .util import (batch, pos, predict_expected, predict_samples,
 from .random import set_hyperseed
 
 __all__ = (
+    'likelihoods',
+    'distributions',
     '__version__',
     'elbo',
     'Activation',
