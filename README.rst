@@ -8,6 +8,9 @@ Aboleth
     :target: https://circleci.com/gh/determinant-io/aboleth/tree/develop
     :alt: circleCI
 
+A bare-bones TensorFlow framework for *Bayesian* deep learning and Gaussian
+process approximation [1]_ with stochastic gradient variational Bayes [2]_.
+
 .. figure:: http://fc03.deviantart.net/fs71/i/2010/162/e/3/Aboleth__Sunken_Empires_by_butterfrog.jpg
     :width: 50%
     :alt: (c) 2010-2017 butterfrog
@@ -15,9 +18,6 @@ Aboleth
 
     Aboleth |copy| 2010-2017 butterfrog.
 
-
-A bare-bones TensorFlow framework for *Bayesian* deep learning and Gaussian
-process approximation [1]_ with stochastic gradient variational Bayes [2]_.
 
 Features
 --------
@@ -61,7 +61,7 @@ and Normal prior/posterior distributions on the network weights:
         ab.DenseVariational(output_dim=100) >>
         ab.Activation(tf.nn.relu) >>
         ab.DenseVariational(output_dim=1) >>
-        ab.Activation(tf.nn.sigmoid) >>
+        ab.Activation(tf.nn.sigmoid)
     )
 
     X_ = tf.placeholder(tf.float, shape=(None, D))
