@@ -2,7 +2,7 @@
 from . import likelihoods
 from . import distributions
 from .version import __version__
-from .losses import elbo
+from .losses import elbo, max_posterior
 from .baselayers import stack
 from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
                      DenseMAP, InputLayer, EmbedVariational, RandomFourier,
@@ -21,6 +21,7 @@ __all__ = (
     'distributions',
     '__version__',
     'elbo',
+    'max_posterior',
     'Activation',
     'DropOut',
     'MaxPool2D',
