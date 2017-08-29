@@ -8,6 +8,7 @@ Documentation Contents
 
    installation
    quickstart
+   demos
    authors
 
    losses
