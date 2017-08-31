@@ -118,8 +118,8 @@ References
        2014.
 
 
-Copyright & License
--------------------
+License
+-------
 
 Copyright 2017 CSIRO (Data61)
 

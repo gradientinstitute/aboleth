@@ -10,6 +10,7 @@ Documentation Contents
    quickstart
    demos
    authors
+   contributing
 
    losses
    baselayers

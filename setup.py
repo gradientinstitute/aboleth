@@ -8,9 +8,9 @@ readme = open('README.rst').read()
 setup(
     name='aboleth',
     version=__version__,
-    description='Bayesian supervised deep learning with tensorflow',
+    description='Bayesian supervised deep learning with TensorFlow',
     long_description=readme,
-    author='Determinant',
+    author='Lachlan McCalman, Daniel Steinberg',
     author_email='lachlan.mccalman@data61.csiro.au',
     url='https://github.com/determinant-io/aboleth',
     packages=find_packages(),
@@ -38,7 +38,7 @@ setup(
             'scikit-learn>=0.18.1',
         ]
     },
-    license="All Right Reserved",
+    license="Apache 2.0",
     zip_safe=False,
     keywords='aboleth',
     classifiers=[
