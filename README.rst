@@ -9,14 +9,15 @@ Aboleth
     :alt: circleCI
 
 A bare-bones TensorFlow framework for *Bayesian* deep learning and Gaussian
-process approximation [1]_ with stochastic gradient variational Bayes [2]_.
+process approximation [1]_ with stochastic gradient variational Bayes inference
+[2]_.
 
 .. figure:: http://fc03.deviantart.net/fs71/i/2010/162/e/3/Aboleth__Sunken_Empires_by_butterfrog.jpg
     :width: 50%
     :alt: (c) 2010-2017 butterfrog
     :align: center
 
-    Aboleth |copy| 2010-2017 butterfrog.
+    Image |copy| 2010-2017 butterfrog.
 
 
 Features
@@ -26,8 +27,8 @@ Some of the features of Aboleth:
 
 - Bayesian fully-connected, embedding and convolutional layers using SGVB [2]_
   for inference.
-- Random Fourier and arc-cosine features for approximate GPs. Optional
-  variational optimisation of these feature weights as per [1]_.
+- Random Fourier and arc-cosine features for approximate Gaussian processes.
+  Optional variational optimisation of these feature weights as per [1]_.
 - Imputation layers with parameters that are learned as part of a model.
 - Very flexible construction of networks, e.g. multiple inputs, ResNets etc.
 - Optional maximum-likelihood type II inference for model parameters such as
@@ -84,13 +85,6 @@ subject to change in subsequent releases if there is interest in this
 capability.
 
 
-Examples
---------
-
-See the `demos <https://github.com/determinant-io/aboleth/tree/develop/demos>`_
-folder for more examples of creating and training algorithms with Aboleth.
-
-
 Installation
 ------------
 
@@ -105,6 +99,14 @@ To install additional dependencies required by the `demos <https://github.com/de
 To install in develop mode with packages required for development::
 
     $ pip install -e .[dev]
+
+
+Getting Started
+---------------
+
+See the quick start guide to get started! Also see See the `demos
+<https://github.com/determinant-io/aboleth/tree/develop/demos>`_ folder for
+more examples of creating and training algorithms with Aboleth.
 
 
 References

@@ -1,10 +1,13 @@
+.. _quickstart:
+
 Quick Start Guide
 =================
 
-In Aboleth we use function composition, that we have implemented with the
-right-shift operator, ``>>``, to compose neural network models. These models
-are classes that when called return a TensorFlow computational graph
-(really a ``tf.Tensor``). We can best demonstrate this with a few examples.
+In Aboleth we use function composition to compose machine learning models.
+These models are callable python classes that when called return a TensorFlow
+computational graph (really a ``tf.Tensor``). We can best demonstrate this with
+a few examples.
+
 
 .. _log_clas:
 
@@ -25,11 +28,13 @@ regularisation on the model weights:
         ab.Activation(tf.nn.sigmoid)
     )
 
-This has implemented the following function,
+Here the right shift operator, ``>>``, implements functions composition (or
+specifically, a writer monad) from the innermost function to the outermost.
+The above code block has has implemented the following function,
 
 .. math::
 
-    p(\mathbf{y} = 1 | \mathbf{X}) = \sigma(\mathbf{X}\mathbf{w})
+    p(\mathbf{y} = 1 | \mathbf{X}) = \sigma(\mathbf{X}\mathbf{w}),
 
 where :math:`\mathbf{w} \in \mathbb{R}^D` are the model weights,
 :math:`\mathbf{y} \in \mathbb{Z}^N_2` are the binary labels, :math:`\mathbf{X}
@@ -41,22 +46,22 @@ inputs so we can refer to them later when we call our class ``layers``. This is
 useful when we have multiple inputs into our model, for examples, if we want to
 deal with continuous and categorical features separately (see :ref:`multi_in`).
 
-So now we defined the structure of the predictive model, if we wish we can
-create it's computational graph,
+So now we have defined the structure of the predictive model, if we wish we can
+create its computational graph,
 
 .. code::
 
     net, reg = layers(X=X_)
 
-Where the key word argument ``X`` was defined in the ``InputLayer`` and ``X_``
+where the keyword argument ``X`` was defined in the ``InputLayer`` and ``X_``
 is a placeholder (``tf.placeholder``) or the actual predictive data we want to
 build into our model. ``net`` is the resulting computational graph of our
 predictive model/network, and ``reg`` are the regularisation terms associated
 with the model parameters (layer weights in this case).
 
 If we wanted, we could evaluate ``net`` right now in a TensorFlow session,
-however, none of the weights have been fit to the data. In order to fit the
-weights, we need to define a loss function. So firstly we need to define a
+however none of the weights have been fit to the data. In order to fit the
+weights, we need to define a loss function. For this we need to define a
 likelihood model for our classifier, here we choose a Bernoulli distribution
 for our binary classifier (which corresponds to a log-loss):
 
@@ -64,13 +69,14 @@ for our binary classifier (which corresponds to a log-loss):
         
     likelihood = ab.likelihoods.Bernoulli()
 
-The mathematical expression of this is:
+When we call likelihood, it will return a tensor that implements the log of a
+Bernoulli probability mass function,
 
 .. math::
 
     \mathcal{L}(y_n, p_n) = y_n \log p_n + (1 - y_n) \log(1 - p_n).
 
-Where we have used :math:`p_n` as shorthand for :math:`p(y_n = 1)`. Now we
+where we have used :math:`p_n` as shorthand for :math:`p(y_n = 1)`. Now we
 have enough to build the loss function we will use to optimize the model
 weights:
 
@@ -78,14 +84,15 @@ weights:
         
     loss = ab.max_posterior(net, Y_, reg, likelihood)
 
-This is a maximum a-posteriori loss function, which can be though of as a 
+This is a *maximum a-posteriori* loss function, which can be thought of as a 
 maximum likelihood objective with a penalty on the magnitude of the weights
-(controlled by ``l2_reg`` or :math:`\lambda`):
+from a Gaussian prior (controlled by ``l2_reg`` or :math:`\lambda`),
 
 .. math::
 
     \min_{\mathbf{w}} - \frac{1}{N} \sum_n \mathcal{L}(y_n,
-    \sigma(\mathbf{x}_n^\top \mathbf{w})) + \frac{\lambda}{2}\|\mathbf{w}\|^2_2
+    \sigma(\mathbf{x}_n^\top \mathbf{w})) +
+    \frac{\lambda}{2}\|\mathbf{w}\|^2_2.
 
 Now we have enough to use the ``tf.train`` module to learn the weights of our
 model:
@@ -114,13 +121,13 @@ utilities (we recommend looking at
 <https://www.tensorflow.org/api_docs/python/tf/train/shuffle_batch>`_).
 
 Now that we have learned our classifier's weights, :math:`\hat{\mathbf{w}}`, we
-will probably want to use it to predict class label probabilities for unseen
+will probably want to use for predicting class label probabilities on unseen
 data :math:`\mathbf{x}^*`,
 
 .. math::
 
     p(y^* = 1 | \mathbf{X}, \mathbf{x}^*) = 
-        \sigma(\mathbf{x}^{* \top}\hat{\mathbf{w}})
+        \sigma(\mathbf{x}^{* \top}\hat{\mathbf{w}}).
 
 This can be very easily achieved by just evaluating our model on the unseen
 predictive data (still in the TensorFlow session from above):
@@ -136,15 +143,15 @@ And that is it!
 Bayesian Logistic Classification
 --------------------------------
 
-Aboleth is all about Bayesian inference, so now we'll demonstrate how to make
-a variational inference version of the logistic classifier. The main difference
-is that now we place a prior distribution on the weights,
+Aboleth is all about Bayesian inference, so now we'll demonstrate how to make a
+variational inference version of the logistic classifier. Now we explicitly
+place a prior distribution on the weights,
 
 .. math::
 
-    p(\mathbf{w}) = \mathcal{N}(\mathbf{w} | \mathbf{0}, \psi \mathbf{I}_D)
+    p(\mathbf{w}) = \mathcal{N}(\mathbf{w} | \mathbf{0}, \psi \mathbf{I}_D).
 
-Where :math:`\psi` is the prior weight variance (note that this corresponds to
+Here :math:`\psi` is the prior weight variance (note that this corresponds to
 :math:`\lambda^{-1}` in the MAP logistic classifier). We use the same
 likelihood model as before,
 
@@ -154,7 +161,7 @@ likelihood model as before,
         \sigma(\mathbf{x}_n^\top \mathbf{w})),
 
 and ideally we would like to infer the posterior distribution over these 
-weights using Bayes rule (as opposed to just the MAP value,
+weights using Bayes' rule (as opposed to just the MAP value,
 :math:`\hat{\mathbf{w}}`),
 
 .. math::
@@ -163,22 +170,22 @@ weights using Bayes rule (as opposed to just the MAP value,
     p(\mathbf{w}) \prod_n p(y_n | \mathbf{w}, \mathbf{x}_n)
     }{
     \int p(\mathbf{w}) \prod_n p(y_n | \mathbf{w}, \mathbf{x}_n) d\mathbf{w} 
-    },
+    }.
 
-however the integral in the denominator is intractable for this class of model.
-This is where variational inference comes to the rescue! By approximating the
+Unfortunately the integral in the denominator is intractable for this model.
+This is where variational inference comes to the rescue by approximating the
 posterior with a known form -- in this case a Gaussian,
 
 .. math::
 
     p(\mathbf{w} | \mathbf{X}, \mathbf{y}) & \approx q(\mathbf{w}), \\
-        &= \mathcal{N}(\mathbf{w} | \boldsymbol{\mu}, \boldsymbol{\Sigma}).
+        &= \mathcal{N}(\mathbf{w} | \boldsymbol{\mu}, \boldsymbol{\Sigma}),
 
-Here :math:`\boldsymbol{\mu} \in \mathbb{R}^D` and :math:`\boldsymbol{\Sigma}
+where :math:`\boldsymbol{\mu} \in \mathbb{R}^D` and :math:`\boldsymbol{\Sigma}
 \in \mathbb{R}^{D \times D}`. To make this approximation as close as possible,
-we can tractably optimize the Kullback Leibler divergence between this and true
-posterior using the evidence lower bound, ELBO, and the reparameterization
-trick in [1]_:
+variational inference optimizes the Kullback Leibler divergence between this
+and true posterior using the evidence lower bound, ELBO, and the
+reparameterization trick in [1]_:
 
 .. math::
 
@@ -187,29 +194,30 @@ trick in [1]_:
         p(\mathbf{w} | \mathbf{X}, \mathbf{y})
         \right].
 
-Why would we want to go to all this bother (i.e. learn an extra :math:`D^2`
-number of parameters over the MAP approach)? Well, a few reasons, the first
-being that the weights are well regularised in this formulation, for instance
-we can actually learn :math:`\psi`, rather than having to set it (this
-optimization of the prior is called empirical Bayes)! Secondly, we have a
-principled way of incorporating modelling uncertainty over the weights into our
-predictions,
+One question you may ask is why would we want to go to all this bother over the
+MAP approach? Specifically, why learn an extra :math:`\mathcal{O}(D^2)` number
+of parameters over the MAP approach? Well, a few reasons, the first being that
+the weights are well regularised in this formulation, for instance we can
+actually learn :math:`\psi`, rather than having to set it (this optimization of
+the prior is called empirical Bayes). Secondly, we have a principled way of
+incorporating modelling uncertainty over the weights into our predictions,
 
 .. math::
 
     p(y^* = 1 | \mathbf{X}, \mathbf{x}^*) &= \int
         \sigma(\mathbf{x}^{* \top}\mathbf{w})
         q(\mathbf{w}) d\mathbf{w}, \\
-        &\approx \frac{1}{S} \sum_s \sigma(\mathbf{x}^{* \top}\mathbf{w}^{(s)})
-        , \quad \mathbf{w}^{(s)} \sim q(\mathbf{w}).
+        &\approx \frac{1}{S} \sum^S_{s=1} 
+        \sigma(\mathbf{x}^{* \top}\mathbf{w}^{(s)}),
+        \quad \mathbf{w}^{(s)} \sim q(\mathbf{w}).
 
 This will have the effect of making our predictive probabilities closer to 0.5
 when the model is uncertain. The MAP approach has no mechanism to achieve this
 since it only learns the mode of the posterior, :math:`\hat{\mathbf{w}}`, with
 no notion of variance.
 
-Ok, so how do we implement this with Aboleth? Easy, we change ``layers`` to
-the following,
+So how do we implement this with Aboleth? Easy; we change ``layers`` to the
+following,
 
 .. code::
 
@@ -225,17 +233,17 @@ the following,
 
 Note we are using ``DenseVariational`` instead of ``DenseMAP``. In the
 ``DenseVariational`` layer the ``full`` parameter tells the layer to use a full
-covariance Gaussian, and ``var`` is initial value of the weight prior variance
-(which is optimized). Also we've set ``n_samples=5`` in the ``InputLayer``,
-this lets the subsequent layers know that we are making a *stochastic* model,
-that is, whenever we call ``layers`` we are actually expecting back 5 samples
-of the model output. This makes the ``DenseVariational`` layer multiply its
-input with 5 samples of the weights from the approximate posterior,
-:math:`\mathbf{X}\mathbf{w}^{(s)}`, where :math:`\mathbf{w}^{(s)} \sim
-q(\mathbf{w}),~\text{for}~s = \{1 \ldots 5\}`.  These 5 samples are then passed
-to the ``Activation`` layer.
+covariance Gaussian, and ``var`` is initial value of the weight prior variance,
+:math:`\psi`, which is optimized. Also we've set ``n_samples=5`` in the
+``InputLayer``, this lets the subsequent layers know that we are making a
+*stochastic* model, that is, whenever we call ``layers`` we are actually
+expecting back 5 samples of the model output. This makes the
+``DenseVariational`` layer multiply its input with 5 samples of the weights
+from the approximate posterior, :math:`\mathbf{X}\mathbf{w}^{(s)}`, where
+:math:`\mathbf{w}^{(s)} \sim q(\mathbf{w}),~\text{for}~s = \{1 \ldots 5\}`.
+These 5 samples are then passed to the ``Activation`` layer.
 
-Then, like before:
+Then like before to complete the model specification:
 
 .. code::
 
@@ -245,7 +253,7 @@ Then, like before:
 
 The main differences here are that ``reg`` is now ``kl``, and we use the
 ``elbo`` loss function. For all intents and purposes ``kl`` is still a
-regulariser on the weights (it is the Kullback Leibler divergence between the
+regularizer on the weights (it is the Kullback Leibler divergence between the
 posterior and the prior distributions on the weights), and ``elbo`` is the
 evidence lower bound objective. Here ``N`` is the (expected) size of the
 dataset, we need to know this term in order to properly calculate the evidence
@@ -267,7 +275,7 @@ these samples for the predicted class probability,
     expected_p = np.mean(probabilities, axis=0)
 
 or, you can generate *more* samples to get a more accurate expected
-probability (again with the TensorFlow session, ``sess``),
+probabilities (again with the TensorFlow session, ``sess``),
 
 .. code::
 
@@ -284,27 +292,26 @@ of these samples exactly as before.
 Approximate Gaussian Processes
 ------------------------------
 
-Apart from Aboleth providing the building blocks to easily create Bayesian deep
-neural nets, it also provides the building blocks to easily create scalable
+Aboleth also provides the building blocks to easily create scalable
 (approximate) Gaussian processes. We'll implement a simple Gaussian process
-regressor here.
+regressor here, but for brevity, we'll skip the introduction to Gaussian
+processes, and refer the interested reader to [2]_. 
 
-For brevity, we'll skip the introduction to Gaussian processes, and refer the
-interested reader to [2]_. The approximation we have implemented in Aboleth is
-the *random feature* approximation (see [3]_ and [4]_), where we can
-approximate a kernel function from a random set of basis functions,
+The approximation we have implemented in Aboleth is the *random feature
+expansions* (see [3]_ and [4]_), where we can approximate a kernel function
+from a set of random basis functions,
 
 .. math::
 
     \text{k}(\mathbf{x}_i, \mathbf{x}_j) \approx \frac{1}{S}
-        \sum_s \phi^{(s)}(\mathbf{x}_i)^\top \phi^{(s)}(\mathbf{x}_j)
+        \sum^S_{s=1} \phi^{(s)}(\mathbf{x}_i)^\top \phi^{(s)}(\mathbf{x}_j),
 
 
-With equality in the infinite limit. The trick is to find the right set of
-basis functions, :math:`\phi`, that correspond to a particular family of kernel
-functions, e.g. radial basis, Matern, etc. This insight allows us to formulate
-a Gaussian process regressor as a *Bayesian linear regressor* using the basis
-functions, :math:`\phi^{(s)}(\mathbf{X})`!
+with equality in the infinite limit. The trick is to find the right family of
+basis functions, :math:`\phi`, that corresponds to a particular family of
+kernel functions, e.g. radial basis, Matern, etc. This insight allows us to
+approximate a Gaussian process regressor with a *Bayesian linear regressor*
+using these random basis functions, :math:`\phi^{(s)}(\mathbf{X})`!
 
 We can easily do this using Aboleth, for example, with a radial basis kernel,
 
@@ -324,8 +331,8 @@ We can easily do this using Aboleth, for example, with a radial basis kernel,
 
 Here we have made ``lenscale`` a TensorFlow variable so it will be optimized,
 and we have also used the ``ab.pos`` function to make sure it stays positive.
-The ``ab.RandomFourier`` class implements random Fourier features [3]_, which
-can model shift invariant kernel functions, like radial basis, Matern, etc. See
+The ``ab.RandomFourier`` class implements random Fourier features [3]_, that
+can model shift invariant kernel functions like radial basis, Matern, etc. See
 :ref:`kernels` for implemented kernels. We have also implemented random
 arc-cosine kernels [4]_ see ``ab.RandomArcCosine`` in :ref:`layers`.
 
@@ -341,10 +348,12 @@ Then to complete the formulation of the Gaussian process (likelihood and loss),
 
 
 Here we just have a Normal likelihood since we are creating a model for
-regression, and we can also get TensorFlow to optimise the likelihood variance.
+regression, and we can also get TensorFlow to optimise the likelihood variance,
+``var``.
 
-Training and prediction work exactly the same was as the Bayesian logistic
-classifier. Here is an example of the approximate GP in action;
+Training and prediction work in exactly the same way as the Bayesian logistic
+classifier. Here is an example of the approximate GP in action (see
+:ref:`regress` for a more detailed demonstration);
 
 .. figure:: GP_approx.png
 
@@ -358,8 +367,8 @@ classifier. Here is an example of the approximate GP in action;
 See Also
 --------
 
-For demonstrations of more of the functionality within Aboleth, we recommend
-you check out the demos,
+For more detailed demonstrations of the functionality within Aboleth, we
+recommend you check out the demos,
 
 - :ref:`regress` and :ref:`sarcos` - for more regression applications. 
 - :ref:`multi_in` - models with multiple input data types.
