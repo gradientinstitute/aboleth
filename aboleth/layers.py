@@ -348,9 +348,9 @@ class DenseVariational(SampleLayer3):
     ----------
     output_dim : int
         the dimension of the output of this layer
-    reg : float
-        the initial value of the weight prior, which defaults to
-        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{reg} \mathbf{I})`,
+    var : float
+        the initial value of the weight prior variance, which defaults to
+        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{var} \mathbf{I})`,
         this is optimized (a la maximum likelihood type II).
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
@@ -361,11 +361,11 @@ class DenseVariational(SampleLayer3):
     prior_W : distributions.Normal, distributions.Gaussian, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``reg`` parameter.
+        weights. This ignores the ``var`` parameter.
     prior_b : distributions.Normal, distributions.Gaussian, optional
         This is the prior distribution object to use on the layer intercept. It
         must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``reg`` and ``use_bias`` parameters.
+        This ignores the ``var`` and ``use_bias`` parameters.
     post_W : distributions.Normal, distributions.Gaussian, optional
         It must have parameters compatible with (input_dim, output_dim) shaped
         weights. This ignores the ``full`` parameter. See also
@@ -378,11 +378,11 @@ class DenseVariational(SampleLayer3):
 
     """
 
-    def __init__(self, output_dim, reg=1., full=False, use_bias=True,
+    def __init__(self, output_dim, var=1., full=False, use_bias=True,
                  prior_W=None, prior_b=None, post_W=None, post_b=None):
         """Create and instance of a variational dense layer."""
         self.output_dim = output_dim
-        self.reg = reg
+        self.var = var
         self.full = full
         self.use_bias = use_bias
         self.pW = prior_W
@@ -428,7 +428,7 @@ class DenseVariational(SampleLayer3):
             output_shape = (input_dim, self.output_dim,)
 
         if prior_W is None:
-            prior_W = norm_prior(dim=output_shape, var=self.reg)
+            prior_W = norm_prior(dim=output_shape, var=self.var)
 
         assert _is_dim(prior_W.mu, output_shape), \
             "Prior inconsistent dimension!"
@@ -445,9 +445,9 @@ class DenseVariational(SampleLayer3):
         if post_W is None:
             # We don't want a full-covariance on an intercept, check input_dim
             if self.full and input_dim is not None:
-                post_W = gaus_posterior(dim=output_shape, var0=self.reg)
+                post_W = gaus_posterior(dim=output_shape, var0=self.var)
             else:
-                post_W = norm_posterior(dim=output_shape, var0=self.reg)
+                post_W = norm_posterior(dim=output_shape, var0=self.var)
 
         assert _is_dim(post_W.mu, output_shape), \
             "Posterior inconsistent dimension!"
@@ -472,9 +472,9 @@ class EmbedVariational(DenseVariational):
         the dimension of the output (embedding) of this layer
     n_categories : int
         the number of categories in the input variable
-    reg : float
-        the initial value of the weight prior, which defaults to
-        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{reg} \mathbf{I})`,
+    var : float
+        the initial value of the weight prior variance, which defaults to
+        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{var} \mathbf{I})`,
         this is optimized (a la maximum likelihood type II).
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
@@ -483,7 +483,7 @@ class EmbedVariational(DenseVariational):
     prior_W : distributions.Normal, distributions.Gaussian, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``reg`` parameter.
+        weights. This ignores the ``var`` parameter.
     post_W : distributions.Normal, distributions.Gaussian, optional
         This is the posterior distribution object to use on the layer weights.
         It must have parameters compatible with (input_dim, output_dim) shaped
@@ -492,13 +492,13 @@ class EmbedVariational(DenseVariational):
 
     """
 
-    def __init__(self, output_dim, n_categories, reg=1., full=False,
+    def __init__(self, output_dim, n_categories, var=1., full=False,
                  prior_W=None, post_W=None):
         """Create and instance of a variational dense embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
         self.n_categories = n_categories
-        self.reg = reg
+        self.var = var
         self.full = full
         self.pW = prior_W
         self.qW = post_W

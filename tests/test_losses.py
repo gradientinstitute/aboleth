@@ -1,61 +1,65 @@
 """Test the layers module."""
+
 import numpy as np
 import tensorflow as tf
 
 import aboleth as ab
+from aboleth.losses import _sum_likelihood
 
 
-def test_net_outputs(make_graph):
-    """Test for expected output dimensions from a net."""
+def test_elbo_likelihood(make_graph):
+    """Test for expected output dimensions from loss ."""
     x, y, N, X_, Y_, N_, like, layers = make_graph
     Net, kl = layers(X=X_)
+
+    # Now test with likelihood weights
     loss = ab.elbo(Net, Y_, N, kl, like)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
 
-        P = Net.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
-        l = loss.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
-
-        assert P.shape == (10, N, 1)
-        assert np.isscalar(l)
+        L = loss.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
+        assert np.isscalar(L)
 
 
-def test_likelihood_weights(make_graph):
+def test_map_likelihood(make_graph):
     """Test for expected output dimensions from deepnet."""
-    x, y, N, X_, Y_, N_, like, layers = make_graph
-    Net, kl = layers(X=X_)
+    x, y, _, _, _, _, like, layers = make_graph
+    Net, reg = layers(X=x.astype(np.float32))
 
     # Now test with likelihood weights
-    lw = np.ones_like(y)
-    lw_ = tf.placeholder(tf.float32, (len(y), 1))
-    lossw = ab.elbo(Net, Y_, N, kl, like, like_weights=lw_)
-    lossf = ab.elbo(Net, Y_, N, kl, like, like_weights=lambda y: 1.)
+    loss = ab.max_posterior(Net, y.astype(np.float32),  reg, like)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
 
-        P = Net.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
-        l = lossw.eval(feed_dict={X_: x, Y_: y, N_: float(N), lw_: lw})
-        assert P.shape == (10, N, 1)
-        assert np.isscalar(l)
-
-        l = lossf.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
-        assert np.isscalar(l)
+        L = loss.eval()
+        assert np.isscalar(L)
 
 
-def test_elbo_output(make_graph):
-    """Test for scalar output from elbo."""
-    x, y, N, X_, Y_, N_, like, layers = make_graph
-    Net, kl = layers(X=X_)
-    kl = 0.0
-    elbo = ab.elbo(Net, Y_, N, kl, like)
+def test_sum_likelihood():
+    """Test we can do weighted sums of likelihoods."""
+    like = ab.likelihoods.Bernoulli()
+    N = 5
+    Net = np.ones(N) * .5
+    Y = np.ones(N)
+
+    def weight_fn(Y):
+        return Y * np.arange(N)
+
+    unweighted = _sum_likelihood(Y, Net, like, None)
+    value = _sum_likelihood(Y, Net, like, np.arange(N))
+    call = _sum_likelihood(Y, Net, like, weight_fn)
 
     tc = tf.test.TestCase()
     with tc.test_session():
-        tf.global_variables_initializer().run()
+        sumll = unweighted.eval()
+        assert np.allclose(sumll, np.log(0.5) * N)
 
-        obj = elbo.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
-        assert np.isscalar(obj)
+        sumll = value.eval()
+        assert np.allclose(sumll, np.sum(np.log(0.5) * np.arange(N)))
+
+        sumll = call.eval()
+        assert np.allclose(sumll, np.sum(np.log(0.5) * np.arange(N)))

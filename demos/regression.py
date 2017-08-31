@@ -27,7 +27,7 @@ true_noise = 0.1
 # Model settings
 n_samples = 5
 n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
-n_epochs = 300
+n_epochs = 100
 batch_size = 10
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
@@ -43,11 +43,11 @@ lenscale = 1.
 kern = ab.RBFVariational(lenscale=lenscale)
 
 
-net = ab.stack(
-    ab.InputLayer(name="X", n_samples=n_samples),
-    ab.RandomFourier(n_features=200, kernel=kern),
+net = (
+    ab.InputLayer(name="X", n_samples=n_samples) >>
+    ab.RandomFourier(n_features=100, kernel=kern) >>
     ab.DenseVariational(output_dim=1, reg=reg, full=True)
-    )
+)
 
 
 def main():

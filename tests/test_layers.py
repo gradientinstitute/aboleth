@@ -13,6 +13,20 @@ DIM = (2, 10)
 EDIM = (5, 10)
 
 
+def test_net_outputs(make_graph):
+    """Test for expected output dimensions from a net."""
+    x, y, N, X_, Y_, N_, like, layers = make_graph
+    Net, kl = layers(X=X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+
+        P = Net.eval(feed_dict={X_: x, Y_: y, N_: float(N)})
+
+        assert P.shape == (10, N, 1)
+
+
 def test_input(make_data):
     """Test the input layer."""
     x, _, X = make_data
