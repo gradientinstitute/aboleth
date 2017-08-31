@@ -64,10 +64,10 @@ You can run the tests by issuing from the top level repository directory::
 
     $ pytest .
 
-Our continuous integration (CI) will fail if coverage drops below 80%, and we
-generally want coverage to remain above 90%, furthermore, our CI will fail
-if the code doesn't pass PEP 8 and PEP 257 conventions. You can run the exact
-CI tests by issuing::
+Our continuous integration (CI) will fail if coverage drops below 90%, and we
+generally want coverage to remain significantly above this. Furthermore, our CI
+will fail if the code doesn't pass PEP 8 and PEP 257 conventions. You can run
+the exact CI tests by issuing::
 
     $ make coverage
     $ make lint

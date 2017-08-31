@@ -105,8 +105,8 @@ def batch_prediction(feed_dict, batch_size):
         original data for the current batch
     dict :
         with each element an array length ``batch_size``, i.e. a subset of
-        data, and an element for ``N_``. Use this as your feed-dict when
-        evaluating a loss, training, etc.
+        data. Use this as your feed-dict when evaluating a model, prediction,
+        etc.
 
     Note
     ----
