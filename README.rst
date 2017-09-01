@@ -12,13 +12,6 @@ A bare-bones TensorFlow framework for *Bayesian* deep learning and Gaussian
 process approximation [1]_ with stochastic gradient variational Bayes inference
 [2]_.
 
-.. figure:: http://fc03.deviantart.net/fs71/i/2010/162/e/3/Aboleth__Sunken_Empires_by_butterfrog.jpg
-    :width: 50%
-    :alt: (c) 2010-2017 butterfrog
-    :align: center
-
-    Image |copy| 2010-2017 butterfrog.
-
 
 Features
 --------
