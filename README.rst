@@ -8,9 +8,9 @@ Aboleth
     :target: https://circleci.com/gh/data61/aboleth/tree/develop
     :alt: circleCI
 
-A bare-bones TensorFlow framework for *Bayesian* deep learning and Gaussian
-process approximation [1]_ with stochastic gradient variational Bayes inference
-[2]_.
+A bare-bones `TensorFlow <https://www.tensorflow.org/>`_ framework for
+*Bayesian* deep learning and Gaussian process approximation [1]_ with
+stochastic gradient variational Bayes inference [2]_.
 
 
 Features
