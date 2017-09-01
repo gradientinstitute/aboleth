@@ -35,12 +35,7 @@ extensions = [
     'sphinx.ext.ifconfig',
 ]
 
-extensions.extend(
-    ['sphinx.ext.napoleon',
-     'sphinx.ext.autosummary',
-     'IPython.sphinxext.ipython_console_highlighting',
-     'IPython.sphinxext.ipython_directive']
-)
+extensions.extend(['sphinx.ext.napoleon', 'sphinx.ext.autosummary'])
 
 napoleon_numpy_docstring = True
 
