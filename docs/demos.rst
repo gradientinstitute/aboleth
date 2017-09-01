@@ -9,7 +9,12 @@ Demos
 Regression
 ----------
 
-TODO
+.. automodule:: demos.regression
+    :exclude-members: main, batch_training
+
+You can find the full script `here
+<https://github.com/data61/aboleth/blob/develop/demos/regression.py>`_.
+    
 
 .. _sarcos:
 

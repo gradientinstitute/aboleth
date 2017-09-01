@@ -1,4 +1,8 @@
-"""Demo using aboleth for regression."""
+"""This demo uses Aboleth for approximate Gaussian process regression.
+
+More detailed explanation here...
+
+"""
 import logging
 
 import numpy as np
@@ -46,7 +50,7 @@ kern = ab.RBFVariational(lenscale=lenscale)
 net = (
     ab.InputLayer(name="X", n_samples=n_samples) >>
     ab.RandomFourier(n_features=100, kernel=kern) >>
-    ab.DenseVariational(output_dim=1, reg=reg, full=True)
+    ab.DenseVariational(output_dim=1, var=reg, full=True)
 )
 
 

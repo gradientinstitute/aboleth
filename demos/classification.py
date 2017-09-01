@@ -19,8 +19,8 @@ ab.set_hyperseed(RSEED)
 NITER = 20000
 BSIZE = 10
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
-LSAMPLES = 10
-PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
+LSAMPLES = 1
+PSAMPLES = 50  # This will give LSAMPLES * PSAMPLES predictions
 REG = 0.1
 
 # Network structure

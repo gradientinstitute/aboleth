@@ -4,8 +4,8 @@ Aboleth
 
 .. |copy| unicode:: 0xA9
 
-.. image:: https://circleci.com/gh/determinant-io/aboleth/tree/develop.svg?style=svg&circle-token=f02db635cf3a7e998e17273c91f13ffae7dbf088
-    :target: https://circleci.com/gh/determinant-io/aboleth/tree/develop
+.. image:: https://circleci.com/gh/data61/aboleth/tree/develop.svg?style=svg&circle-token=f02db635cf3a7e998e17273c91f13ffae7dbf088
+    :target: https://circleci.com/gh/data61/aboleth/tree/develop
     :alt: circleCI
 
 A bare-bones TensorFlow framework for *Bayesian* deep learning and Gaussian
@@ -92,7 +92,8 @@ For a minimal install, at the command line via pip in the project directory::
 
     $ pip install .
 
-To install additional dependencies required by the `demos <https://github.com/determinant-io/aboleth/tree/develop/demos>`_::
+To install additional dependencies required by the `demos
+<https://github.com/data61/aboleth/tree/develop/demos>`_::
 
     $ pip install .[demos]
 
@@ -105,7 +106,7 @@ Getting Started
 ---------------
 
 See the quick start guide to get started. Also see See the `demos
-<https://github.com/determinant-io/aboleth/tree/develop/demos>`_ folder for
+<https://github.com/data61/aboleth/tree/develop/demos>`_ folder for
 more examples of creating and training algorithms with Aboleth.
 
 
