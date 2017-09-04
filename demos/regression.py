@@ -1,8 +1,4 @@
-"""This demo uses Aboleth for approximate Gaussian process regression.
-
-More detailed explanation here...
-
-"""
+"""This demo uses Aboleth for approximate Gaussian process regression."""
 import logging
 
 import numpy as np
@@ -16,37 +12,48 @@ import aboleth as ab
 from aboleth.likelihoods import Normal
 from aboleth.datasets import gp_draws
 
+# Set up a python logger so we can see the output of MonitoredTrainingSession
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# Set up a consistent random seed in Aboleth so we get repeatable, but random
+# results
 RSEED = 666
 ab.set_hyperseed(RSEED)
 
 # Data settings
-N = 2000
-Ns = 400
-kernel = kern(length_scale=0.5)
-true_noise = 0.1
+N = 2000  # Number of training points to generate
+Ns = 400  # Number of testing points to generate
+kernel = kern(length_scale=0.5)  # Kernel to use for making a random GP draw
+true_noise = 0.1  # Add noise to the GP draws, to make things a little harder
 
 # Model settings
-n_samples = 5
+n_samples = 5  # Number of random samples to get from an Aboleth net
 n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
-n_epochs = 100
-batch_size = 10
-config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
+n_epochs = 100  # how many times to see the data for training
+batch_size = 10  # mini batch size for stochastric gradients
+config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
-variance = tf.Variable(1.)
-reg = 1.
+# Model initialisation
+variance = tf.Variable(1.)  # Likelihood variance initialisation, and learning
+reg = 1.  # Initial weight prior variance, this is optimised later
 
 # Random Fourier Features
-# lenscale = ab.pos(tf.Variable(1.))
-# kern = ab.RBF(lenscale=lenscale)
+# lenscale = tf.Variable(1.)  # learn the length scale
+# kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
 
-# Variational Fourier Features -- length-scale setting here is the "prior"
+# Variational Fourier Features -- length-scale setting here is the "prior", we
+# can choose to optimise this or not
 lenscale = 1.
-kern = ab.RBFVariational(lenscale=lenscale)
+kern = ab.RBFVariational(lenscale=lenscale)  # This is VAR-FIXED kernel from
+# Cutjar et. al. 2017
 
-
+# This is how we make the "latent function" of a Gaussian process, here
+# n_features controls how many random basis functions we use in the
+# approximation. The more of these, the more accurate, but more costly
+# computationally. "full" indicates we want a full-covariance matrix Gaussian
+# posterior of the model weights. This is optional, but it does greatly improve
+# the model uncertainty away from the data.
 net = (
     ab.InputLayer(name="X", n_samples=n_samples) >>
     ab.RandomFourier(n_features=100, kernel=kern) >>
@@ -66,39 +73,47 @@ def main():
     Xq = np.linspace(-20, 20, Ns).astype(np.float32)[:, np.newaxis]
     Yq = np.linspace(-4, 4, Ns).astype(np.float32)[:, np.newaxis]
 
-    # Image
+    # Set up the probability image query points
     Xi, Yi = np.meshgrid(Xq, Yq)
     Xi = Xi.astype(np.float32).reshape(-1, 1)
     Yi = Yi.astype(np.float32).reshape(-1, 1)
 
     _, D = Xr.shape
 
-    # Data
+    # Name the "data" parts of the graph
     with tf.name_scope("Input"):
+        # This function will make a TensorFlow queue for shuffling and batching
+        # the data, and will run through n_epochs of the data.
         Xb, Yb = batch_training(Xr, Yr, n_epochs=n_epochs,
                                 batch_size=batch_size)
         X_ = tf.placeholder_with_default(Xb, shape=(None, D))
         Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
 
     with tf.name_scope("Likelihood"):
-        lkhood = Normal(variance=ab.pos(variance))
+        lkhood = Normal(variance=ab.pos(variance))  # Keep the var positive
 
+    # This is where we build the actual GP model
     with tf.name_scope("Deepnet"):
         Phi, kl = net(X=X_)
         loss = ab.elbo(Phi, Y_, N, kl, lkhood)
 
+    # Set up the trainig graph
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         global_step = tf.train.create_global_step()
         train = optimizer.minimize(loss, global_step=global_step)
+
+    # This is used for building the predictive density image
+    with tf.name_scope("Predict"):
         logprob = lkhood(Y_, Phi)
 
-    # Logging
+    # Logging learning progress
     log = tf.train.LoggingTensorHook(
         {'step': global_step, 'loss': loss},
         every_n_iter=1000
     )
 
+    # This is the main training "loop"
     with tf.train.MonitoredTrainingSession(
             config=config,
             save_summaries_steps=None,
@@ -118,8 +133,8 @@ def main():
         logPY = ab.predict_expected(logprob, feed_dict={Y_: Yi, X_: Xi},
                                     n_groups=n_pred_samples, session=sess)
 
-    Eymean = Ey.mean(axis=0)
-    Py = np.exp(logPY.reshape(Ns, Ns))
+    Eymean = Ey.mean(axis=0)  # Average samples to get mean predicted funtion
+    Py = np.exp(logPY.reshape(Ns, Ns))  # Turn log-prob into prob
 
     # Plot
     im_min = np.amin(Py)
@@ -138,12 +153,11 @@ def main():
 
 
 def batch_training(X, Y, batch_size, n_epochs):
-    """Batch training queue."""
+    """Batch training queue convenience function."""
     X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
     Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
-    X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 1000, 1,
-                                              enqueue_many=True,
-                                              seed=RSEED)
+    X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 100, 1,
+                                              enqueue_many=True, seed=RSEED)
     return X_batch, Y_batch
 
 
