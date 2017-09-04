@@ -12,17 +12,7 @@ Documentation Contents
    authors
    contributing
 
-   losses
-   baselayers
-   layers
-   hlayers
-   impute
-   kernels
-   likelihoods
-   distributions
-   random
-   util
-   datasets
+   api/api
 
 
 Feedback

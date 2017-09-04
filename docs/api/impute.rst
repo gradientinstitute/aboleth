@@ -1,7 +1,7 @@
 .. _impute:
 
-Imputation neural network layers
-================================
+ab.impute
+=========
 
 .. automodule:: aboleth.impute
     :members:

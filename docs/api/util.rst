@@ -1,5 +1,7 @@
-Utility functions
-=================
+.. _util:
+
+ab.util
+=======
 
 .. automodule:: aboleth.util
     :members:

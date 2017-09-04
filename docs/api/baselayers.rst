@@ -1,7 +1,7 @@
 .. _baselayers:
 
-Base classes for neural network layers
-======================================
+ab.baselayers
+=============
 
 .. automodule:: aboleth.baselayers
     :members:

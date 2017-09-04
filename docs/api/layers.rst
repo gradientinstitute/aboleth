@@ -1,7 +1,7 @@
 .. _layers:
 
-Neural network layers
-=====================
+ab.layers
+=========
 
 .. automodule:: aboleth.layers
     :members:

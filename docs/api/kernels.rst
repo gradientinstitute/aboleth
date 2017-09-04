@@ -1,7 +1,7 @@
 .. _kernels:
 
-Random Kernel approximation
-===========================
+ab.kernels
+==========
 
 .. automodule:: aboleth.kernels
     :members:

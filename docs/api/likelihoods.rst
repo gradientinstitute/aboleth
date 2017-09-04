@@ -1,7 +1,7 @@
 .. _likelihoods:
 
-Likelihood models
-=================
+ab.likelihoods
+==============
 
 .. automodule:: aboleth.likelihoods
     :members:

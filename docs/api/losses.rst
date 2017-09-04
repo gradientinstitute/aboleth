@@ -1,5 +1,5 @@
-Loss functions
-==============
+ab.losses
+=========
 
 .. automodule:: aboleth.losses
     :members:

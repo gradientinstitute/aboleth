@@ -1,7 +1,7 @@
 .. _hlayers:
 
-Higher-order neural network layers
-==================================
+ab.hlayers
+==========
 
 .. automodule:: aboleth.hlayers
     :members:
