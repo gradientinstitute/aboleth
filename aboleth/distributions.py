@@ -134,7 +134,7 @@ class Gaussian(ParameterDistribution):
 #
 
 def norm_prior(dim, var):
-    """Initialise a prior (diagonal) Normal distribution.
+    """Initialise a prior (zero mean, diagonal) Normal distribution.
 
     Parameters
     ----------
@@ -147,6 +147,11 @@ def norm_prior(dim, var):
     -------
     P : Normal
         the initialised prior Normal object.
+
+    Note
+    ----
+    This will make a tf.Variable on the variance of the prior that is
+    initialised with ``var``.
 
     """
     mu = tf.zeros(dim)
@@ -170,6 +175,13 @@ def norm_posterior(dim, var0):
     Q : Normal
         the initialised posterior Normal object.
 
+    Note
+    ----
+    This will make tf.Variables on the randomly initialised mean and variance
+    of the posterior. The initialisation of the mean is from a Normal with zero
+    mean, and ``var0`` variance, and the initialisation of the variance is from
+    a gamma distribution with an alpha of ``var0`` and a beta of 1.
+
     """
     mu_0 = tf.random_normal(dim, stddev=tf.sqrt(var0), seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
@@ -185,7 +197,8 @@ def gaus_posterior(dim, var0):
     """Initialise a posterior Gaussian distribution with a diagonal covariance.
 
     Even though this is initialised with a diagonal covariance, a full
-    covariance will be learned.
+    covariance will be learned, using a lower triangular Cholesky
+    parameterisation.
 
     Parameters
     ----------
@@ -199,6 +212,13 @@ def gaus_posterior(dim, var0):
     Q : Gaussian
         the initialised posterior Gaussian object.
 
+    Note
+    ----
+    This will make tf.Variables on the randomly initialised mean and covariance
+    of the posterior. The initialisation of the mean is from a Normal with zero
+    mean, and ``var0`` variance, and the initialisation of the variance is from
+    a gamma distribution with an alpha of ``var0`` and a beta of 1.
+
     """
     I, O = dim
     sig0 = np.sqrt(var0)
@@ -207,7 +227,7 @@ def gaus_posterior(dim, var0):
     u, v = np.tril_indices(I)
     indices = (u * I + v)[:, np.newaxis]
     l0 = np.tile(np.eye(I), [O, 1, 1])[:, u, v].T
-    l0 = l0 * tf.random_gamma(alpha=sig0, shape=l0.shape, seed=next(seedgen))
+    l0 = l0 * tf.random_gamma(alpha=var0, shape=l0.shape, seed=next(seedgen))
     l = tf.Variable(l0, name="W_cov_q")
     Lt = tf.transpose(tf.scatter_nd(indices, l, shape=(I * I, O)))
     L = tf.reshape(Lt, (O, I, I))

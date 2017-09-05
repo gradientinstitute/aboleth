@@ -115,20 +115,25 @@ todo_include_todos = True
 
 
 # Autodoc options
-autodoc_default_flags = ['members', 'undoc-members', 'private-members',
-                         'inherited-members', 'show-inheritance']
+autodoc_default_flags = ['members', 'undoc-members', 'inherited-members',
+                         'show-inheritance']
 
 
 # -- Options for HTML output ----------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'alabaster'
+# html_theme = 'alabaster'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+html_theme_options = {
+    'github_button': True,
+    'github_banner': True,
+    'github_user': 'data61',
+    'github_repo': 'aboleth',
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []

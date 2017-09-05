@@ -26,7 +26,6 @@ class InputLayer(MultiLayer):
     ----------
     name : string
         The name of the input. Used as the agument for input into the net.
-
     n_samples : int > 0
         The number of samples.
 
@@ -303,11 +302,11 @@ class RandomArcCosine(RandomFourier):
 
     See Also
     --------
-    [1] Cho, Youngmin, and Lawrence K. Saul. "Analysis and extension of
-        arc-cosine kernels for large margin classification." arXiv preprint
-        arXiv:1112.3712 (2011).
-    [2] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. Random Feature
-        Expansions for Deep Gaussian Processes. In ICML, 2017.
+    [1] Cho, Youngmin, and Lawrence K. Saul.
+        "Analysis and extension of arc-cosine kernels for large margin
+        classification." arXiv preprint arXiv:1112.3712 (2011).
+    [2] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M.
+        Random Feature Expansions for Deep Gaussian Processes. In ICML, 2017.
 
     """
 
@@ -393,10 +392,11 @@ class DenseVariational(SampleLayer3):
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self._get_X_dims(X)
+        W_shape, b_shape = self._weight_shapes(input_dim)
 
         # Layer weights
-        self.pW = self._make_prior(self.pW, input_dim)
-        self.qW = self._make_posterior(self.qW, input_dim)
+        self.pW = self._make_prior(self.pW, W_shape)
+        self.qW = self._make_posterior(self.qW, W_shape)
 
         # Regularizers
         KL = kl_qp(self.qW, self.pW)
@@ -408,8 +408,8 @@ class DenseVariational(SampleLayer3):
         # Optional bias
         if self.use_bias is True or self.prior_b or self.post_b:
             # Layer intercepts
-            self.pb = self._make_prior(self.pb)
-            self.qb = self._make_posterior(self.qb)
+            self.pb = self._make_prior(self.pb, b_shape)
+            self.qb = self._make_posterior(self.qb, b_shape)
 
             # Regularizers
             KL += kl_qp(self.qb, self.pb)
@@ -420,39 +420,36 @@ class DenseVariational(SampleLayer3):
 
         return Net, KL
 
-    def _make_prior(self, prior_W, input_dim=None):
+    def _make_prior(self, prior_W, weight_shape):
         """Check/make prior."""
-        if input_dim is None:
-            output_shape = (self.output_dim,)
-        else:
-            output_shape = (input_dim, self.output_dim,)
-
         if prior_W is None:
-            prior_W = norm_prior(dim=output_shape, var=self.var)
+            prior_W = norm_prior(dim=weight_shape, var=self.var)
 
-        assert _is_dim(prior_W.mu, output_shape), \
+        assert _is_dim(prior_W.mu, weight_shape), \
             "Prior inconsistent dimension!"
 
         return prior_W
 
-    def _make_posterior(self, post_W, input_dim=None):
+    def _make_posterior(self, post_W, weight_shape):
         """Check/make posterior."""
-        if input_dim is None:
-            output_shape = (self.output_dim,)
-        else:
-            output_shape = (input_dim, self.output_dim,)
-
         if post_W is None:
             # We don't want a full-covariance on an intercept, check input_dim
-            if self.full and input_dim is not None:
-                post_W = gaus_posterior(dim=output_shape, var0=self.var)
+            if self.full and len(weight_shape) > 1:
+                post_W = gaus_posterior(dim=weight_shape, var0=self.var)
             else:
-                post_W = norm_posterior(dim=output_shape, var0=self.var)
+                post_W = norm_posterior(dim=weight_shape, var0=self.var)
 
-        assert _is_dim(post_W.mu, output_shape), \
+        assert _is_dim(post_W.mu, weight_shape), \
             "Posterior inconsistent dimension!"
 
         return post_W
+
+    def _weight_shapes(self, input_dim):
+        """Generate weight and bias weight shape tuples."""
+        weight_shape = (input_dim, self.output_dim)
+        bias_shape = (self.output_dim,)
+
+        return weight_shape, bias_shape
 
     @staticmethod
     def _sample_W(dist, n_samples):
@@ -506,12 +503,13 @@ class EmbedVariational(DenseVariational):
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self._get_X_dims(X)
+        W_shape, _ = self._weight_shapes(self.n_categories)
 
         assert input_dim == 1, "X must be a *column* of indices!"
 
         # Layer weights
-        self.pW = self._make_prior(self.pW, self.n_categories)
-        self.qW = self._make_posterior(self.qW, self.n_categories)
+        self.pW = self._make_prior(self.pW, W_shape)
+        self.qW = self._make_posterior(self.qW, W_shape)
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = self._sample_W(self.qW, n_samples)

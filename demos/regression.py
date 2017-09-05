@@ -22,7 +22,7 @@ RSEED = 666
 ab.set_hyperseed(RSEED)
 
 # Data settings
-N = 2000  # Number of training points to generate
+N = 1000  # Number of training points to generate
 Ns = 400  # Number of testing points to generate
 kernel = kern(length_scale=0.5)  # Kernel to use for making a random GP draw
 true_noise = 0.1  # Add noise to the GP draws, to make things a little harder
@@ -30,7 +30,7 @@ true_noise = 0.1  # Add noise to the GP draws, to make things a little harder
 # Model settings
 n_samples = 5  # Number of random samples to get from an Aboleth net
 n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
-n_epochs = 100  # how many times to see the data for training
+n_epochs = 200  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
