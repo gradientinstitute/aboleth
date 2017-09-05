@@ -1,4 +1,4 @@
-"""Example of using different nets for different input types."""
+"""Example of using different input layers for different input types."""
 import tempfile
 import urllib.request as req
 
@@ -25,15 +25,15 @@ LABEL_COLUMN = "label"
 
 
 # Algorithm properties
-RSEED = 17
+RSEED = 666
 ab.set_hyperseed(RSEED)
 
 # Sample width of net
-T_SAMPLES = 10
-EMBED_DIMS = 3
+T_SAMPLES = 10  # Number of random samples to get from an Aboleth net
+EMBED_DIMS = 5   # Number of dimensions to embed the categorical columns into
 
-BSIZE = 50
-NITER = 60000
+BSIZE = 50  # Mini batch size
+NITER = 60000  # Number of iterations (mini-batch views)
 P_SAMPLES = 5  # results in T_SAMPLES * P_SAMPLES predcitions
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
@@ -46,16 +46,22 @@ def main():
     df = pd.concat((df_train, df_test))
     X_con, X_cat, n_cats, Y = input_fn(df)
 
-    # Define our graph
-    con_layer = (ab.InputLayer(name='con', n_samples=T_SAMPLES) >>
-                 ab.DenseVariational(output_dim=5, full=True))
+    # Define the continuous layers
+    con_layer = (
+        ab.InputLayer(name='con', n_samples=T_SAMPLES) >>
+        ab.DenseVariational(output_dim=5, full=True)
+    )
 
-    # Note every embed_var call can be different
+    # Now define the cateogrical layers, which we embed
+    # Note every embed_var call can be different, this is just "lazy"
     cat_layer_list = [ab.EmbedVariational(EMBED_DIMS, i) for i in n_cats]
+    cat_layer = (
+        ab.InputLayer(name='cat', n_samples=T_SAMPLES) >>
+        ab.PerFeature(*cat_layer_list)  # Assign columns to an embedding layers
+    )
 
-    cat_layer = (ab.InputLayer(name='cat', n_samples=T_SAMPLES) >>
-                 ab.PerFeature(*cat_layer_list))
-
+    # Now we can feed the initial continuous and cateogrical layers to further
+    # "joint" layers after we concatenate them
     net = ab.stack(ab.Concat(con_layer, cat_layer),
                    ab.RandomArcCosine(100, 1.),
                    ab.DenseVariational(output_dim=1, full=True),
@@ -71,7 +77,7 @@ def main():
     X_cat_ = tf.placeholder(tf.int32, [None, Xt_cat.shape[1]])
     Y_ = tf.placeholder(tf.float32, [None, 1])
 
-    # # Feed dicts
+    # Feed dicts
     train_dict = {X_con_: Xt_con, X_cat_: Xt_cat, Y_: Yt}
     test_dict = {X_con_: Xs_con, X_cat_: Xs_cat}
 
@@ -88,10 +94,13 @@ def main():
     with tf.Session(config=CONFIG):
         init.run()
 
+        # We're going to just use a feed_dict to feed in batches, which we
+        # generate here
         batches = ab.batch(
             train_dict,
             batch_size=BSIZE,
             n_iter=NITER)
+
         for i, data in enumerate(batches):
             train.run(feed_dict=data)
             if i % 1000 == 0:
@@ -101,7 +110,7 @@ def main():
         # Predict
         Ep = ab.predict_expected(Phi, test_dict, P_SAMPLES)
 
-    Ey = Ep > 0.5
+    Ey = Ep > 0.5  # Max probability assignment
 
     acc = accuracy_score(Ys.flatten(), Ey.flatten())
     logloss = log_loss(Ys.flatten(), np.hstack((1 - Ep, Ep)))

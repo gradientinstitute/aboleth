@@ -16,12 +16,13 @@ RSEED = 100
 ab.set_hyperseed(RSEED)
 
 # Optimization
-NITER = 20000
-BSIZE = 10
+NITER = 20000  # Training iterations per fold
+BSIZE = 10  # mini-batch size
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
-LSAMPLES = 1
+LSAMPLES = 1  # We're only using 1 dropout "sample" for learning to be more
+# like a MAP network
 PSAMPLES = 50  # This will give LSAMPLES * PSAMPLES predictions
-REG = 0.1
+REG = 0.001  # weight regularizer
 
 # Network structure
 net = ab.stack(
@@ -53,14 +54,13 @@ def main():
     with tf.name_scope("Input"):
         X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
         Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
-        N_ = tf.placeholder(dtype=tf.float32)
 
     with tf.name_scope("Likelihood"):
         lkhood = ab.likelihoods.Bernoulli()
 
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X=X_)
-        loss = ab.elbo(Phi, Y_, N_, kl, lkhood)
+        Phi, reg = net(X=X_)
+        loss = ab.max_posterior(Phi, Y_, reg, lkhood, first_axis_is_obs=False)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
@@ -83,8 +83,7 @@ def main():
             batches = ab.batch(
                 {X_: Xr, Y_: Yr},
                 batch_size=BSIZE,
-                n_iter=NITER,
-                N_=N_)
+                n_iter=NITER)
             for i, data in enumerate(batches):
                 train.run(feed_dict=data)
                 if i % 1000 == 0:

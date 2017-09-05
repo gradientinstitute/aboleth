@@ -68,7 +68,7 @@ and Normal prior/posterior distributions on the network weights:
     # Define the likelihood model
     likelihood = ab.likelihoods.Bernoulli()
 
-    # Build the network, net, and the parameter regularisation, kl
+    # Build the network, net, and the parameter regularization, kl
     net, kl = net(X=X_)
 
     # Build the final loss function to use with TensorFlow train
