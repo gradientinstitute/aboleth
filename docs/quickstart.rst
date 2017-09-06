@@ -370,7 +370,7 @@ See Also
 For more detailed demonstrations of the functionality within Aboleth, we
 recommend you check out the demos,
 
-- :ref:`regress` and :ref:`sarcos` - for more regression applications. 
+- :ref:`regress` and :ref:`sarcos_reg` - for more regression applications. 
 - :ref:`multi_in` - models with multiple input data types.
 - :ref:`clas_drop` - Bayesian nets using dropout.
 - :ref:`impute_layers` - let Aboleth deal with missing data for you.
