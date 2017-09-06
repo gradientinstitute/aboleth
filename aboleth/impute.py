@@ -1,8 +1,10 @@
 """Layers that impute missing data."""
 import tensorflow as tf
+
 from aboleth.baselayers import MultiLayer
 from aboleth.distributions import Normal
 from aboleth.random import seedgen
+from aboleth.util import pos
 
 
 class ImputeOp(MultiLayer):
@@ -15,7 +17,6 @@ class ImputeOp(MultiLayer):
     ----------
     datalayer : callable
         A layer that returns a data tensor. Must be of form ``f(**kwargs)``.
-
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form ``f(**kwargs)``.
@@ -34,6 +35,9 @@ class ImputeOp(MultiLayer):
 
         self._check_rank(X_ND)
         self._set_mask(M)
+
+        # Extra build/initialisation here
+        self._initialise_variables(X_ND)
 
         # Map over the samples layer
         Net = tf.map_fn(self._impute2D, X_ND)
@@ -65,15 +69,19 @@ class ImputeOp(MultiLayer):
         return X_imputed
 
     def _check_rank(self, X):
-
+        """Check the rank of the input tensors."""
         rank = len(X.shape)
         assert rank == 3
 
     def _set_mask(self, M):
-
+        """Create Tensor Masks."""
         # Identify indices of the missing datapoints
         self.missing_ind = tf.where(M)
         self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+
+    def _initialise_variables(self, X):
+        """Optional extra build stage."""
+        pass
 
 
 class MeanImpute(ImputeOp):
@@ -121,24 +129,21 @@ class MeanImpute(ImputeOp):
 
 
 class FixedNormalImpute(ImputeOp):
-    r"""Impute the missing values using marginal gaussians over each column.
+    r"""Impute the missing values using marginal Gaussians over each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
-    mask layer. Returns a layer that returns a tensor in which the masked
-    values have been imputed as the column means calculated from the batch.
+    mask layer. Creates a layer that returns a tensor in which the masked
+    values have been imputed as random draws from the marginal Gaussians.
 
     Parameters
     ----------
     datalayer : callable
         A layer that returns a data tensor. Must be of form ``f(**kwargs)``.
-
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form ``f(**kwargs)``.
-
     mu_array : array-like
         A list of the global mean values of each dat column
-
     var_array : array-like
         A list of the global variance of each data column
 
@@ -168,12 +173,12 @@ class FixedNormalImpute(ImputeOp):
         return X_with_impute
 
 
-class VarScalarImpute(ImputeOp):
+class LearnedScalarImpute(ImputeOp):
     r"""Impute the missing values using learnt scalar for each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
-    mask layer.  Returns a layer that returns a tensor in which the masked
-    values have been imputed with a learnt different scalar per colum.
+    mask layer. Creates a layer that returns a tensor in which the masked
+    values have been imputed with a learned scalar value per colum.
 
     Parameters
     ----------
@@ -189,27 +194,15 @@ class VarScalarImpute(ImputeOp):
         r"""Construct and instance of a VarScalarImpute operation."""
         super().__init__(datalayer, masklayer)
 
-    def _build(self, **kwargs):
-        r"""Build an impute operation graph."""
-        X_ND, loss1 = self.datalayer(**kwargs)
-        M, loss2 = self.masklayer(**kwargs)
+    def _initialise_variables(self, X):
+        """Initialise the impute variables."""
+        datadim = int(X.shape[2])
+        self.impute_scalars = tf.Variable(
+            tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
+            name="impute_scalars"
+        )
 
-        self._check_rank(X_ND)
-        self._set_mask(M)
-
-        # Initialise the impute variables
-        datadim = int(X_ND.shape[2])
-        impute_scalars = tf.Variable(tf.random_normal(shape=(1, datadim),
-                                                      seed=next(seedgen)),
-                                     name="impute_scalars")
-
-        # Map over the samples layer
-        Net = tf.map_fn(lambda x: self._impute2D(x, impute_scalars), X_ND)
-
-        loss = tf.add(loss1, loss2)
-        return Net, loss
-
-    def _impute2D(self, X_2D, scalars):
+    def _impute2D(self, X_2D):
         r"""Randomly impute a rank 2 tensor.
 
         Parameters
@@ -229,7 +222,8 @@ class VarScalarImpute(ImputeOp):
         data_zeroed_missing = X_2D * self.real_val_mask
 
         # Make an vector of the impute values for each missing point
-        imputed_vals = tf.gather(scalars[0, :], self.missing_ind[:, 1])
+        imputed_vals = tf.gather(self.impute_scalars[0, :],
+                                 self.missing_ind[:, 1])
 
         # Fill the imputed values into the data tensor of zeros
         shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
@@ -240,8 +234,13 @@ class VarScalarImpute(ImputeOp):
         return X_with_impute
 
 
-class VarNormalImpute(ImputeOp):
-    r"""Impute the missing values with draws from learnt normal distributions.
+class LearnedNormalImpute(ImputeOp):
+    r"""Impute the missing values with draws from learned normal distributions.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer. This creates a layer that will learn marginal Gaussian
+    parameters per column, and infill missing values using draws from these
+    Gaussians.
 
     Parameters
     ----------
@@ -250,37 +249,24 @@ class VarNormalImpute(ImputeOp):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be an InputLayer.
-
     """
 
     def __init__(self, datalayer, masklayer):
         r"""Construct and instance of a VarScalarImpute operation."""
         super().__init__(datalayer, masklayer)
 
-    def _build(self, **kwargs):
-        r"""Build an impute operation graph."""
-        X_ND, loss1 = self.datalayer(**kwargs)
-        M, loss2 = self.masklayer(**kwargs)
-
-        self._check_rank(X_ND)
-        self._set_mask(M)
-
-        # Initialise the impute variables
-        datadim = int(X_ND.shape[2])
-        impute_means = tf.Variable(tf.random_normal(shape=(1, datadim),
-                                                    seed=next(seedgen)),
-                                   name="impute_scalars")
-
-        impute_variances = tf.abs(tf.Variable(tf.random_normal(
-            shape=(1, datadim), seed=next(seedgen)), name="impute_scalars"))
-
-        self.normal = Normal(impute_means, impute_variances)
-
-        # Map over the samples layer
-        Net = tf.map_fn(lambda x: self._impute2D(x), X_ND)
-
-        loss = tf.add(loss1, loss2)
-        return Net, loss
+    def _initialise_variables(self, X):
+        """Initialise the impute variables."""
+        datadim = int(X.shape[2])
+        impute_means = tf.Variable(
+            tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
+            name="impute_scalars"
+        )
+        impute_variances = tf.Variable(
+            tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
+            name="impute_scalars"
+        )
+        self.normal = Normal(impute_means, pos(impute_variances))
 
     def _impute2D(self, X_2D):
         r"""Impute a rank 2 tensor with draws from normal distributions.

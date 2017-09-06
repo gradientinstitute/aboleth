@@ -58,7 +58,7 @@ def test_fixed_gaussian_impute(make_missing_data):
         assert KL.eval() == 0.0
 
 
-def test_variable_scalar_impute(make_missing_data):
+def test_leanred_scalar_impute(make_missing_data):
     """Test the impute that learns a scalar value to impute for each col."""
     ab.set_hyperseed(100)
     _, m, X, _ = make_missing_data
@@ -71,7 +71,7 @@ def test_variable_scalar_impute(make_missing_data):
         return kwargs['M'], 0.0
 
     n, N, D = X.shape
-    impute = ab.VarScalarImpute(data_layer, mask_layer)
+    impute = ab.LearnedScalarImpute(data_layer, mask_layer)
 
     F, KL = impute(X=X, M=m)
 
@@ -79,12 +79,12 @@ def test_variable_scalar_impute(make_missing_data):
     with tc.test_session():
         tf.global_variables_initializer().run()
         X_imputed = F.eval()
-        assert KL.eval() == 0.0 #Might want to change this in the future
+        assert KL.eval() == 0.0  # Might want to change this in the future
         assert(X_imputed.shape == X.shape)
 
 
-def test_variable_normal_impute(make_missing_data):
-    """Test the variable normal impute function."""
+def test_learned_normal_impute(make_missing_data):
+    """Test the learned normal impute function."""
     ab.set_hyperseed(100)
     _, m, X, _ = make_missing_data
 
@@ -96,7 +96,7 @@ def test_variable_normal_impute(make_missing_data):
         return kwargs['M'], 0.0
 
     n, N, D = X.shape
-    impute = ab.VarNormalImpute(data_layer, mask_layer)
+    impute = ab.LearnedNormalImpute(data_layer, mask_layer)
 
     F, KL = impute(X=X, M=m)
 
@@ -104,5 +104,5 @@ def test_variable_normal_impute(make_missing_data):
     with tc.test_session():
         tf.global_variables_initializer().run()
         X_imputed = F.eval()
-        assert KL.eval() == 0.0 #Might want to change this in the future
+        assert KL.eval() == 0.0  # Might want to change this in the future
         assert(X_imputed.shape == X.shape)

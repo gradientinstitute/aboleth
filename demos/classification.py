@@ -1,4 +1,9 @@
 #! /usr/bin/env python3
+"""This script demonstrates an alternative way of making a Bayesian Neural Net.
+
+This is based on Yarin Gal's work on interpreting dropout networks as a special
+case of Bayesian neural nets, see http://mlg.eng.cam.ac.uk/yarin/blog_2248.html
+"""
 import tensorflow as tf
 import numpy as np
 

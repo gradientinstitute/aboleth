@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 """This demo uses Aboleth for approximate Gaussian process regression."""
 import logging
 

@@ -1,4 +1,5 @@
-"""Sarcos regression demo."""
+#! /usr/bin/env python3
+"""Sarcos regression demo with TensorBoard."""
 import logging
 
 import numpy as np

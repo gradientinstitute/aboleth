@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 """Example of using different input layers for different input types."""
 import tempfile
 import urllib.request as req

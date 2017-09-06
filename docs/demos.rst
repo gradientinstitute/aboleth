@@ -130,4 +130,25 @@ The script can be found here: `classification.py
 Imputation Layers
 -----------------
 
-TODO
+Aboleth has a few layers that we can use to *impute* data and also to *learn
+imputation statistics*, see :ref:`impute`. This drastically simplifies the
+pipeline for dealing with messy data, and means our imputation methods can
+benefit from information contained in the labels (as opposed to imputing as a
+separate stage from supervised learning).
+
+This script demonstrates an imputation layer that learns a "mean" and a
+"variance" of a Normal distribution (per column) to *randomly* impute the data
+from! We compare it to just imputing the missing values with the column means.
+
+The task is a multi-task classification problem in which we have to predict
+forest coverage types from 54 features or various types, described `here
+<http://archive.ics.uci.edu/ml/datasets/Covertype>`_. We have randomly removed
+elements from the features, which we impute using the two aforementioned
+techniques.
+
+Naive mean imputation gives 68.9% accuracy (0.727 log loss), and the per-column
+Normal imputation gives 69.2% accuracy (0.710 log loss). 
+
+You can find the script here: `imputation.py
+<https://github.com/data61/aboleth/blob/develop/demos/imputation.py>`_
+
