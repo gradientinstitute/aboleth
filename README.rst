@@ -8,8 +8,8 @@ Aboleth
     :target: https://circleci.com/gh/data61/aboleth/tree/develop
     :alt: circleCI
 
-.. image:: https://readthedocs.org/projects/aboleth/badge/?version=latest
-    :target: http://aboleth.readthedocs.io/en/latest/?badge=latest
+.. image:: https://readthedocs.org/projects/aboleth/badge/?version=stable
+    :target: http://aboleth.readthedocs.io/en/latest/?badge=stable
     :alt: Documentation Status
 
 A bare-bones `TensorFlow <https://www.tensorflow.org/>`_ framework for
