@@ -9,7 +9,7 @@ Aboleth
     :alt: circleCI
 
 .. image:: https://readthedocs.org/projects/aboleth/badge/?version=stable
-    :target: http://aboleth.readthedocs.io/en/latest/?badge=stable
+    :target: http://aboleth.readthedocs.io/en/stable/?badge=stable
     :alt: Documentation Status
 
 A bare-bones `TensorFlow <https://www.tensorflow.org/>`_ framework for
