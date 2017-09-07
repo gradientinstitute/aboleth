@@ -85,16 +85,26 @@ capability.
 Installation
 ------------
 
-For a minimal install, at the command line via pip in the project directory::
+To get up and running quickly you can use pip and get the Aboleth package from
+`PyPI <https://pypi.python.org/pypi>`_::
 
-    $ pip install .
+    $ pip install aboleth
 
-To install additional dependencies required by the `demos
+For the best performance on your architecture, we recommend installing
+`TensorFlow from sources
+<https://www.tensorflow.org/install/install_sources>`_.
+
+Or, to install additional dependencies required by the `demos
 <https://github.com/data61/aboleth/tree/develop/demos>`_::
 
-    $ pip install .[demos]
+    $ pip install aboleth[demos]
 
-To install in develop mode with packages required for development::
+To install in develop mode with packages required for development we recommend
+you clone the repository from GitHub::
+
+    $ git clone git@github.com:data61/aboleth.git
+
+Then in the directory that you cloned into, issue the following::
 
     $ pip install -e .[dev]
 
