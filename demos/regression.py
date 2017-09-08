@@ -129,7 +129,7 @@ def main():
             pass
 
         # Prediction
-        Ey = ab.predict_samples(Phi, feed_dict={X_: Xq, Y_: np.zeros_like(Yq)},
+        Ey = ab.predict_samples(Phi, feed_dict={X_: Xq},
                                 n_groups=n_pred_samples, session=sess)
         logPY = ab.predict_expected(logprob, feed_dict={Y_: Yi, X_: Xi},
                                     n_groups=n_pred_samples, session=sess)

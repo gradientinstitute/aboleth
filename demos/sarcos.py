@@ -4,12 +4,12 @@ import logging
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib.data import Dataset, Iterator
 from scipy.stats import norm
 from sklearn.metrics import r2_score
 from sklearn.preprocessing import StandardScaler
 
 import aboleth as ab
-from aboleth.likelihoods import Normal
 from aboleth.datasets import fetch_gpml_sarcos_data
 
 
@@ -39,7 +39,7 @@ net = ab.stack(
 
 # Learning and prediction settings
 BATCH_SIZE = 100  # number of observations per mini batch
-NEPOCHS = 50  # Number of times to iterate though the dataset
+NEPOCHS = 100  # Number of times to iterate though the dataset
 NPREDICTSAMPLES = 10  # results in NSAMPLES * NPREDICTSAMPLES samples
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
@@ -64,20 +64,31 @@ def main():
     Yr -= ym
     Ys -= ym
 
-    # Data
-    with tf.name_scope("Input"):
-        Xb, Yb = batch_training(Xr, Yr, n_epochs=NEPOCHS,
-                                batch_size=BATCH_SIZE)
-        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
-        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
+    # Training batches
+    data_tr = Dataset.from_tensor_slices({'X': Xr, 'Y': Yr})
+    data_tr = data_tr.shuffle(buffer_size=1000)
+    data_tr = data_tr.repeat(NEPOCHS)
+    data_tr = data_tr.batch(BATCH_SIZE)
+
+    # Testing iterators
+    data_ts = Dataset.from_tensors({'X': Xs, 'Y': Ys})
+    # data_ts = Dataset.from_tensors({'X': Xs})
+    data_ts = data_ts.repeat()
+
+    with tf.name_scope("DataIterators"):
+        iterator = Iterator.from_structure(data_tr.output_types,
+                                           data_tr.output_shapes)
+        data = iterator.get_next()
+        training_init = iterator.make_initializer(data_tr)
+        testing_init = iterator.make_initializer(data_ts)
 
     with tf.name_scope("Likelihood"):
         var = ab.pos(tf.Variable(VARIANCE))
-        lkhood = Normal(variance=var)
+        lkhood = ab.likelihoods.Normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X=X_)
-        loss = ab.elbo(Phi, Y_, N, kl, lkhood)
+        Phi, kl = net(X=data['X'])
+        loss = ab.elbo(Phi, data['Y'], N, kl, lkhood)
         tf.summary.scalar('loss', loss)
 
     with tf.name_scope("Train"):
@@ -93,6 +104,7 @@ def main():
 
     with tf.train.MonitoredTrainingSession(
             config=CONFIG,
+            scaffold=tf.train.Scaffold(local_init_op=training_init),
             checkpoint_dir="./sarcos/",
             save_summaries_steps=None,
             save_checkpoint_secs=60,
@@ -107,8 +119,9 @@ def main():
             pass
 
         # Prediction
-        Ey = ab.predict_samples(Phi, feed_dict={X_: Xs, Y_: np.zeros_like(Ys)},
-                                n_groups=NPREDICTSAMPLES, session=sess)
+        sess.run(testing_init)
+        Ey = ab.predict_samples(Phi, feed_dict=None, n_groups=NPREDICTSAMPLES,
+                                session=sess)
         sigma2 = var.eval(session=sess)
 
     # Score
@@ -129,15 +142,6 @@ def msll(Y_true, Y_pred, V_pred, Y_train):
     rand_ll = norm.logpdf(Y_true, loc=mt, scale=st)
     msll = - (ll - rand_ll).mean()
     return msll
-
-
-def batch_training(X, Y, batch_size, n_epochs):
-    """Batch training queue."""
-    X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
-    Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
-    X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 100, 1,
-                                              enqueue_many=True)
-    return X_batch, Y_batch
 
 
 if __name__ == "__main__":
