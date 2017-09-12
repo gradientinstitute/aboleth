@@ -52,14 +52,17 @@ anisotropic) kernels.
 We have also demonstrated how you can use `TensorBoard
 <https://www.tensorflow.org/get_started/summaries_and_tensorboard>`_ with the
 models you construct in Aboleth, so you can visually monitor the progress of
-learning. This has the nice side-effect of also enabling model check point
-saving, so you can actually *resume* learning this model if you run the script
-*again*!!
+learning. This also allows us to visualise the model's performance on the
+*validation* set every training epoch. Using TensorBoard has the nice
+side-effect of also enabling model check point saving, so you can actually
+*resume* learning this model if you run the script *again*!!
 
 .. figure:: tensorboard_sarcos.png
 
     Using TensorBoard to visualise the learning progress of the Aboleth model
-    fitting the SARCOS dataset. 
+    fitting the SARCOS dataset. The "r-square" plot here is made from
+    evaluating the R-square performance on the held-out test set every epoch of
+    training.
 
 This demo will make a ``sarcos`` folder in the directory you run the demo from.
 This contains all of the model checkpoints, and to visualise these with

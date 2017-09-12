@@ -123,7 +123,7 @@ def batch_prediction(feed_dict, batch_size):
         yield ind, batch_dict
 
 
-def predict_samples(predictor, feed_dict, n_groups=1, session=None):
+def predict_samples(predictor, feed_dict=None, n_groups=1, session=None):
     r"""Help to get samples from a predictor.
 
     Parameters
@@ -133,7 +133,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
         ``n_samples`` are the random samples from the predictor (e.g. the
         output of ``Net``), ``N`` is the size of the query dataset, and
         ``tasks`` the number of prediction tasks.
-    feed_dict : dict
+    feed_dict : dict, optional
         The data with ``{tf.placeholder: data}`` entries.
     n_groups : int
         The number of times to evaluate the ``predictor`` and concatenate the
@@ -157,7 +157,7 @@ def predict_samples(predictor, feed_dict, n_groups=1, session=None):
     return pred
 
 
-def predict_expected(predictor, feed_dict, n_groups=1, session=None):
+def predict_expected(predictor, feed_dict=None, n_groups=1, session=None):
     r"""Help to get the expected value from a predictor.
 
     Parameters
@@ -167,7 +167,7 @@ def predict_expected(predictor, feed_dict, n_groups=1, session=None):
         ``n_samples`` are the random samples from the predictor (e.g. the
         output of ``Net``), ``N`` is the size of the query dataset, and
         ``tasks`` the number of prediction tasks.
-    feed_dict : dict
+    feed_dict : dict, optional
         The data with ``{tf.placeholder: data}`` entries.
     n_groups : int
         The number of times to evaluate the ``predictor`` and concatenate the

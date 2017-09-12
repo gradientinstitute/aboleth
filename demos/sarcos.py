@@ -4,12 +4,11 @@ import logging
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.contrib.data import Dataset, Iterator
 from scipy.stats import norm
-from sklearn.metrics import r2_score
 from sklearn.preprocessing import StandardScaler
 
 import aboleth as ab
-from aboleth.likelihoods import Normal
 from aboleth.datasets import fetch_gpml_sarcos_data
 
 
@@ -18,13 +17,13 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 NSAMPLES = 10  # Number of random samples to get from an Aboleth net
-NFEATURES = 2000  # Number of random features/bases to use in the approximation
+NFEATURES = 1500  # Number of random features/bases to use in the approximation
 VARIANCE = 10.0  # Initial estimate of the observation variance
 
 # Random Fourier Features, this is setting up an anisotropic length scale, or
 # one length scale per dimension
-LENSCALE = ab.pos(tf.Variable(10 * np.ones((21, 1), dtype=np.float32)))
-KERNEL = ab.RBF(LENSCALE)
+LENSCALE = tf.Variable(5 * np.ones((21, 1), dtype=np.float32))
+KERNEL = ab.RBF(ab.pos(LENSCALE))
 
 # Variational Fourier Features -- length-scale setting here is the "prior"
 # LENSCALE = 10.
@@ -38,8 +37,8 @@ net = ab.stack(
 )
 
 # Learning and prediction settings
-BATCH_SIZE = 100  # number of observations per mini batch
-NEPOCHS = 50  # Number of times to iterate though the dataset
+BATCH_SIZE = 50  # number of observations per mini batch
+NEPOCHS = 100  # Number of times to iterate though the dataset
 NPREDICTSAMPLES = 10  # results in NSAMPLES * NPREDICTSAMPLES samples
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
@@ -64,26 +63,37 @@ def main():
     Yr -= ym
     Ys -= ym
 
-    # Data
-    with tf.name_scope("Input"):
-        Xb, Yb = batch_training(Xr, Yr, n_epochs=NEPOCHS,
-                                batch_size=BATCH_SIZE)
-        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
-        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
+    # Training batches
+    data_tr = Dataset.from_tensor_slices({'X': Xr, 'Y': Yr}) \
+        .shuffle(buffer_size=1000) \
+        .batch(BATCH_SIZE)
+
+    # Testing iterators
+    data_ts = Dataset.from_tensors({'X': Xs, 'Y': Ys}).repeat()
+
+    with tf.name_scope("DataIterators"):
+        iterator = Iterator.from_structure(data_tr.output_types,
+                                           data_tr.output_shapes)
+        data = iterator.get_next()
+        training_init = iterator.make_initializer(data_tr)
+        testing_init = iterator.make_initializer(data_ts)
 
     with tf.name_scope("Likelihood"):
         var = ab.pos(tf.Variable(VARIANCE))
-        lkhood = Normal(variance=var)
+        lkhood = ab.likelihoods.Normal(variance=var)
 
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X=X_)
-        loss = ab.elbo(Phi, Y_, N, kl, lkhood)
+        Phi, kl = net(X=data['X'])
+        loss = ab.elbo(Phi, data['Y'], N, kl, lkhood)
         tf.summary.scalar('loss', loss)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         global_step = tf.train.create_global_step()
         train = optimizer.minimize(loss, global_step=global_step)
+
+    with tf.name_scope("Test"):
+        r2 = rsquare(data['Y'], Phi)
 
     # Logging
     log = tf.train.LoggingTensorHook(
@@ -93,33 +103,49 @@ def main():
 
     with tf.train.MonitoredTrainingSession(
             config=CONFIG,
+            scaffold=tf.train.Scaffold(local_init_op=training_init),
             checkpoint_dir="./sarcos/",
             save_summaries_steps=None,
-            save_checkpoint_secs=60,
+            save_checkpoint_secs=20,
             save_summaries_secs=20,
             hooks=[log]
     ) as sess:
-        try:
-            while not sess.should_stop():
-                sess.run(train)
-        except tf.errors.OutOfRangeError:
-            print('Input queues have been exhausted!')
-            pass
+        summary_writer = sess._hooks[1]._summary_writer
+        for i in range(NEPOCHS):
+
+            # Train for one epoch
+            try:
+                while not sess.should_stop():
+                    sess.run(train)
+            except tf.errors.OutOfRangeError:
+                pass
+
+            # Init testing and assess and log R-square score on test set
+            sess.run(testing_init)
+            r2_score = sess.run(r2)
+            score_sum = tf.Summary(value=[
+                tf.Summary.Value(tag='r-square', simple_value=r2_score)
+            ])
+            summary_writer.add_summary(score_sum, sess.run(global_step))
+
+            # Re-init training
+            sess.run(training_init)
 
         # Prediction
-        Ey = ab.predict_samples(Phi, feed_dict={X_: Xs, Y_: np.zeros_like(Ys)},
-                                n_groups=NPREDICTSAMPLES, session=sess)
-        sigma2 = var.eval(session=sess)
+        sess.run(testing_init)
+        Ey = ab.predict_samples(Phi, feed_dict=None, n_groups=NPREDICTSAMPLES,
+                                session=sess)
+        sigma2 = sess.run(var)
+        r2_score = sess.run(r2)
 
-    # Score
+    # Score mean standardised log likelihood
     Eymean = Ey.mean(axis=0)
     Eyvar = Ey.var(axis=0) + sigma2  # add sigma2 for obervation noise
-    r2 = r2_score(Ys.flatten(), Eymean)
     snlp = msll(Ys.flatten(), Eymean, Eyvar, Yr.flatten())
 
     print("------------")
     print("r-square: {:.4f}, smse: {:.4f}, msll: {:.4f}."
-          .format(r2, 1 - r2, snlp))
+          .format(r2_score, 1 - r2_score, snlp))
 
 
 def msll(Y_true, Y_pred, V_pred, Y_train):
@@ -131,13 +157,12 @@ def msll(Y_true, Y_pred, V_pred, Y_train):
     return msll
 
 
-def batch_training(X, Y, batch_size, n_epochs):
-    """Batch training queue."""
-    X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
-    Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
-    X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 100, 1,
-                                              enqueue_many=True)
-    return X_batch, Y_batch
+def rsquare(Y, P):
+    """Coefficient of Determinantion (R-square) in TensorFlow."""
+    SS_ref = tf.reduce_sum((Y - tf.reduce_mean(P, axis=0))**2)
+    SS_tot = tf.reduce_sum((Y - tf.reduce_mean(Y))**2)
+    R2 = 1 - SS_ref / SS_tot
+    return R2
 
 
 if __name__ == "__main__":
