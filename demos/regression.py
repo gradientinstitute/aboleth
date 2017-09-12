@@ -6,11 +6,11 @@ import numpy as np
 import bokeh.plotting as bk
 import bokeh.palettes as bp
 import tensorflow as tf
+from tensorflow.contrib.data import Dataset
 # from sklearn.gaussian_process.kernels import Matern as kern
 from sklearn.gaussian_process.kernels import RBF as kern
 
 import aboleth as ab
-from aboleth.likelihoods import Normal
 from aboleth.datasets import gp_draws
 
 # Set up a python logger so we can see the output of MonitoredTrainingSession
@@ -36,7 +36,7 @@ batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
 # Model initialisation
-variance = tf.Variable(1.)  # Likelihood variance initialisation, and learning
+noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
 reg = 1.  # Initial weight prior variance, this is optimised later
 
 # Random Fourier Features
@@ -90,13 +90,11 @@ def main():
         X_ = tf.placeholder_with_default(Xb, shape=(None, D))
         Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
 
-    with tf.name_scope("Likelihood"):
-        lkhood = Normal(variance=ab.pos(variance))  # Keep the var positive
-
     # This is where we build the actual GP model
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X=X_)
-        loss = ab.elbo(Phi, Y_, N, kl, lkhood)
+        phi, kl = net(X=X_)
+        lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
+        loss = ab.elbo(lkhood, Y_, N, kl)
 
     # Set up the trainig graph
     with tf.name_scope("Train"):
@@ -106,7 +104,7 @@ def main():
 
     # This is used for building the predictive density image
     with tf.name_scope("Predict"):
-        logprob = lkhood(Y_, Phi)
+        logprob = lkhood.log_prob(Y_)
 
     # Logging learning progress
     log = tf.train.LoggingTensorHook(
@@ -129,7 +127,7 @@ def main():
             pass
 
         # Prediction
-        Ey = ab.predict_samples(Phi, feed_dict={X_: Xq},
+        Ey = ab.predict_samples(phi, feed_dict={X_: Xq, Y_: [[None]]},
                                 n_groups=n_pred_samples, session=sess)
         logPY = ab.predict_expected(logprob, feed_dict={Y_: Yi, X_: Xi},
                                     n_groups=n_pred_samples, session=sess)
@@ -155,11 +153,12 @@ def main():
 
 def batch_training(X, Y, batch_size, n_epochs):
     """Batch training queue convenience function."""
-    X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
-    Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
-    X_batch, Y_batch = tf.train.shuffle_batch([X, Y], batch_size, 100, 1,
-                                              enqueue_many=True, seed=RSEED)
-    return X_batch, Y_batch
+    data_tr = Dataset.from_tensor_slices({'X': X, 'Y': Y}) \
+        .shuffle(buffer_size=1000, seed=RSEED) \
+        .repeat(n_epochs) \
+        .batch(batch_size)
+    data = data_tr.make_one_shot_iterator().get_next()
+    return data['X'], data['Y']
 
 
 if __name__ == "__main__":

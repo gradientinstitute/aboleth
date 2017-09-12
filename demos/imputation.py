@@ -4,6 +4,7 @@ import logging
 
 import tensorflow as tf
 import numpy as np
+from tensorflow.contrib.data import Dataset
 from sklearn.datasets import fetch_covtype
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, log_loss, confusion_matrix
@@ -43,8 +44,7 @@ lenscale = ab.pos(tf.Variable(np.ones((54, 1), dtype=np.float32)))
 
 layers = (
     ab.RandomArcCosine(n_features=NFEATURES, lenscale=lenscale) >>
-    ab.DenseVariational(output_dim=NCLASSES) >>
-    ab.Activation(tf.nn.softmax)
+    ab.DenseVariational(output_dim=NCLASSES)
 )
 
 
@@ -53,7 +53,8 @@ def main():
     # Fetch data, one-hot targets and standardise data
     data = fetch_covtype()
     X = data.data
-    Y = OneHotEncoder(sparse=False).fit_transform(data.target[:, np.newaxis])
+    # Y = OneHotEncoder(sparse=False).fit_transform(data.target[:, np.newaxis])
+    Y = (data.target - 1)[:, np.newaxis]
     X = StandardScaler().fit_transform(X)
 
     # Now fake some missing data with a mask
@@ -74,7 +75,7 @@ def main():
     # Split the training and testing data
     X_tr, X_ts, Y_tr, Y_ts, M_tr, M_ts = train_test_split(
         X.astype(np.float32),
-        Y.astype(np.float32),
+        Y.astype(np.int32),
         mask,
         test_size=FRAC_TEST,
         random_state=RSEED
@@ -86,16 +87,16 @@ def main():
         Xb, Yb, Mb = batch_training(X_tr, Y_tr, M_tr, n_epochs=NEPOCHS,
                                     batch_size=BSIZE)
         X_ = tf.placeholder_with_default(Xb, shape=(None, D))
-        Y_ = tf.placeholder_with_default(Yb, shape=(None, NCLASSES))
+        # Y_ = tf.placeholder_with_default(Yb, shape=(None, NCLASSES))
+        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
         M_ = tf.placeholder_with_default(Mb, shape=(None, D))
-
-    with tf.name_scope("Likelihood"):
-        lkhood = ab.likelihoods.Categorical()  # Multiclass
 
     with tf.name_scope("Deepnet"):
         # Conditionally assign a placeholder for masks if USE_ABOLETH
-        Phi, kl = net(X=X_, M=M_) if USE_ABOLETH else net(X=X_)
-        loss = ab.elbo(Phi, Y_, N_tr, kl, lkhood)
+        nn, kl = net(X=X_, M=M_) if USE_ABOLETH else net(X=X_)
+        lkhood = tf.distributions.Categorical(logits=nn)
+        import IPython; IPython.embed(); exit()
+        loss = ab.elbo(lkhood, Y_, N_tr, kl)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -123,12 +124,12 @@ def main():
             pass
 
         # Prediction
-        feed_dict = {X_: X_ts}
+        feed_dict = {X_: X_ts, Y_: [[None]]}
         if USE_ABOLETH:
             feed_dict[M_] = M_ts
 
-        Ep = ab.predict_samples(Phi, feed_dict=feed_dict, n_groups=PSAMPLES,
-                                session=sess)
+        Ep = ab.predict_samples(lkhood.mean(), feed_dict=feed_dict,
+                                n_groups=PSAMPLES, session=sess)
 
     # Get mean of samples for prediction, and max probability assignments
     p = Ep.mean(axis=0)
@@ -145,13 +146,12 @@ def main():
 
 def batch_training(X, Y, M, batch_size, n_epochs):
     """Batch training queue convenience function."""
-    X = tf.train.limit_epochs(X, n_epochs, name="X_lim")
-    Y = tf.train.limit_epochs(Y, n_epochs, name="Y_lim")
-    M = tf.train.limit_epochs(M, n_epochs, name="M_lim")
-    X_batch, Y_batch, M_batch = tf.train.shuffle_batch(
-        [X, Y, M], batch_size, 100, 1, enqueue_many=True, seed=RSEED
-    )
-    return X_batch, Y_batch, M_batch
+    data_tr = Dataset.from_tensor_slices({'X': X, 'Y': Y, 'M': M}) \
+        .shuffle(buffer_size=1000, seed=RSEED) \
+        .repeat(n_epochs) \
+        .batch(batch_size)
+    data = data_tr.make_one_shot_iterator().get_next()
+    return data['X'], data['Y'], data['M']
 
 
 def get_labels(p):
