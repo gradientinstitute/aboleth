@@ -123,7 +123,7 @@ def main():
             pass
 
         # Prediction
-        feed_dict = {X_: X_ts}
+        feed_dict = {X_: X_ts, Y_: [[None] * 7]}
         if USE_ABOLETH:
             feed_dict[M_] = M_ts
 

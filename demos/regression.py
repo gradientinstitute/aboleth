@@ -128,8 +128,8 @@ def main():
             print('Input queues have been exhausted!')
             pass
 
-        # Prediction
-        Ey = ab.predict_samples(Phi, feed_dict={X_: Xq},
+        # Prediction, the [[None]] is to stop the default placeholder queue
+        Ey = ab.predict_samples(Phi, feed_dict={X_: Xq, Y_: [[None]]},
                                 n_groups=n_pred_samples, session=sess)
         logPY = ab.predict_expected(logprob, feed_dict={Y_: Yi, X_: Xi},
                                     n_groups=n_pred_samples, session=sess)
