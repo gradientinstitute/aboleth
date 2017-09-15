@@ -8,7 +8,7 @@ from tensorflow.contrib.data import Dataset
 from sklearn.datasets import fetch_covtype
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, log_loss, confusion_matrix
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, Imputer
+from sklearn.preprocessing import StandardScaler, Imputer
 
 import aboleth as ab
 
@@ -27,8 +27,8 @@ FRAC_MISSING = 0.2  # Fraction of data that is missing
 MISSING_VAL = -666  # Value to indicate missingness
 
 # Optimization
-NEPOCHS = 2  # Number of times to see the data in training
-BSIZE = 10  # Mini batch size
+NEPOCHS = 5  # Number of times to see the data in training
+BSIZE = 100  # Mini batch size
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 LSAMPLES = 5  # Number of samples the mode returns
 PSAMPLES = 10  # This will give LSAMPLES * PSAMPLES predictions
@@ -53,8 +53,7 @@ def main():
     # Fetch data, one-hot targets and standardise data
     data = fetch_covtype()
     X = data.data
-    # Y = OneHotEncoder(sparse=False).fit_transform(data.target[:, np.newaxis])
-    Y = (data.target - 1)[:, np.newaxis]
+    Y = (data.target - 1)
     X = StandardScaler().fit_transform(X)
 
     # Now fake some missing data with a mask
@@ -87,15 +86,14 @@ def main():
         Xb, Yb, Mb = batch_training(X_tr, Y_tr, M_tr, n_epochs=NEPOCHS,
                                     batch_size=BSIZE)
         X_ = tf.placeholder_with_default(Xb, shape=(None, D))
-        # Y_ = tf.placeholder_with_default(Yb, shape=(None, NCLASSES))
-        Y_ = tf.placeholder_with_default(Yb, shape=(None, 1))
+        # Y_ has to be this dimension for compatability with Categorical
+        Y_ = tf.placeholder_with_default(Yb, shape=(None,))
         M_ = tf.placeholder_with_default(Mb, shape=(None, D))
 
     with tf.name_scope("Deepnet"):
         # Conditionally assign a placeholder for masks if USE_ABOLETH
         nn, kl = net(X=X_, M=M_) if USE_ABOLETH else net(X=X_)
         lkhood = tf.distributions.Categorical(logits=nn)
-        import IPython; IPython.embed(); exit()
         loss = ab.elbo(lkhood, Y_, N_tr, kl)
 
     with tf.name_scope("Train"):
@@ -124,21 +122,21 @@ def main():
             pass
 
         # Prediction
-        feed_dict = {X_: X_ts, Y_: [[None]]}
+        feed_dict = {X_: X_ts, Y_: [0]}
         if USE_ABOLETH:
             feed_dict[M_] = M_ts
 
-        Ep = ab.predict_samples(lkhood.mean(), feed_dict=feed_dict,
+        Ep = ab.predict_samples(lkhood.probs, feed_dict=feed_dict,
                                 n_groups=PSAMPLES, session=sess)
 
     # Get mean of samples for prediction, and max probability assignments
     p = Ep.mean(axis=0)
-    Ey = get_labels(p)
+    Ey = p.argmax(axis=1)
 
     # Score results
     acc = accuracy_score(Y_ts, Ey)
     ll = log_loss(Y_ts, p)
-    conf = confusion_matrix(Y_ts.argmax(axis=1), Ey.argmax(axis=1))
+    conf = confusion_matrix(Y_ts, Ey)
     print("Final scores:")
     print("\tAccuracy = {}\n\tLog loss = {}\n\tConfusion =\n{}".
           format(acc, ll, conf))
@@ -152,14 +150,6 @@ def batch_training(X, Y, M, batch_size, n_epochs):
         .batch(batch_size)
     data = data_tr.make_one_shot_iterator().get_next()
     return data['X'], data['Y'], data['M']
-
-
-def get_labels(p):
-    """Get hard assignment labels from probabilities"""
-    N = len(p)
-    Ey = np.zeros_like(p)
-    Ey[np.arange(N), p.argmax(axis=1)] = 1
-    return Ey
 
 
 if __name__ == "__main__":

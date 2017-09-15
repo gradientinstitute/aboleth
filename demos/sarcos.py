@@ -81,7 +81,7 @@ def main():
     with tf.name_scope("Deepnet"):
         phi, kl = net(X=data['X'])
         std = tf.Variable(NOISE, name="noise")
-        lkhood = tf.distributions.Normal(phi, scale=std)
+        lkhood = tf.distributions.Normal(phi, scale=ab.pos(std))
         loss = ab.elbo(lkhood, data['Y'], N, kl)
         tf.summary.scalar('loss', loss)
 

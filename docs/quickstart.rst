@@ -67,17 +67,35 @@ for our binary classifier (which corresponds to a log-loss):
 
 .. code::
         
-    likelihood = ab.likelihoods.Bernoulli()
+    likelihood = tf.distributions.Bernoulli(probs=net)
 
-When we call likelihood, it will return a tensor that implements the log of a
-Bernoulli probability mass function,
+If we were to call ``likelihood.log_prob(Y)``, it would return a tensor that
+implements the log of a Bernoulli probability mass function,
 
 .. math::
 
     \mathcal{L}(y_n, p_n) = y_n \log p_n + (1 - y_n) \log(1 - p_n).
 
-where we have used :math:`p_n` as shorthand for :math:`p(y_n = 1)`. Now we
-have enough to build the loss function we will use to optimize the model
+which is an integral part of our loss function. Here we have used :math:`p_n`
+as shorthand for :math:`p(y_n = 1)`. 
+
+.. note::
+    We actually find it is more numerically stable to define Bernoulli
+    likelihoods with logits::
+
+        likelihood = tf.distributions.Bernoulli(logits=net)
+
+    Where::
+
+        layers = (
+            ab.InputLayer(name="X") >>
+            ab.DenseMap(output_dim=1, l1_reg=0, l2_reg=.05) >>
+        )
+        net, reg = layers(X=X_)
+
+    The ``Bernoulli`` class then computes the sigmoid activation internally.
+
+Now we have enough to build the loss function we will use to optimize the model
 weights:
 
 .. code::
@@ -134,7 +152,12 @@ predictive data (still in the TensorFlow session from above):
 
 .. code::
 
-    probabilities = net.eval(feed_dict={X_: X_query})
+    probs = net.eval(feed_dict={X_: X_query})
+
+.. note::
+    If you used logits as per the above note, then the prediction becomes::
+        
+        probs = likelihood.probs.eval(feed_dict={X_: X_query})
 
 And that is it!
 
@@ -247,9 +270,9 @@ Then like before to complete the model specification:
 
 .. code::
 
-    likelihood = ab.likelihoods.Bernoulli()
     net, kl = layers(X=X_)
-    loss = ab.elbo(net, Y_, N=10000, KL=kl, likelihood=likelihood)
+    likelihood = tf.distributions.Bernoulli(probs=net)
+    loss = ab.elbo(likelihood, Y_, N=10000, KL=kl)
 
 The main differences here are that ``reg`` is now ``kl``, and we use the
 ``elbo`` loss function. For all intents and purposes ``kl`` is still a
@@ -260,11 +283,11 @@ dataset, we need to know this term in order to properly calculate the evidence
 lower bound when using mini-batches of data.
 
 We train this model in exactly the same way as the logistic classifier, however
-prediction is slightly different - that is, ``probabilities``,
+prediction is slightly different - that is, ``probs``,
 
 .. code::
 
-    probabilities = net.eval(feed_dict={X_: X_query})
+    probs = net.eval(feed_dict={X_: X_query})
 
 now has a shape of :math:`(5, N^*, 1)` where we have 5 samples of :math:`N^*`
 predictions; before we had :math:`(N^*, 1)`. You can simply take the mean of
@@ -272,7 +295,7 @@ these samples for the predicted class probability,
 
 .. code::
 
-    expected_p = np.mean(probabilities, axis=0)
+    expected_p = np.mean(probs, axis=0)
 
 or, you can generate *more* samples to get a more accurate expected
 probabilities (again with the TensorFlow session, ``sess``),
@@ -320,8 +343,8 @@ We can easily do this using Aboleth, for example, with a radial basis kernel,
     import tensorflow as tf
     import aboleth as ab
     
-    lenscale = ab.pos(tf.Variable(1.))  # learn isotropic length scale
-    kern = ab.RBF(lenscale=lenscale)
+    lenscale = tf.Variable(1.)  # learn isotropic length scale
+    kern = ab.RBF(lenscale=ab.pos(lenscale))
 
     layers = (
         ab.InputLayer(name="X", n_samples=5) >>
@@ -340,16 +363,16 @@ Then to complete the formulation of the Gaussian process (likelihood and loss),
 
 .. code::
 
-    var = ab.pos(tf.Variable(1.))  # learn likelihood variance
+    std = tf.Variable(1.)  # learn likelihood std. deviation
 
-    likelihood = ab.likelihoods.Normal(var=var)
     net, kl = layers(X=X_)
-    loss = ab.elbo(net, Y_, kl, N=10000, likelihood=likelihood)
+    likelihood = tf.distributions.Normal(net, scale=ab.pos(std))
+    loss = ab.elbo(likelihood, Y_, kl, N=10000)
 
 
 Here we just have a Normal likelihood since we are creating a model for
-regression, and we can also get TensorFlow to optimise the likelihood variance,
-``var``.
+regression, and we can also get TensorFlow to optimise the likelihood standard
+deviation, ``std``.
 
 Training and prediction work in exactly the same way as the Bayesian logistic
 classifier. Here is an example of the approximate GP in action (see

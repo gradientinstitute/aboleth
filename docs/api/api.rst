@@ -15,7 +15,6 @@ may use Python 3 language specific features). If you would like to contribute
     layers
     hlayers
     kernels
-    likelihoods
     distributions
     impute
     random

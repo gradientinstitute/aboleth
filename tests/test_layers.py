@@ -15,7 +15,7 @@ EDIM = (5, 10)
 
 def test_net_outputs(make_graph):
     """Test for expected output dimensions from a net."""
-    x, y, N, X_, Y_, N_, like, layers = make_graph
+    x, y, N, X_, Y_, N_, layers = make_graph
     Net, kl = layers(X=X_)
 
     tc = tf.test.TestCase()

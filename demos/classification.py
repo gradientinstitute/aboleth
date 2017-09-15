@@ -94,10 +94,10 @@ def main():
 
             # Predict, NOTE: we use the mean of the likelihood to get the
             # probabilies
-            Ey = ab.predict_expected(lkhood.mean(), {X_: Xs}, PSAMPLES)
+            ps = ab.predict_expected(lkhood.probs, {X_: Xs}, PSAMPLES)
 
             print("Fold {}:".format(k))
-            Ep = np.hstack((1. - Ey, Ey))
+            Ep = np.hstack((1. - ps, ps))
 
             print_k_result(Ys, Ep, ll, acc, "BNN")
 

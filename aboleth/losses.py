@@ -9,15 +9,18 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
     ----------
     likelihood : tf.distributions.Distribution
         the likelihood object that takes neural network(s) as an input. The
-        ``batch_shape`` of this object should be (n_samples, N, tasks).
+        ``batch_shape`` of this object should be (n_samples, N, ...), where
+        ``n_samples`` is the number of likelihood samples (defined by
+        ab.InputLayer) and ``N`` is the number of observations (can be ``?`` if
+        you are using a placeholder and mini-batching).
     Y : ndarray, Tensor
         the targets of shape (N, tasks).
     N : int, Tensor
         the total size of the dataset (i.e. number of observations).
     like_weights : callable, ndarray, Tensor
         weights to apply to each observation in the expected log likelihood.
-        This should be an array of shape (N, 1) or can be called as
-        ``like_weights(Y)`` and should return a (N, 1) array.
+        This should be an array of shape (N,) or can be called as
+        ``like_weights(Y)`` and should return a (N,) array.
 
     Returns
     -------
@@ -26,7 +29,8 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
 
     """
     rank = len(likelihood.batch_shape)
-    assert rank > 2, "We need a Tensor of at least rank 3 for Bayesian models!"
+    assert rank >= 2, "likelihood should be at least a rank 2 tensor! The " \
+        "first dimension the network samples, the second the observations."
 
     # Batch amplification factor
     B = N / tf.to_float(likelihood.batch_shape_tensor()[1])
@@ -51,14 +55,16 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None,
     ----------
     likelihood : tf.distributions.Distribution
         the likelihood object that takes neural network(s) as an input. The
-        ``batch_shape`` of this object should be (n_samples, N, tasks) or (N,
-        tasks).
+        ``batch_shape`` of this object should be (n_samples, N, ...), where
+        ``n_samples`` is the number of likelihood samples (defined by
+        ab.InputLayer) and ``N`` is the number of observations (can be ``?`` if
+        you are using a placeholder and mini-batching).
     Y : ndarray, Tensor
         the targets of shape (N, tasks).
     like_weights : callable, ndarray, Tensor
         weights to apply to each observation in the expected log likelihood.
-        This should be an array of shape (N, 1) or can be called as
-        ``like_weights(Y)`` and should return a (N, 1) array.
+        This should be an array of shape (N,) or can be called as
+        ``like_weights(Y)`` and should return a (N,) array.
     first_axis_is_obs : bool
         indicates if the first axis indexes the observations/data or not. This
         will be True if the likelihood outputs a ``batch_shape`` of (N, tasks)
