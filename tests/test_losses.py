@@ -9,11 +9,11 @@ from aboleth.losses import _sum_likelihood
 
 def test_elbo_likelihood(make_graph):
     """Test for expected output dimensions from loss ."""
-    x, y, N, X_, Y_, N_, like, layers = make_graph
-    Net, kl = layers(X=X_)
+    x, y, N, X_, Y_, N_, layers = make_graph
+    nn, kl = layers(X=X_)
+    like = tf.distributions.Normal(nn, scale=1.)
 
-    # Now test with likelihood weights
-    loss = ab.elbo(Net, Y_, N, kl, like)
+    loss = ab.elbo(like, Y_, N, kl)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -25,11 +25,11 @@ def test_elbo_likelihood(make_graph):
 
 def test_map_likelihood(make_graph):
     """Test for expected output dimensions from deepnet."""
-    x, y, _, _, _, _, like, layers = make_graph
-    Net, reg = layers(X=x.astype(np.float32))
+    x, y, _, _, _, _, layers = make_graph
+    nn, reg = layers(X=x.astype(np.float32))
+    like = tf.distributions.Normal(nn, scale=1.)
 
-    # Now test with likelihood weights
-    loss = ab.max_posterior(Net, y.astype(np.float32),  reg, like)
+    loss = ab.max_posterior(like, y.astype(np.float32), reg)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -39,19 +39,56 @@ def test_map_likelihood(make_graph):
         assert np.isscalar(L)
 
 
+def test_categorical_likelihood(make_data):
+    """Test aboleth with a tf.distributions.Categorical likelihood.
+
+    Since it is a bit of an odd half-multivariate case.
+    """
+    x, y, _, = make_data
+    N, K = x.shape
+
+    # Make two classes (K = 2)
+    Y = np.zeros(len(y), dtype=np.int32)
+    Y[y[:, 0] > 0] = 1
+
+    layers = ab.stack(
+        ab.InputLayer(name='X', n_samples=10),
+        lambda X: (X, 0.0)   # Mock a sampling layer, with 2-class output
+    )
+
+    nn, reg = layers(X=x.astype(np.float32))
+    like = tf.distributions.Categorical(logits=nn)
+
+    ELBO = ab.elbo(like, Y, N, reg)
+    MAP = ab.max_posterior(like, Y, reg)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+
+        assert like.probs.eval().shape == (10, N, K)
+        assert like.prob(Y).eval().shape == (10, N)
+
+        L = ELBO.eval()
+        assert np.isscalar(L)
+
+        L = MAP.eval()
+        assert np.isscalar(L)
+
+
 def test_sum_likelihood():
     """Test we can do weighted sums of likelihoods."""
-    like = ab.likelihoods.Bernoulli()
     N = 5
-    Net = np.ones(N) * .5
+    Net = np.ones(N, dtype=np.float32) * .5
+    like = tf.distributions.Bernoulli(probs=Net)
     Y = np.ones(N)
 
     def weight_fn(Y):
         return Y * np.arange(N)
 
-    unweighted = _sum_likelihood(Y, Net, like, None)
-    value = _sum_likelihood(Y, Net, like, np.arange(N))
-    call = _sum_likelihood(Y, Net, like, weight_fn)
+    unweighted = _sum_likelihood(like, Y, None)
+    value = _sum_likelihood(like, Y, np.arange(N))
+    call = _sum_likelihood(like, Y, weight_fn)
 
     tc = tf.test.TestCase()
     with tc.test_session():

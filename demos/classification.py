@@ -40,7 +40,6 @@ net = ab.stack(
     ab.Activation(h=tf.nn.relu),
     ab.DropOut(0.5),
     ab.DenseMAP(output_dim=1, l1_reg=0., l2_reg=REG),
-    ab.Activation(h=tf.nn.sigmoid)
 )
 
 
@@ -48,7 +47,7 @@ def main():
     """Run the demo."""
     data = load_breast_cancer()
     X = data.data.astype(np.float32)
-    y = data.target.astype(np.float32)[:, np.newaxis]
+    y = data.target.astype(np.int32)[:, np.newaxis]
     X = StandardScaler().fit_transform(X).astype(np.float32)
     N, D = X.shape
 
@@ -60,12 +59,10 @@ def main():
         X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
         Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 1))
 
-    with tf.name_scope("Likelihood"):
-        lkhood = ab.likelihoods.Bernoulli()
-
     with tf.name_scope("Deepnet"):
-        Phi, reg = net(X=X_)
-        loss = ab.max_posterior(Phi, Y_, reg, lkhood, first_axis_is_obs=False)
+        nn, reg = net(X=X_)
+        lkhood = tf.distributions.Bernoulli(logits=nn)
+        loss = ab.max_posterior(lkhood, Y_, reg, first_axis_is_obs=False)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
@@ -95,11 +92,12 @@ def main():
                     loss_val = loss.eval(feed_dict=data)
                     print("Iteration {}, loss = {}".format(i, loss_val))
 
-            # Predict
-            Ey = ab.predict_expected(Phi, {X_: Xs}, PSAMPLES)
+            # Predict, NOTE: we use the mean of the likelihood to get the
+            # probabilies
+            ps = ab.predict_expected(lkhood.probs, {X_: Xs}, PSAMPLES)
 
             print("Fold {}:".format(k))
-            Ep = np.hstack((1. - Ey, Ey))
+            Ep = np.hstack((1. - ps, ps))
 
             print_k_result(Ys, Ep, ll, acc, "BNN")
 

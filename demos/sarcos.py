@@ -18,7 +18,7 @@ logger.setLevel(logging.INFO)
 
 NSAMPLES = 10  # Number of random samples to get from an Aboleth net
 NFEATURES = 1500  # Number of random features/bases to use in the approximation
-VARIANCE = 10.0  # Initial estimate of the observation variance
+NOISE = 3.0  # Initial estimate of the observation variance
 
 # Random Fourier Features, this is setting up an anisotropic length scale, or
 # one length scale per dimension
@@ -78,13 +78,11 @@ def main():
         training_init = iterator.make_initializer(data_tr)
         testing_init = iterator.make_initializer(data_ts)
 
-    with tf.name_scope("Likelihood"):
-        var = ab.pos(tf.Variable(VARIANCE))
-        lkhood = ab.likelihoods.Normal(variance=var)
-
     with tf.name_scope("Deepnet"):
-        Phi, kl = net(X=data['X'])
-        loss = ab.elbo(Phi, data['Y'], N, kl, lkhood)
+        phi, kl = net(X=data['X'])
+        std = tf.Variable(NOISE, name="noise")
+        lkhood = tf.distributions.Normal(phi, scale=ab.pos(std))
+        loss = ab.elbo(lkhood, data['Y'], N, kl)
         tf.summary.scalar('loss', loss)
 
     with tf.name_scope("Train"):
@@ -93,7 +91,7 @@ def main():
         train = optimizer.minimize(loss, global_step=global_step)
 
     with tf.name_scope("Test"):
-        r2 = rsquare(data['Y'], Phi)
+        r2 = rsquare(data['Y'], phi)
 
     # Logging
     log = tf.train.LoggingTensorHook(
@@ -133,14 +131,14 @@ def main():
 
         # Prediction
         sess.run(testing_init)
-        Ey = ab.predict_samples(Phi, feed_dict=None, n_groups=NPREDICTSAMPLES,
+        Ey = ab.predict_samples(phi, feed_dict=None, n_groups=NPREDICTSAMPLES,
                                 session=sess)
-        sigma2 = sess.run(var)
+        sigma = sess.run(std)
         r2_score = sess.run(r2)
 
     # Score mean standardised log likelihood
     Eymean = Ey.mean(axis=0)
-    Eyvar = Ey.var(axis=0) + sigma2  # add sigma2 for obervation noise
+    Eyvar = Ey.var(axis=0) + sigma**2  # add sigma2 for obervation noise
     snlp = msll(Ys.flatten(), Eymean, Eyvar, Yr.flatten())
 
     print("------------")

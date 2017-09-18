@@ -9,7 +9,6 @@ import pandas as pd
 from sklearn.metrics import log_loss, accuracy_score
 
 import aboleth as ab
-from aboleth.likelihoods import Bernoulli
 
 
 # Data properties
@@ -65,8 +64,7 @@ def main():
     # "joint" layers after we concatenate them
     net = ab.stack(ab.Concat(con_layer, cat_layer),
                    ab.RandomArcCosine(100, 1.),
-                   ab.DenseVariational(output_dim=1, full=True),
-                   ab.Activation(tf.sigmoid))
+                   ab.DenseVariational(output_dim=1, full=True))
 
     # Split data into training and testing
     Xt_con, Xs_con = np.split(X_con, [len(df_train)], axis=0)
@@ -84,10 +82,10 @@ def main():
 
     # Make model
     N = len(Xt_con)
-    likelihood = Bernoulli()
-    Phi, kl = net(con=X_con_, cat=X_cat_)
+    nn, kl = net(con=X_con_, cat=X_cat_)
+    likelihood = tf.distributions.Bernoulli(logits=nn)
 
-    loss = ab.elbo(Phi, Y_, N, kl, likelihood)
+    loss = ab.elbo(likelihood, Y_, N, kl)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
@@ -109,7 +107,7 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Ep = ab.predict_expected(Phi, test_dict, P_SAMPLES)
+        Ep = ab.predict_expected(nn, test_dict, P_SAMPLES)
 
     Ey = Ep > 0.5  # Max probability assignment
 

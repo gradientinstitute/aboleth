@@ -19,9 +19,9 @@ This is a simple demo that draws a random, non linear function from a Gaussian
 process with a specified kernel and length scale. We then use Aboleth (in
 Gaussian process approximation mode) to try to learn this function given only a
 few noisy observations of it. This script also demonstrates how we can divide
-the data into mini-batches using utilities in the `tf.train
-<https://www.tensorflow.org/api_docs/python/tf/train>`_ module, and how we can
-use `tf.train.MonitoredTrainingSession
+the data into mini-batches using utilities in the `tf.contrib.data
+<https://www.tensorflow.org/programmers_guide/datasets>`_ module, and how we
+can use `tf.train.MonitoredTrainingSession
 <https://www.tensorflow.org/api_docs/python/tf/train/MonitoredTrainingSession>`_
 to log the learning progress.   
 
@@ -149,8 +149,8 @@ forest coverage types from 54 features or various types, described `here
 elements from the features, which we impute using the two aforementioned
 techniques.
 
-Naive mean imputation gives 68.9% accuracy (0.727 log loss), and the per-column
-Normal imputation gives 69.2% accuracy (0.710 log loss). 
+Naive mean imputation gives 68.7% accuracy (0.717 log loss), and the per-column
+Normal imputation gives 69.1% accuracy (0.713 log loss). 
 
 You can find the script here: `imputation.py
 <https://github.com/data61/aboleth/blob/develop/demos/imputation.py>`_

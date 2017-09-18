@@ -42,8 +42,8 @@ TensorFlow, so you can still assign parts of the computational graph to
 different hardware, use your own data feeds/queues, and manage your own
 sessions etc.
 
-Here is an example of building a simple BNN classifier with one hidden layer
-and Normal prior/posterior distributions on the network weights:
+Here is an example of building a simple Bayesian neural net classifier with one
+hidden layer and Normal prior/posterior distributions on the network weights:
 
 .. code-block:: python
 
@@ -59,20 +59,19 @@ and Normal prior/posterior distributions on the network weights:
         ab.DenseVariational(output_dim=100) >>
         ab.Activation(tf.nn.relu) >>
         ab.DenseVariational(output_dim=1) >>
-        ab.Activation(tf.nn.sigmoid)
     )
 
     X_ = tf.placeholder(tf.float, shape=(None, D))
     Y_ = tf.placeholder(tf.float, shape=(None, 1))
 
-    # Define the likelihood model
-    likelihood = ab.likelihoods.Bernoulli()
+    # Build the network, nn, and the parameter regularization, kl
+    nn, kl = net(X=X_)
 
-    # Build the network, net, and the parameter regularization, kl
-    net, kl = net(X=X_)
+    # Define the likelihood model
+    likelihood = tf.distributions.Bernoulli(logits=nn)
 
     # Build the final loss function to use with TensorFlow train
-    loss = ab.elbo(net, Y_, N, kl, likelihood)
+    loss = ab.elbo(likelihood, Y_, N, kl)
 
     # Now your TensorFlow training code here!
     ...
