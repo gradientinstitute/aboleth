@@ -1,5 +1,4 @@
 """Test distributions.py functionality."""
-# import pytest
 import numpy as np
 import tensorflow as tf
 from scipy.linalg import cho_solve
@@ -86,18 +85,6 @@ def test_kl_gaussian_gaussian(random):
     tc = tf.test.TestCase()
     with tc.test_session():
         assert np.allclose(KL.eval(), KLr)
-
-
-# def test_chollogdet():
-#     """Test log det with cholesky matrices."""
-#     Dim = (5, 10, 10)
-#     L = random_chol(Dim)
-#     rlogdet = np.sum([logdet(l) for l in L])
-#     tlogdet = _chollogdet(L)
-
-#     tc = tf.test.TestCase()
-#     with tc.test_session():
-#         assert np.allclose(tlogdet.eval(), rlogdet)
 
 
 def random_chol(dim):
