@@ -20,8 +20,7 @@ setup(
         'numpy>=1.12.0',
         'scipy>=0.18.1',
         'tensorflow>=1.3.0',
-        'six>=1.10.0',
-        'multipledispatch>=0.4.9',
+        'six>=1.10.0'
     ],
     extras_require={
         'dev': [

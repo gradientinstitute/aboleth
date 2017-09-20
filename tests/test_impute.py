@@ -43,9 +43,9 @@ def test_fixed_gaussian_impute(make_missing_data):
 
     n, N, D = X.shape
     mean_array = 2 * np.ones(D).astype(np.float32)
-    var_array = 0.001 * np.ones(D).astype(np.float32)
+    std_array = np.sqrt(0.001) * np.ones(D).astype(np.float32)
     impute = ab.FixedNormalImpute(data_layer, mask_layer, mean_array,
-                                  var_array)
+                                  std_array)
 
     F, KL = impute(X=X, M=m)
 
@@ -58,7 +58,7 @@ def test_fixed_gaussian_impute(make_missing_data):
         assert KL.eval() == 0.0
 
 
-def test_leanred_scalar_impute(make_missing_data):
+def test_learned_scalar_impute(make_missing_data):
     """Test the impute that learns a scalar value to impute for each col."""
     ab.set_hyperseed(100)
     _, m, X, _ = make_missing_data

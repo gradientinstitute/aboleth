@@ -5,7 +5,7 @@ import tensorflow as tf
 from aboleth.kernels import RBF, RBFVariational
 from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
-                                   kl_qp)
+                                   kl_sum)
 from aboleth.baselayers import Layer, MultiLayer
 
 
@@ -347,29 +347,29 @@ class DenseVariational(SampleLayer3):
     ----------
     output_dim : int
         the dimension of the output of this layer
-    var : float
-        the initial value of the weight prior variance, which defaults to
-        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{var} \mathbf{I})`,
-        this is optimized (a la maximum likelihood type II).
+    std : float
+        the initial value of the weight prior standard deviation, which
+        defaults to :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{std}^2
+        \mathbf{I})`, this is optimized (a la maximum likelihood type II).
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
-    prior_W : distributions.Normal, distributions.Gaussian, optional
+    prior_W : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``var`` parameter.
-    prior_b : distributions.Normal, distributions.Gaussian, optional
+        weights. This ignores the ``std`` parameter.
+    prior_b : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer intercept. It
         must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``var`` and ``use_bias`` parameters.
-    post_W : distributions.Normal, distributions.Gaussian, optional
+        This ignores the ``std`` and ``use_bias`` parameters.
+    post_W : tf.distributions.Distribution, optional
         It must have parameters compatible with (input_dim, output_dim) shaped
         weights. This ignores the ``full`` parameter. See also
         ``distributions.gaus_posterior``.
-    post_b : distributions.Normal, distributions.Gaussian, optional
+    post_b : tf.distributions.Distributions, optional
         This is the posterior distribution object to use on the layer
         intercept. It must have parameters compatible with (output_dim,) shaped
         weights. This ignores the ``use_bias`` parameters.  See also
@@ -377,11 +377,11 @@ class DenseVariational(SampleLayer3):
 
     """
 
-    def __init__(self, output_dim, var=1., full=False, use_bias=True,
+    def __init__(self, output_dim, std=1., full=False, use_bias=True,
                  prior_W=None, prior_b=None, post_W=None, post_b=None):
         """Create and instance of a variational dense layer."""
         self.output_dim = output_dim
-        self.var = var
+        self.std = std
         self.full = full
         self.use_bias = use_bias
         self.pW = prior_W
@@ -399,7 +399,7 @@ class DenseVariational(SampleLayer3):
         self.qW = self._make_posterior(self.qW, W_shape)
 
         # Regularizers
-        KL = kl_qp(self.qW, self.pW)
+        KL = kl_sum(self.qW, self.pW)
 
         # Linear layer
         Wsamples = self._sample_W(self.qW, n_samples)
@@ -412,7 +412,7 @@ class DenseVariational(SampleLayer3):
             self.qb = self._make_posterior(self.qb, b_shape)
 
             # Regularizers
-            KL += kl_qp(self.qb, self.pb)
+            KL += kl_sum(self.qb, self.pb)
 
             # Linear layer
             bsamples = tf.expand_dims(self._sample_W(self.qb, n_samples), 1)
@@ -423,9 +423,9 @@ class DenseVariational(SampleLayer3):
     def _make_prior(self, prior_W, weight_shape):
         """Check/make prior."""
         if prior_W is None:
-            prior_W = norm_prior(dim=weight_shape, var=self.var)
+            prior_W = norm_prior(weight_shape, std=self.std)
 
-        assert _is_dim(prior_W.mu, weight_shape), \
+        assert _is_dim(prior_W, weight_shape), \
             "Prior inconsistent dimension!"
 
         return prior_W
@@ -435,25 +435,26 @@ class DenseVariational(SampleLayer3):
         if post_W is None:
             # We don't want a full-covariance on an intercept, check input_dim
             if self.full and len(weight_shape) > 1:
-                post_W = gaus_posterior(dim=weight_shape, var0=self.var)
+                post_W = gaus_posterior(weight_shape, std0=self.std)
             else:
-                post_W = norm_posterior(dim=weight_shape, var0=self.var)
+                post_W = norm_posterior(weight_shape, std0=self.std)
 
-        assert _is_dim(post_W.mu, weight_shape), \
+        assert _is_dim(post_W, weight_shape), \
             "Posterior inconsistent dimension!"
 
         return post_W
 
     def _weight_shapes(self, input_dim):
         """Generate weight and bias weight shape tuples."""
-        weight_shape = (input_dim, self.output_dim)
+        weight_shape = (self.output_dim, input_dim)
         bias_shape = (self.output_dim,)
 
         return weight_shape, bias_shape
 
     @staticmethod
     def _sample_W(dist, n_samples):
-        samples = tf.stack([dist.sample() for _ in range(n_samples)])
+        samples = \
+            tf.stack([tf.transpose(dist.sample()) for _ in range(n_samples)])
         return samples
 
 
@@ -469,19 +470,19 @@ class EmbedVariational(DenseVariational):
         the dimension of the output (embedding) of this layer
     n_categories : int
         the number of categories in the input variable
-    var : float
-        the initial value of the weight prior variance, which defaults to
-        :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{var} \mathbf{I})`,
-        this is optimized (a la maximum likelihood type II).
+    std : float
+        the initial value of the weight prior standard deviation, which
+        defaults to :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{std}^2
+        \mathbf{I})`, this is optimized (a la maximum likelihood type II).
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
-    prior_W : distributions.Normal, distributions.Gaussian, optional
+    prior_W : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
         weights. This ignores the ``var`` parameter.
-    post_W : distributions.Normal, distributions.Gaussian, optional
+    post_W : tf.distributions.Distribution, optional
         This is the posterior distribution object to use on the layer weights.
         It must have parameters compatible with (input_dim, output_dim) shaped
         weights. This ignores the ``full`` parameter. See also
@@ -489,13 +490,13 @@ class EmbedVariational(DenseVariational):
 
     """
 
-    def __init__(self, output_dim, n_categories, var=1., full=False,
+    def __init__(self, output_dim, n_categories, std=1., full=False,
                  prior_W=None, post_W=None):
         """Create and instance of a variational dense embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
         self.n_categories = n_categories
-        self.var = var
+        self.std = std
         self.full = full
         self.pW = prior_W
         self.qW = post_W
@@ -516,7 +517,7 @@ class EmbedVariational(DenseVariational):
         Net = tf.gather(Wsamples, X[0, :, 0], axis=1)
 
         # Regularizers
-        KL = kl_qp(self.qW, self.pW)
+        KL = kl_sum(self.qW, self.pW)
 
         return Net, KL
 
@@ -581,7 +582,7 @@ def _l1_loss(X):
     return l1
 
 
-def _is_dim(X, dims):
+def _is_dim(distribution, dims):
     r"""Check if ``X``'s dimension is the same as the tuple ``dims``."""
-    shape = tuple([int(d) for d in X.get_shape()])
+    shape = tuple(distribution.loc.shape)
     return shape == dims

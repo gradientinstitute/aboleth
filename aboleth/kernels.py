@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from aboleth.random import seedgen
-from aboleth.distributions import Normal, norm_posterior, kl_qp
+from aboleth.distributions import norm_posterior, kl_sum
 
 
 #
@@ -143,27 +143,30 @@ class RBFVariational(ShiftInvariant):
         dim = (input_dim, n_features)
 
         # Setup the prior, lenscale may be a variable, so dont use prior_normal
-        pP = Normal(mu=tf.zeros(dim), var=self.__len2var(self.lenscale))
+        pP = tf.distributions.Normal(
+            loc=tf.zeros(dim),
+            scale=self.__len2std(self.lenscale)
+        )
 
         # Initialise the posterior
         if self.lenscale_post is None:
             self.lenscale_post = np.sqrt(1 / input_dim)
-        qP = norm_posterior(dim=dim, var0=self.__len2var(self.lenscale_post))
+        qP = norm_posterior(dim=dim, std0=self.__len2std(self.lenscale_post))
 
-        KL = kl_qp(qP, pP)
+        KL = kl_sum(qP, pP)
 
         # We implement the VAR-FIXED method here from Cutajar et. al 2017, so
         # we pre-generate and fix the standard normal samples
         rand = np.random.RandomState(next(seedgen))
-        e = rand.randn(input_dim, n_features).astype(np.float32)
-        P = qP.sample(e)
+        e = rand.randn(*dim).astype(np.float32)
+        P = qP.mean() + qP.stddev() * e
 
         return P, KL
 
     @staticmethod
-    def __len2var(lenscale):
-        var = tf.to_float(1. / lenscale**2)
-        return var
+    def __len2std(lenscale):
+        std = tf.to_float(1. / lenscale)
+        return std
 
 
 class Matern(ShiftInvariant):
