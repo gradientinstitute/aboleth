@@ -2,7 +2,6 @@
 import tensorflow as tf
 
 from aboleth.baselayers import MultiLayer
-from aboleth.distributions import Normal
 from aboleth.random import seedgen
 from aboleth.util import pos
 
@@ -144,15 +143,17 @@ class FixedNormalImpute(ImputeOp):
         masked. Must be of form ``f(**kwargs)``.
     mu_array : array-like
         A list of the global mean values of each dat column
-    var_array : array-like
-        A list of the global variance of each data column
+    std_array : array-like
+        A list of the global standard deviation of each data column
 
     """
 
-    def __init__(self, datalayer, masklayer, mu_array, var_array):
+    def __init__(self, datalayer, masklayer, mu_array, std_array):
         """Construct and instance of a RandomGaussImpute operation."""
         super().__init__(datalayer, masklayer)
-        self.normal_array = [Normal(m, v) for m, v in zip(mu_array, var_array)]
+        self.normal_array = [
+            tf.distributions.Normal(m, s) for m, s in zip(mu_array, std_array)
+        ]
 
     def _impute2D(self, X_2D):
         r"""Randomly impute a rank 2 tensor."""
@@ -262,11 +263,14 @@ class LearnedNormalImpute(ImputeOp):
             tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
             name="impute_scalars"
         )
-        impute_variances = tf.Variable(
-            tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
+        impute_stddev = tf.Variable(
+            tf.random_gamma(alpha=1., shape=(1, datadim), seed=next(seedgen)),
             name="impute_scalars"
         )
-        self.normal = Normal(impute_means, pos(impute_variances))
+        self.normal = tf.distributions.Normal(
+            impute_means,
+            tf.sqrt(pos(impute_stddev))
+        )
 
     def _impute2D(self, X_2D):
         r"""Impute a rank 2 tensor with draws from normal distributions.

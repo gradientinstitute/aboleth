@@ -9,8 +9,8 @@ from aboleth.layers import SampleLayer
 
 
 D = 10
-DIM = (2, 10)
-EDIM = (5, 10)
+DIM = (10, 2)
+EDIM = (10, 5)
 
 
 def test_net_outputs(make_graph):

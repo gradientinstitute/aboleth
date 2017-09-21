@@ -96,7 +96,7 @@ We demonstrate a few things in this script:
 - How to loop over mini-batches directly using a ``feed_dict`` and an
   appropriate mini-batch generator, ``ab.batch`` (see :ref:`util`).
 
-Using this set up we get an accuracy of about 85.9%, compared to the wide and
+Using this set up we get an accuracy of about 85.3%, compared to the wide and
 deep model that achieves 84.4%.
 
 The full script is here: `multi_input.py
@@ -140,8 +140,9 @@ benefit from information contained in the labels (as opposed to imputing as a
 separate stage from supervised learning).
 
 This script demonstrates an imputation layer that learns a "mean" and a
-"variance" of a Normal distribution (per column) to *randomly* impute the data
-from! We compare it to just imputing the missing values with the column means.
+"standard deviation" of a Normal distribution (per column) to *randomly* impute
+the data from! We compare it to just imputing the missing values with the
+column means.
 
 The task is a multi-task classification problem in which we have to predict
 forest coverage types from 54 features or various types, described `here

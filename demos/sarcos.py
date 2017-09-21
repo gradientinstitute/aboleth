@@ -18,7 +18,7 @@ logger.setLevel(logging.INFO)
 
 NSAMPLES = 10  # Number of random samples to get from an Aboleth net
 NFEATURES = 1500  # Number of random features/bases to use in the approximation
-NOISE = 3.0  # Initial estimate of the observation variance
+NOISE = 3.0  # Initial estimate of the observation noise
 
 # Random Fourier Features, this is setting up an anisotropic length scale, or
 # one length scale per dimension

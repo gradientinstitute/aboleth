@@ -37,7 +37,7 @@ config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
 # Model initialisation
 noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
-reg = 1.  # Initial weight prior variance, this is optimised later
+reg = 1.  # Initial weight prior std. dev, this is optimised later
 
 # Random Fourier Features
 # lenscale = tf.Variable(1.)  # learn the length scale
@@ -58,7 +58,7 @@ kern = ab.RBFVariational(lenscale=lenscale)  # This is VAR-FIXED kernel from
 net = (
     ab.InputLayer(name="X", n_samples=n_samples) >>
     ab.RandomFourier(n_features=100, kernel=kern) >>
-    ab.DenseVariational(output_dim=1, var=reg, full=True)
+    ab.DenseVariational(output_dim=1, std=reg, full=True)
 )
 
 

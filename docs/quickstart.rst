@@ -172,11 +172,11 @@ place a prior distribution on the weights,
 
 .. math::
 
-    p(\mathbf{w}) = \mathcal{N}(\mathbf{w} | \mathbf{0}, \psi \mathbf{I}_D).
+    p(\mathbf{w}) = \mathcal{N}(\mathbf{w} | \mathbf{0}, \psi^2 \mathbf{I}_D).
 
-Here :math:`\psi` is the prior weight variance (note that this corresponds to
-:math:`\lambda^{-1}` in the MAP logistic classifier). We use the same
-likelihood model as before,
+Here :math:`\psi` is the prior weight standard deviation (note that this
+corresponds to :math:`\sqrt{\lambda^{-1}}` in the MAP logistic classifier).
+We use the same likelihood model as before,
 
 .. math::
 
@@ -250,15 +250,15 @@ following,
 
     layers = (
         ab.InputLayer(name="X", n_samples=5) >>
-        ab.DenseVariational(output_dim=1, var=1., full=True) >>
+        ab.DenseVariational(output_dim=1, std=1., full=True) >>
         ab.Activation(tf.nn.sigmoid)
     )
 
 Note we are using ``DenseVariational`` instead of ``DenseMAP``. In the
 ``DenseVariational`` layer the ``full`` parameter tells the layer to use a full
-covariance Gaussian, and ``var`` is initial value of the weight prior variance,
-:math:`\psi`, which is optimized. Also we've set ``n_samples=5`` in the
-``InputLayer``, this lets the subsequent layers know that we are making a
+covariance Gaussian, and ``std`` is initial value of the weight prior standard
+deviation, :math:`\psi`, which is optimized. Also we've set ``n_samples=5`` in
+the ``InputLayer``, this lets the subsequent layers know that we are making a
 *stochastic* model, that is, whenever we call ``layers`` we are actually
 expecting back 5 samples of the model output. This makes the
 ``DenseVariational`` layer multiply its input with 5 samples of the weights
