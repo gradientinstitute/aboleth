@@ -37,7 +37,7 @@ The above code block has has implemented the following function,
     p(\mathbf{y} = 1 | \mathbf{X}) = \sigma(\mathbf{X}\mathbf{w}),
 
 where :math:`\mathbf{w} \in \mathbb{R}^D` are the model weights,
-:math:`\mathbf{y} \in \mathbb{Z}^N_2` are the binary labels, :math:`\mathbf{X}
+:math:`\mathbf{y} \in \mathbb{N}^N_2` are the binary labels, :math:`\mathbf{X}
 \in \mathbb{R}^{N \times D}` are the predictive inputs and
 :math:`\sigma(\cdot)` is a logistic sigmoid function. At this stage ``layers``
 is a callable class (``ab.baselayers.MultiLayerComposite``), and no

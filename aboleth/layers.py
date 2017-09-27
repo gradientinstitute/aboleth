@@ -73,7 +73,8 @@ class SampleLayer(Layer):
 
         """
         rank = len(X.shape)
-        assert rank > 2
+        assert rank > 2, "SampleLayers require rank > 2 input Tensors, with" \
+            " the first axis being the random samples of the net."""
         Net, KL = self._build(X)
         return Net, KL
 
@@ -341,16 +342,63 @@ class RandomArcCosine(RandomFourier):
 #
 
 class DenseVariational(SampleLayer3):
-    r"""Dense (fully connected) linear layer, with variational inference.
+    r"""A dense (fully connected) linear layer, with variational inference.
+
+    This implements a dense linear layer,
+
+    .. math::
+        f(\mathbf{X}) = \mathbf{X} \mathbf{W} + \mathbf{b}
+
+    where prior, :math:`p(\cdot)`, and approximate posterior, :math:`q(\cdot)`
+    distributions are placed on the weights and *also* the biases. Here
+    :math:`\mathbf{X} \in \mathbb{R}^{N \times D_{in}}`, :math:`\mathbf{W} \in
+    \mathbb{R}^{D_{in} \times D_{out}}` and :math:`\mathbf{b} \in
+    \mathbb{R}^{D_{out}}`. By default, the same Normal prior is placed on each
+    of the layer weights and biases,
+
+    .. math::
+        w_{ij} \sim \mathcal{N}(0, \sigma^2), \quad
+        b_{j} \sim \mathcal{N}(0, \sigma^2),
+
+    and a different Normal posterior is learned for each of the layer weights
+    and biases,
+
+    .. math::
+        w_{ij} \sim \mathcal{N}(m_{ij}, c_{ij}), \quad
+        b_{j} \sim \mathcal{N}(l_{j}, o_{j}).
+
+    We also have the option of placing full-covariance Gaussian posteriors on
+    the input dimension of the weights,
+
+    .. math::
+        \mathbf{w}_{j} \sim \mathcal{N}(\mathbf{m}_{j}, \mathbf{C}_{j}),
+
+    where :math:`\mathbf{m}_j \in \mathbb{R}^{D_{in}}` and
+    :math:`\mathbf{C}_j \in \mathbb{R}^{D_{in} \times D_{in}}`.
+
+    This layer will use variational inference to learn *all* of the non-zero
+    *prior* and posterior parameters.
+
+    Whenever this layer is called, it will return the result,
+
+    .. math::
+        f^{(s)}(\mathbf{X}) = \mathbf{X} \mathbf{W}^{(s)} + \mathbf{b}^{(s)}
+
+    with samples from the posteriors, :math:`\mathbf{W}^{(s)} \sim
+    q(\mathbf{W})` and :math:`\mathbf{b}^{(s)} \sim q(\mathbf{b})`. The number
+    of samples, *s*, can be controlled by using the ``n_samples`` argument in
+    an ``InputLayer`` used to feed the first layer of a model, or by tiling
+    :math:`\mathbf{X}` on the first dimension. This layer also returns the
+    result of :math:`\text{KL}[q\|p]` for all parameters.
 
     Parameters
     ----------
     output_dim : int
         the dimension of the output of this layer
     std : float
-        the initial value of the weight prior standard deviation, which
-        defaults to :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{std}^2
-        \mathbf{I})`, this is optimized (a la maximum likelihood type II).
+        the initial value of the weight prior standard deviation
+        (:math:`\sigma` above), this is optimized a la maximum likelihood type
+        II.
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
@@ -461,8 +509,50 @@ class DenseVariational(SampleLayer3):
 class EmbedVariational(DenseVariational):
     r"""Dense (fully connected) embedding layer, with variational inference.
 
-    This layer works directly on shape (N, 1) inputs of category *indices*
-    rather than one-hot representations, for efficiency.
+    This layer works directly on shape (N, 1) inputs of *K* category *indices*
+    rather than one-hot representations, for efficiency, and is a dense linear
+    layer,
+
+    .. math::
+        f(\mathbf{X}) = \mathbf{X} \mathbf{W},
+
+    where prior, :math:`p(\cdot)`, and approximate posterior, :math:`q(\cdot)`
+    distributions are placed on the weights. Here :math:`\mathbf{X} \in
+    \mathbb{N}_2^{N \times K}` and :math:`\mathbf{W} \in \mathbb{R}^{K \times
+    D_{out}}`. Though in code we represent :math:`\mathbf{X}` as a vector of
+    indices in :math:`\mathbb{N}_K^{N \times 1}`. By default, the same Normal
+    prior is placed on each of the layer weights,
+
+    .. math::
+        w_{ij} \sim \mathcal{N}(0, \sigma^2),
+
+    and a different Normal posterior is learned for each of the layer weights,
+
+    .. math::
+        w_{ij} \sim \mathcal{N}(m_{ij}, c_{ij}).
+
+    We also have the option of placing full-covariance Gaussian posteriors on
+    the input dimension of the weights,
+
+    .. math::
+        \mathbf{w}_{j} \sim \mathcal{N}(\mathbf{m}_{j}, \mathbf{C}_{j}),
+
+    where :math:`\mathbf{m}_j \in \mathbb{R}^{K}` and
+    :math:`\mathbf{C}_j \in \mathbb{R}^{K \times K}`.
+
+    This layer will use variational inference to learn *all* of the non-zero
+    *prior* and posterior parameters.
+
+    Whenever this layer is called, it will return the result,
+
+    .. math::
+        f^{(s)}(\mathbf{X}) = \mathbf{X} \mathbf{W}^{(s)}
+
+    with samples from the posterior, :math:`\mathbf{W}^{(s)} \sim
+    q(\mathbf{W})`. The number of samples, *s*, can be controlled by using the
+    ``n_samples`` argument in an ``InputLayer`` used to feed the first layer of
+    a model, or by tiling :math:`\mathbf{X}` on the first dimension. This layer
+    also returns the result of :math:`\text{KL}[q\|p]` for all parameters.
 
     Parameters
     ----------
@@ -471,9 +561,9 @@ class EmbedVariational(DenseVariational):
     n_categories : int
         the number of categories in the input variable
     std : float
-        the initial value of the weight prior standard deviation, which
-        defaults to :math:`\mathbf{W} \sim \mathcal{N}(\mathbf{0}, \text{std}^2
-        \mathbf{I})`, this is optimized (a la maximum likelihood type II).
+        the initial value of the weight prior standard deviation
+        (:math:`\sigma` above), this is optimized a la maximum likelihood type
+        II.
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
@@ -481,7 +571,7 @@ class EmbedVariational(DenseVariational):
     prior_W : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``var`` parameter.
+        weights. This ignores the ``std`` parameter.
     post_W : tf.distributions.Distribution, optional
         This is the posterior distribution object to use on the layer weights.
         It must have parameters compatible with (input_dim, output_dim) shaped
@@ -524,6 +614,17 @@ class EmbedVariational(DenseVariational):
 
 class DenseMAP(SampleLayer):
     r"""Dense (fully connected) linear layer, with MAP inference.
+
+    This implements a linear layer, and when called returns
+
+    .. math::
+        f(\mathbf{X}) = \mathbf{X} \mathbf{W} + \mathbf{b}
+
+    where :math:`\mathbf{X} \in \mathbb{R}^{N \times D_{in}}`,
+    :math:`\mathbf{W} \in \mathbb{R}^{D_{in} \times D_{out}}` and
+    :math:`\mathbf{b} \in \mathbb{R}^{D_{out}}`. This layer uses maximum
+    *a-posteriori* inference to learn the weights and biases, and so also
+    returns complexity penalities (l1 or l2) for the weights and biases.
 
     Parameters
     ----------
