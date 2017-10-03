@@ -4,7 +4,6 @@ import tensorflow as tf
 from aboleth.baselayers import MultiLayer
 from aboleth.random import seedgen
 from aboleth.util import pos
-from aboleth.random import seedgen
 
 
 class ImputeOp(MultiLayer):
