@@ -173,9 +173,21 @@ def _kl_gaussian_normal(q, p, name=None):
     tr = tf.reduce_sum(L * L) / p_var
     # tr = tf.reduce_sum(tf.trace(q.covariance())) / p_var  # Above is faster
     dist = tf.reduce_sum((p.mean() - q.mean())**2) / p_var
-    logdet = n * D * tf.log(p_var) \
-        - 2 * tf.reduce_sum(q.scale.log_abs_determinant())
+    # logdet = n * D * tf.log(p_var) \
+    #     - 2 * tf.reduce_sum(q.scale.log_abs_determinant())  # Numerical issue
+    logdet = n * D * tf.log(p_var) - _chollogdet(L)
     KL = 0.5 * (tr + dist + logdet - n * D)
     if name:
         KL = tf.identity(KL, name=name)
     return KL
+
+
+#
+# Private module stuff
+#
+
+def _chollogdet(L):
+    """Log det of a cholesky, where L is (..., D, D)."""
+    l = pos(tf.matrix_diag_part(L))  # keep > 0, and no vanashing gradient
+    logdet = 2. * tf.reduce_sum(tf.log(l))
+    return logdet

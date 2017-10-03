@@ -25,7 +25,7 @@ def test_mean_impute(make_missing_data):
     with tc.test_session():
         X_imputed = F.eval()
         imputed_data = X_imputed[1, m]
-        assert list(imputed_data[-5:]) == [1., 2., 3., 4., 5.]
+        assert np.allclose(imputed_data[-5:], [1., 2., 3., 4., 5.])
         assert KL.eval() == 0.0
 
 
@@ -53,8 +53,8 @@ def test_fixed_gaussian_impute(make_missing_data):
     with tc.test_session():
         X_imputed = F.eval()
         imputed_data = X_imputed[1, m]
-        correct = [1.98, 1.97,  1.93,  2.02, 2.02]
-        assert np.isclose(list(imputed_data[-5:]), correct, atol=0.1).all()
+        correct = np.array([1.94, 1.97,  1.93,  2.03, 2.02])
+        assert np.allclose(imputed_data[-5:], correct, atol=0.1)
         assert KL.eval() == 0.0
 
 

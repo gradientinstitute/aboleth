@@ -161,7 +161,7 @@ class FixedNormalImpute(ImputeOp):
         data_zeroed_missing_tf = X_2D * self.real_val_mask
 
         # Divide column totals by the number of non-nan values
-        col_draws = [n.sample() for n in self.normal_array]
+        col_draws = [n.sample(seed=next(seedgen)) for n in self.normal_array]
         # Make an vector of the impute values for each missing point
         imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])
 
@@ -290,7 +290,7 @@ class LearnedNormalImpute(ImputeOp):
         data_zeroed_missing = X_2D * self.real_val_mask
 
         # Divide column totals by the number of non-nan values
-        col_draws = tf.transpose(self.normal.sample())
+        col_draws = tf.transpose(self.normal.sample(seed=next(seedgen)))
         # Make an vector of the impute values for each missing point
         imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])[:, 0]
 
