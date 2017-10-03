@@ -22,7 +22,7 @@ ab.set_hyperseed(RSEED)
 # Data settings
 N = 100  # Number of training points to generate
 Ns = 400  # Number of testing points to generate
-true_noise = 0.1  # Add noise to the GP draws, to make things a little harder
+true_noise = 0.05  # Add noise to the GP draws, to make things a little harder
 
 # Model settings
 n_samples = 5  # Number of random samples to get from an Aboleth net
@@ -31,14 +31,14 @@ n_epochs = 2000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
-model = "deep_gaussian_process"
+model = "nnet_dropout"
 
 
 # Models for regression
 def linear(X, Y):
     """Linear regression with l2 regularization."""
     reg = .01  # Weight prior
-    noise = 1.  # Likelihood st. dev.
+    noise = .5  # Likelihood st. dev.
 
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
@@ -55,7 +55,7 @@ def linear(X, Y):
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
     reg = .01  # Initial weight prior std. dev, this is optimised later
-    noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
+    noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
@@ -72,7 +72,7 @@ def bayesian_linear(X, Y):
 def nnet(X, Y):
     """Neural net with regularization."""
     reg = .01  # Weight prior
-    noise = 1.  # Likelihood st. dev.
+    noise = .5  # Likelihood st. dev.
 
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
@@ -96,7 +96,7 @@ def nnet(X, Y):
 def nnet_dropout(X, Y):
     """Neural net with dropout."""
     reg = 0.001  # Weight prior
-    noise = 1.  # Likelihood st. dev.
+    noise = .5  # Likelihood st. dev.
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
@@ -163,7 +163,7 @@ def svr(X, Y):
 def gaussian_process(X, Y):
     """Gaussian Process Regression."""
     reg = 0.1  # Initial weight prior std. dev, this is optimised later
-    noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
+    noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
     lenscale = tf.Variable(1.)  # learn the length scale
     kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
 
@@ -190,8 +190,6 @@ def deep_gaussian_process(X, Y):
         ab.InputLayer(name="X", n_samples=n_samples) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(ab.pos(lenscale))) >>
         ab.DenseVariational(output_dim=5, std=reg, full=True) >>
-        ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=3, std=reg, full=True) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
         ab.DenseVariational(output_dim=1, std=reg, full=True)
     )

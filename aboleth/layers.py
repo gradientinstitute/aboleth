@@ -153,16 +153,29 @@ class DropOut(Layer):
     keep_prob : float, Tensor
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
+    noise_shape : tuple, Tensor
+        A 1-D Tensor or tuple of type int32, representing the shape for
+        randomly generated keep/drop flags. If none, this will automatically
+        try to share samples of the keep flags along the observations axis, so
+        we obtain samples of the latent functions only. This will assume the
+        obserations are on the *second last* axis, ``[..., N, D]``.
 
     """
 
-    def __init__(self, keep_prob):
+    def __init__(self, keep_prob, noise_shape=None):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
+        self.noise_shape = noise_shape
 
     def _build(self, X):
         """Build the graph of this layer."""
-        noise_shape = None  # equivalent to different samples from posterior
+        if self.noise_shape is None:
+            # Set noise shape to equivalent to different samples from posterior
+            # i.e. share the samples along the data-observations axis
+            noise_shape = (1, X.shape[-1])
+            if len(X.shape) > 2:
+                noise_shape = tuple(X.shape[:-2]) + noise_shape
+            noise_shape = tf.TensorShape(noise_shape)
         Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
