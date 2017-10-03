@@ -53,7 +53,7 @@ def test_fixed_gaussian_impute(make_missing_data):
     with tc.test_session():
         X_imputed = F.eval()
         imputed_data = X_imputed[1, m]
-        correct = np.array([1.94, 2.08,  1.98,  2.05, 2.00])
+        correct = np.array([1.94, 1.97,  1.93,  2.03, 2.02])
         assert np.allclose(imputed_data[-5:], correct, atol=0.1)
         assert KL.eval() == 0.0
 

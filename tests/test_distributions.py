@@ -94,9 +94,16 @@ def test_chollogdet():
     rlogdet = np.sum([logdet(l) for l in L])
     tlogdet = _chollogdet(L)
 
+    L[0, 0, 0] = 1e-17  # Near zero to test numerics
+    L[1, 3, 3] = -1.
+    L[4, 5, 5] = -20.
+
+    nlogdet = _chollogdet(L)
+
     tc = tf.test.TestCase()
     with tc.test_session():
         assert np.allclose(tlogdet.eval(), rlogdet)
+        assert not np.isnan(nlogdet.eval())
 
 
 def random_chol(dim):
