@@ -95,8 +95,8 @@ def test_chollogdet():
     tlogdet = _chollogdet(L)
 
     L[0, 0, 0] = 1e-17  # Near zero to test numerics
-    L[1, 3, 3] = 1e-17
-    L[4, 5, 5] = 1e-17
+    L[1, 3, 3] = -1.
+    L[4, 5, 5] = -20.
 
     nlogdet = _chollogdet(L)
 
