@@ -62,7 +62,7 @@ def main():
     with tf.name_scope("Deepnet"):
         nn, reg = net(X=X_)
         lkhood = tf.distributions.Bernoulli(logits=nn)
-        loss = ab.max_posterior(lkhood, Y_, reg, first_axis_is_obs=False)
+        loss = ab.max_posterior(lkhood, Y_, reg)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)

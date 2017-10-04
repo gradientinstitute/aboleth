@@ -9,18 +9,21 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
     ----------
     likelihood : tf.distributions.Distribution
         the likelihood object that takes neural network(s) as an input. The
-        ``batch_shape`` of this object should be (n_samples, N, ...), where
+        ``batch_shape`` of this object should be ``(n_samples, N, ...)``, where
         ``n_samples`` is the number of likelihood samples (defined by
         ab.InputLayer) and ``N`` is the number of observations (can be ``?`` if
         you are using a placeholder and mini-batching).
     Y : ndarray, Tensor
-        the targets of shape (N, tasks).
+        the targets of shape ``(N, tasks)``.
     N : int, Tensor
         the total size of the dataset (i.e. number of observations).
+    KL : float, Tensor
+        the Kullback Leibler divergence between the posterior and prior
+        parameters of the model (:math:`\text{KL}[q\|p]`).
     like_weights : callable, ndarray, Tensor
         weights to apply to each observation in the expected log likelihood.
-        This should be an array of shape (N,) or can be called as
-        ``like_weights(Y)`` and should return a (N,) array.
+        This should be an array of shape ``(N,)`` or can be called as
+        ``like_weights(Y)`` and should return a ``(N,)`` array.
 
     Returns
     -------
@@ -48,27 +51,31 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
 
 
 def max_posterior(likelihood, Y, regulariser, like_weights=None,
-                  first_axis_is_obs=True):
+                  observation_axis=-2):
     """Build maximum a-posteriori (MAP) loss for a neural net.
 
     Parameters
     ----------
     likelihood : tf.distributions.Distribution
-        the likelihood object that takes neural network(s) as an input. The
-        ``batch_shape`` of this object should be (n_samples, N, ...), where
-        ``n_samples`` is the number of likelihood samples (defined by
-        ab.InputLayer) and ``N`` is the number of observations (can be ``?`` if
-        you are using a placeholder and mini-batching).
+        the likelihood object that takes neural network(s) as an input. One
+        axis of this object's ``batch_shape`` should refer to ``N``, which is
+        the number of observations (can be ``?`` if you are using a placeholder
+        and mini-batching). The axis that indexes observations is set by the
+        ``observation_axis`` setting. For data that is ``(N, tasks)`` or
+        ``(..., N, tasks)``, this should automatically work.
     Y : ndarray, Tensor
-        the targets of shape (N, tasks).
+        the targets of shape ``(N, tasks)``.
+    regulariser : float, Tensor
+        the regulariser on the parameters of the model to penalise model
+        complexity.
     like_weights : callable, ndarray, Tensor
         weights to apply to each observation in the expected log likelihood.
-        This should be an array of shape (N,) or can be called as
-        ``like_weights(Y)`` and should return a (N,) array.
-    first_axis_is_obs : bool
-        indicates if the first axis indexes the observations/data or not. This
-        will be True if the likelihood outputs a ``batch_shape`` of (N, tasks)
-        or False if ``batch_shape`` is (n_samples, N, tasks).
+        This should be an array of shape ``(N,)`` or can be called as
+        ``like_weights(Y)`` and should return a ``(N,)`` array.
+    observation_axis : int
+        The axis that indexes the observations. This will assume the
+        observations are on the *second last* axis, i.e. ``(..., N, D)``. This
+        is used to calculate the mini-batch size.
 
     Returns
     -------
@@ -77,8 +84,7 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None,
 
     """
     # Get the batch size to average the likelihood over
-    obs_ax = 0 if first_axis_is_obs else 1
-    M = tf.to_float(likelihood.batch_shape_tensor()[obs_ax])
+    M = tf.to_float(likelihood.batch_shape_tensor()[observation_axis])
 
     # Average likelihood for batch
     AVLL = _sum_likelihood(likelihood, Y, like_weights) / M

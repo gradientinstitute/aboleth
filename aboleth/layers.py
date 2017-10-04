@@ -17,9 +17,9 @@ class InputLayer(MultiLayer):
     r"""Create an input layer.
 
     This layer defines input kwargs so that a user may easily provide the right
-    inputs to a complex set of layers. It takes a 2D tensor of shape (N, D).
-    If n_samples is specified, the input is tiled along a new first axis
-    creating a (n_samples, N, D) tensor for propogating samples through a
+    inputs to a complex set of layers. It takes a 2D tensor of shape ``(N,
+    D)``.  If n_samples is specified, the input is tiled along a new first axis
+    creating a ``(n_samples, N, D)`` tensor for propogating samples through a
     variational deep net.
 
     Parameters
@@ -153,29 +153,27 @@ class DropOut(Layer):
     keep_prob : float, Tensor
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
-    noise_shape : tuple, Tensor
-        A 1-D Tensor or tuple of type int32, representing the shape for
-        randomly generated keep/drop flags. If none, this will automatically
-        try to share samples of the keep flags along the observations axis, so
-        we obtain samples of the latent functions only. This will assume the
-        obserations are on the *second last* axis, ``[..., N, D]``.
+    observation_axis : int
+        The axis that indexes the observations. This will assume the
+        obserations are on the *second last* axis, i.e. ``(..., N, D)``. This
+        is so we can repeat the dropout pattern over observations, which has
+        the effect of dropping out weights consistently, thereby sampling the
+        "latent function" of the layer.
 
     """
 
-    def __init__(self, keep_prob, noise_shape=None):
+    def __init__(self, keep_prob, observation_axis=-2):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
-        self.noise_shape = noise_shape
+        self.obsax = observation_axis
 
     def _build(self, X):
         """Build the graph of this layer."""
-        if self.noise_shape is None:
-            # Set noise shape to equivalent to different samples from posterior
-            # i.e. share the samples along the data-observations axis
-            noise_shape = (1, X.shape[-1])
-            if len(X.shape) > 2:
-                noise_shape = tuple(X.shape[:-2]) + noise_shape
-            noise_shape = tf.TensorShape(noise_shape)
+        # Set noise shape to equivalent to different samples from posterior
+        # i.e. share the samples along the data-observations axis
+        noise_shape = tf.TensorShape(
+            (*X.shape[:self.obsax], 1, *X.shape[(self.obsax + 1):])
+        )
         Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
@@ -522,9 +520,9 @@ class DenseVariational(SampleLayer3):
 class EmbedVariational(DenseVariational):
     r"""Dense (fully connected) embedding layer, with variational inference.
 
-    This layer works directly on shape (N, 1) inputs of *K* category *indices*
-    rather than one-hot representations, for efficiency, and is a dense linear
-    layer,
+    This layer works directly on shape ``(N, 1)`` inputs of *K* category
+    *indices* rather than one-hot representations, for efficiency, and is a
+    dense linear layer,
 
     .. math::
         f(\mathbf{X}) = \mathbf{X} \mathbf{W},
