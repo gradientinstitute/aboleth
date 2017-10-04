@@ -31,7 +31,7 @@ n_epochs = 2000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
-model = "nnet_dropout"
+model = "gaussian_process"
 
 
 # Models for regression
@@ -76,13 +76,11 @@ def nnet(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
-        ab.DenseMAP(output_dim=30, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=40, l2_reg=reg, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DenseMAP(output_dim=20, l2_reg=reg, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DenseMAP(output_dim=10, l2_reg=reg, l1_reg=0.) >>
-        ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=5, l2_reg=reg, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
     )
@@ -95,21 +93,18 @@ def nnet(X, Y):
 
 def nnet_dropout(X, Y):
     """Neural net with dropout."""
-    reg = 0.001  # Weight prior
+    reg = 0.01  # Weight prior
     noise = .5  # Likelihood st. dev.
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
-        ab.DenseMAP(output_dim=30, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=40, l2_reg=reg, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.95) >>
+        ab.DropOut(keep_prob=0.9) >>
         ab.DenseMAP(output_dim=20, l2_reg=reg, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DropOut(keep_prob=0.95) >>
         ab.DenseMAP(output_dim=10, l2_reg=reg, l1_reg=0.) >>
-        ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.95) >>
-        ab.DenseMAP(output_dim=5, l2_reg=reg, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
     )
@@ -156,7 +151,7 @@ def svr(X, Y):
     )
 
     phi, reg = net(X=X)
-    loss = tf.reduce_mean(tf.maximum(tf.abs(Y - phi - eps), 0.)) + reg
+    loss = tf.reduce_mean(tf.nn.relu(tf.abs(Y - phi - eps))) + reg
     return phi, loss
 
 
@@ -219,7 +214,7 @@ probabilistic = [
     "nnet_dropout",
     "nnet_bayesian",
     "gaussian_process",
-    "deep_gaussian_process"
+    "deep_gaussian_process",
 ]
 
 
