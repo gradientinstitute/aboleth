@@ -27,11 +27,11 @@ true_noise = 0.05  # Add noise to the GP draws, to make things a little harder
 # Model settings
 n_samples = 5  # Number of random samples to get from an Aboleth net
 n_pred_samples = 20  # This will give n_samples by n_pred_samples predictions
-n_epochs = 2000  # how many times to see the data for training
+n_epochs = 4000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
-model = "gaussian_process"
+model = "deep_gaussian_process"
 
 
 # Models for regression
@@ -183,7 +183,7 @@ def deep_gaussian_process(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
-        ab.RandomFourier(n_features=10, kernel=ab.RBF(ab.pos(lenscale))) >>
+        ab.RandomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))) >>
         ab.DenseVariational(output_dim=5, std=reg, full=True) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
         ab.DenseVariational(output_dim=1, std=reg, full=True)
@@ -229,10 +229,13 @@ def main():
         return Y
 
     # Get training and testing data
+    train_bounds = [-10, 10]
+    pred_bounds = [-14, 14]
     rnd = np.random.RandomState(RSEED)
-    Xr = (rnd.rand(N, 1) * 20 - 10).astype(np.float32)
+    Xr = rnd.rand(N, 1) * (train_bounds[1] - train_bounds[0]) + train_bounds[0]
+    Xr = Xr.astype(np.float32)
     Yr = f(Xr) + rnd.randn(N, 1).astype(np.float32) * true_noise
-    Xs = np.linspace(-14, 14, Ns, dtype=np.float32)[:, np.newaxis]
+    Xs = np.linspace(*pred_bounds, Ns, dtype=np.float32)[:, np.newaxis]
     Ys = f(Xs)
     test_bounds = np.logical_and(Xs[:, 0] > -10, Xs[:, 0] < 10)
 
@@ -288,20 +291,25 @@ def main():
     # Score
     r2 = r2_score(Ys.flatten()[test_bounds], Eymean.flatten()[test_bounds])
     print("Score: {:.4f}".format(r2))
-    # import IPython; IPython.embed()
 
     # Plot
-    f = bk.figure(sizing_mode='stretch_both',
+    f = bk.figure(plot_width=1000, plot_height=600, x_axis_label="x",
+                  y_axis_label="y",
                   title="{}, R-square = {:.4f}".format(model, r2))
     if model in probabilistic:
         for y in Ey:
             f.line(Xs.flatten(), y.flatten(), line_color='green',
-                   legend='Samples', alpha=0.1)
-    f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue', legend='Training')
+                   legend='sample predictions', alpha=0.1)
+    f.circle(Xr.flatten(), Yr.flatten(), fill_color='blue',
+             legend='training points')
     f.line(Xs.flatten(), Ys.flatten(), line_color='blue', line_width=3,
            legend='Truth')
-    f.line(Xs.flatten(), Eymean.flatten(), line_color='green', legend='Mean',
-           line_width=3)
+    f.line(Xs.flatten(), Eymean.flatten(), line_color='green',
+           legend='mean prediction', line_width=3)
+    f.line([train_bounds[0], train_bounds[0]], [-.5, 1], line_color='gray',
+           line_dash='dashed', line_width=3, legend="training domain")
+    f.line([train_bounds[1], train_bounds[1]], [-.5, 1], line_color='gray',
+           line_dash='dashed', line_width=3)
     bk.show(f)
 
 
