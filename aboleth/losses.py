@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 def elbo(likelihood, Y, N, KL, like_weights=None):
-    """Build the evidence lower bound loss for a neural net.
+    r"""Build the evidence lower bound loss for a neural net.
 
     Parameters
     ----------
@@ -52,7 +52,7 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
 
 def max_posterior(likelihood, Y, regulariser, like_weights=None,
                   observation_axis=-2):
-    """Build maximum a-posteriori (MAP) loss for a neural net.
+    r"""Build maximum a-posteriori (MAP) loss for a neural net.
 
     Parameters
     ----------
