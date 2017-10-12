@@ -1,3 +1,16 @@
+Release 0.6.2
+=============
+
+Hotfix: Fix the dropout noise shape so we get samples of the latent function of
+the layer (rather than the observations). Also some doco tweaks.
+
+Release 0.6.1
+=============
+
+Hotfix: Fix regression whereby setting the random seed was not working with the
+new distribution objects from TensorFlow (tf.distributions).
+
+
 Release 0.6.0
 =============
 
