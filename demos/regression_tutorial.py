@@ -31,13 +31,14 @@ n_epochs = 4000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
-model = "deep_gaussian_process"
+model = "gaussian_process"
 
 
 # Models for regression
 def linear(X, Y):
     """Linear regression with l2 regularization."""
-    reg = .01  # Weight prior
+    # reg = 1e-4  # Weight regularizer
+    reg = 0.  # Weight regularizer
     noise = .5  # Likelihood st. dev.
 
     net = (
@@ -54,7 +55,7 @@ def linear(X, Y):
 
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
-    reg = .01  # Initial weight prior std. dev, this is optimised later
+    reg = 1e-4  # Initial weight prior std. dev, this is optimised later
     noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
 
     net = (
@@ -71,7 +72,7 @@ def bayesian_linear(X, Y):
 
 def nnet(X, Y):
     """Neural net with regularization."""
-    reg = .01  # Weight prior
+    reg = 1e-4  # Weight regularizer
     noise = .5  # Likelihood st. dev.
 
     net = (
@@ -93,7 +94,7 @@ def nnet(X, Y):
 
 def nnet_dropout(X, Y):
     """Neural net with dropout."""
-    reg = 0.01  # Weight prior
+    reg = 1e-3  # Weight prior
     noise = .5  # Likelihood st. dev.
 
     net = (
@@ -117,7 +118,7 @@ def nnet_dropout(X, Y):
 
 def nnet_bayesian(X, Y):
     """Bayesian neural net."""
-    reg = 0.1  # Weight prior
+    reg = 1e-1  # Weight prior
     noise = tf.Variable(0.01)  # Likelihood st. dev. initialisation
 
     net = (
@@ -139,7 +140,7 @@ def nnet_bayesian(X, Y):
 
 def svr(X, Y):
     """Support vector regressor."""
-    reg = 0.1
+    reg = 1e-4
     eps = 0.01
     lenscale = 1.
 
@@ -147,6 +148,7 @@ def svr(X, Y):
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
+        # ab.DropOut(keep_prob=0.9) >>
         ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
     )
 
@@ -161,6 +163,7 @@ def gaussian_process(X, Y):
     noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
     lenscale = tf.Variable(1.)  # learn the length scale
     kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
+    # kern = ab.RBFVariational(lenscale=ab.pos(lenscale))
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
@@ -169,7 +172,8 @@ def gaussian_process(X, Y):
     )
 
     phi, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
+    # lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
+    lkhood = tf.distributions.StudentT(df=1., loc=phi, scale=ab.pos(noise))
     loss = ab.elbo(lkhood, Y, N, kl)
 
     return phi, loss
@@ -213,6 +217,7 @@ probabilistic = [
     "bayesian_linear",
     "nnet_dropout",
     "nnet_bayesian",
+    "bayesian_svr",
     "gaussian_process",
     "deep_gaussian_process",
 ]
