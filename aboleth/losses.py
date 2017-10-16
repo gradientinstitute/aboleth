@@ -51,7 +51,7 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
 
 
 def max_posterior(likelihood, Y, regulariser, like_weights=None,
-                  observation_axis=-2):
+                  observation_axis=1):
     r"""Build maximum a-posteriori (MAP) loss for a neural net.
 
     Parameters
@@ -61,8 +61,8 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None,
         axis of this object's ``batch_shape`` should refer to ``N``, which is
         the number of observations (can be ``?`` if you are using a placeholder
         and mini-batching). The axis that indexes observations is set by the
-        ``observation_axis`` setting. For data that is ``(N, tasks)`` or
-        ``(..., N, tasks)``, this should automatically work.
+        ``observation_axis`` setting. For data that is ``(n_samples, N, ...)``
+        this should automatically work.
     Y : ndarray, Tensor
         the targets of shape ``(N, tasks)``.
     regulariser : float, Tensor
@@ -73,9 +73,9 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None,
         This should be an array of shape ``(N,)`` or can be called as
         ``like_weights(Y)`` and should return a ``(N,)`` array.
     observation_axis : int
-        The axis that indexes the observations. This will assume the
-        observations are on the *second last* axis, i.e. ``(..., N, D)``. This
-        is used to calculate the mini-batch size.
+        The axis that indexes the observations (``N``). This will assume the
+        obserations are on the *second* axis, i.e. ``(n_samples, N, ...)``.
+        This is used to calculate the mini-batch size.
 
     Returns
     -------

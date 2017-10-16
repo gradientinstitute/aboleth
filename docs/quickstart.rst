@@ -154,6 +154,10 @@ predictive data (still in the TensorFlow session from above):
 
     probs = net.eval(feed_dict={X_: X_query})
 
+However, you may find that ``probs.shape`` will be something like ``(1, N, 1)``
+where ``N = len(X_query)``. Aboleth made a new, 0th, axis here, and we'll talk
+about why this is the case in the next section.
+
 .. note::
     If you used logits as per the above note, then the prediction becomes::
         
@@ -260,11 +264,13 @@ covariance Gaussian, and ``std`` is initial value of the weight prior standard
 deviation, :math:`\psi`, which is optimized. Also we've set ``n_samples=5`` in
 the ``InputLayer``, this lets the subsequent layers know that we are making a
 *stochastic* model, that is, whenever we call ``layers`` we are actually
-expecting back 5 samples of the model output. This makes the
-``DenseVariational`` layer multiply its input with 5 samples of the weights
-from the approximate posterior, :math:`\mathbf{X}\mathbf{w}^{(s)}`, where
-:math:`\mathbf{w}^{(s)} \sim q(\mathbf{w}),~\text{for}~s = \{1 \ldots 5\}`.
-These 5 samples are then passed to the ``Activation`` layer.
+expecting back 5 samples of the model output. This argument defaults to 1,
+which is why we got a one-dimensional 0th axis in the last section. In this
+instance a setting of 5 makes the ``DenseVariational`` layer multiply its input
+with 5 samples of the weights from the approximate posterior,
+:math:`\mathbf{X}\mathbf{w}^{(s)}`, where :math:`\mathbf{w}^{(s)} \sim
+q(\mathbf{w}),~\text{for}~s = \{1 \ldots 5\}`.  These 5 samples are then passed
+to the ``Activation`` layer.
 
 Then like before to complete the model specification:
 

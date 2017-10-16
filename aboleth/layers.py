@@ -18,20 +18,19 @@ class InputLayer(MultiLayer):
 
     This layer defines input kwargs so that a user may easily provide the right
     inputs to a complex set of layers. It takes a 2D tensor of shape ``(N,
-    D)``.  If n_samples is specified, the input is tiled along a new first axis
-    creating a ``(n_samples, N, D)`` tensor for propogating samples through a
-    variational deep net.
+    D)``. The input is tiled along a new first axis creating a ``(n_samples, N,
+    D)`` tensor for propagating samples through a variational deep net.
 
     Parameters
     ----------
     name : string
-        The name of the input. Used as the agument for input into the net.
+        The name of the input. Used as the argument for input into the net.
     n_samples : int > 0
         The number of samples.
 
     """
 
-    def __init__(self, name, n_samples=None):
+    def __init__(self, name, n_samples=1):
         """Construct an instance of InputLayer."""
         self.name = name
         self.n_samples = n_samples
@@ -39,11 +38,8 @@ class InputLayer(MultiLayer):
     def _build(self, **kwargs):
         """Build the tiling input layer."""
         X = kwargs[self.name]
-        if self.n_samples is not None:
-            # (n_samples, N, D)
-            Xs = tf.tile(tf.expand_dims(X, 0), [self.n_samples, 1, 1])
-        else:
-            Xs = tf.convert_to_tensor(X)
+        # (n_samples, N, D)
+        Xs = tf.tile(tf.expand_dims(X, 0), [self.n_samples, 1, 1])
         return Xs, 0.0
 
 
@@ -53,6 +49,7 @@ class SampleLayer(Layer):
     This is the base class for layers that build upon stochastic (variational)
     nets. These expect *rank >= 3* input Tensors, where the first dimension
     indexes the random samples of the stochastic net.
+
     """
 
     def __call__(self, X):
@@ -154,15 +151,15 @@ class DropOut(Layer):
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
     observation_axis : int
-        The axis that indexes the observations. This will assume the
-        obserations are on the *second last* axis, i.e. ``(..., N, D)``. This
-        is so we can repeat the dropout pattern over observations, which has
-        the effect of dropping out weights consistently, thereby sampling the
-        "latent function" of the layer.
+        The axis that indexes the observations (``N``). This will assume the
+        obserations are on the *second* axis, i.e. ``(n_samples, N, ...)``.
+        This is so we can repeat the dropout pattern over observations, which
+        has the effect of dropping out weights consistently, thereby sampling
+        the "latent function" of the layer.
 
     """
 
-    def __init__(self, keep_prob, observation_axis=-2):
+    def __init__(self, keep_prob, observation_axis=1):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
         self.obsax = observation_axis

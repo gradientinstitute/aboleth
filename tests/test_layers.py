@@ -37,7 +37,7 @@ def test_input(make_data):
     with tc.test_session():
         f = F.eval()
         assert KL == 0.0
-        assert np.array_equal(f, x)
+        assert np.array_equal(f, x[np.newaxis, ...])
 
 
 def test_input_sample(make_data):
