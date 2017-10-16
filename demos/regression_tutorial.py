@@ -37,29 +37,30 @@ model = "linear"
 # Models for regression
 def linear(X, Y):
     """Linear regression with l2 regularization."""
-    reg = 1e-4  # Weight regularizer
+    lambda_ = 1e-4  # Weight regularizer
     noise = 1.  # Likelihood st. dev.
 
     net = (
         ab.InputLayer(name="X") >>
-        ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
-    phi, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=phi, scale=noise)
+    Xw, reg = net(X=X)
+    lkhood = tf.distributions.Normal(loc=Xw, scale=noise)
     loss = ab.max_posterior(lkhood, Y, reg)
+    # loss = 0.5 * tf.reduce_mean((Y - Xw)**2) + reg
 
-    return phi, loss
+    return Xw, loss
 
 
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
-    reg = 1e-1  # Initial weight prior std. dev, this is optimised later
+    lambda_ = 1e-1  # Initial weight prior std. dev, this is optimised later
     noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
-        ab.DenseVariational(output_dim=1, std=reg, full=True)
+        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
     )
 
     phi, kl = net(X=X)
@@ -71,18 +72,18 @@ def bayesian_linear(X, Y):
 
 def nnet(X, Y):
     """Neural net with regularization."""
-    reg = 1e-4  # Weight regularizer
+    lambda_ = 1e-4  # Weight regularizer
     noise = .5  # Likelihood st. dev.
 
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
-        ab.DenseMAP(output_dim=40, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=20, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=10, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
     phi, reg = net(X=X)
@@ -93,20 +94,20 @@ def nnet(X, Y):
 
 def nnet_dropout(X, Y):
     """Neural net with dropout."""
-    reg = 1e-3  # Weight prior
+    lambda_ = 1e-3  # Weight prior
     noise = .5  # Likelihood st. dev.
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
-        ab.DenseMAP(output_dim=40, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DropOut(keep_prob=0.9) >>
-        ab.DenseMAP(output_dim=20, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DropOut(keep_prob=0.95) >>
-        ab.DenseMAP(output_dim=10, l2_reg=reg, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
     phi, reg = net(X=X)
@@ -117,18 +118,18 @@ def nnet_dropout(X, Y):
 
 def nnet_bayesian(X, Y):
     """Bayesian neural net."""
-    reg = 1e-1  # Weight prior
+    lambda_ = 1e-1  # Weight prior
     noise = tf.Variable(0.01)  # Likelihood st. dev. initialisation
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
-        ab.DenseVariational(output_dim=20, std=reg) >>
+        ab.DenseVariational(output_dim=20, std=lambda_) >>
         ab.Activation(tf.nn.relu) >>
-        ab.DenseVariational(output_dim=7, std=reg) >>
+        ab.DenseVariational(output_dim=7, std=lambda_) >>
         ab.Activation(tf.nn.relu) >>
-        ab.DenseVariational(output_dim=5, std=reg) >>
+        ab.DenseVariational(output_dim=5, std=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseVariational(output_dim=1, std=reg)
+        ab.DenseVariational(output_dim=1, std=lambda_)
     )
 
     phi, kl = net(X=X)
@@ -139,7 +140,7 @@ def nnet_bayesian(X, Y):
 
 def svr(X, Y):
     """Support vector regressor."""
-    reg = 1e-4
+    lambda_ = 1e-4
     eps = 0.01
     lenscale = 1.
 
@@ -148,7 +149,7 @@ def svr(X, Y):
         ab.InputLayer(name="X", n_samples=1) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
         # ab.DropOut(keep_prob=0.9) >>
-        ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
     phi, reg = net(X=X)
@@ -158,7 +159,7 @@ def svr(X, Y):
 
 def gaussian_process(X, Y):
     """Gaussian Process Regression."""
-    reg = 0.1  # Initial weight prior std. dev, this is optimised later
+    lambda_ = 0.1  # Initial weight prior std. dev, this is optimised later
     noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
     lenscale = tf.Variable(1.)  # learn the length scale
     kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
@@ -167,7 +168,7 @@ def gaussian_process(X, Y):
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
-        ab.DenseVariational(output_dim=1, std=reg, full=True)
+        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
     )
 
     phi, kl = net(X=X)
@@ -180,16 +181,16 @@ def gaussian_process(X, Y):
 
 def deep_gaussian_process(X, Y):
     """Deep Gaussian Process Regression."""
-    reg = 0.1  # Initial weight prior std. dev, this is optimised later
+    lambda_ = 0.1  # Initial weight prior std. dev, this is optimised later
     noise = tf.Variable(.01)  # Likelihood st. dev. initialisation
     lenscale = tf.Variable(1.)  # learn the length scale
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
         ab.RandomFourier(n_features=50, kernel=ab.RBF(ab.pos(lenscale))) >>
-        ab.DenseVariational(output_dim=5, std=reg, full=True) >>
+        ab.DenseVariational(output_dim=5, std=lambda_, full=True) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, std=reg, full=True)
+        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
     )
 
     phi, kl = net(X=X)
