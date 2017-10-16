@@ -17,9 +17,9 @@ class InputLayer(MultiLayer):
     r"""Create an input layer.
 
     This layer defines input kwargs so that a user may easily provide the right
-    inputs to a complex set of layers. It takes a 2D tensor of shape ``(N,
-    D)``. The input is tiled along a new first axis creating a ``(n_samples, N,
-    D)`` tensor for propagating samples through a variational deep net.
+    inputs to a complex set of layers. It takes a tensor of shape ``(N, ...)``.
+    The input is tiled along a new first axis creating a ``(n_samples, N,
+    ...)`` tensor for propagating samples through a variational deep net.
 
     Parameters
     ----------

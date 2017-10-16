@@ -1,8 +1,11 @@
 Release 0.6.3
 =============
-Make ab.InputLayer always make at least 1 sample of the networks for
-consistency and simplicity. This also makes the quick start guide examples
-work.
+
+- Make ab.InputLayer always make at least 1 sample of the networks for
+  consistency and simplicity.
+- Make a ab.MaskInputLayer for binary mask inputs when we don't want to tile
+  the inputs.
+- This also makes the quick start guide examples work.
 
 Release 0.6.2
 =============

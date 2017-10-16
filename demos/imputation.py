@@ -38,7 +38,7 @@ NFEATURES = 100  # Number of random features to use
 
 # Network construction
 data_input = ab.InputLayer(name='X', n_samples=LSAMPLES)  # Data input
-mask_input = ab.InputLayer(name='M')  # Missing data mask input
+mask_input = ab.MaskInputLayer(name='M')  # Missing data mask input
 
 lenscale = ab.pos(tf.Variable(np.ones((54, 1), dtype=np.float32)))
 

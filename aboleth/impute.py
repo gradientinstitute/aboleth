@@ -6,6 +6,30 @@ from aboleth.random import seedgen
 from aboleth.util import pos
 
 
+class MaskInputLayer(MultiLayer):
+    r"""Create an input layer for a binary mask tensor.
+
+    This layer defines input kwargs so that a user may easily provide the right
+    binary mask inputs to a complex set of layers to enable imputation.
+
+    Parameters
+    ----------
+    name : string
+        The name of the input. Used as the agument for input into the net.
+    """
+
+    def __init__(self, name):
+        """Construct an instance of MaskInputLayer."""
+        self.name = name
+
+    def _build(self, **kwargs):
+        """Build the mask input layer."""
+        Mask = kwargs[self.name]
+        assert tf.as_dtype(Mask.dtype).is_bool
+        M = tf.convert_to_tensor(Mask)
+        return M, 0.0
+
+
 class ImputeOp(MultiLayer):
     r"""Abstract Base Impute operation. These specialise MultiLayers.
 
@@ -32,7 +56,7 @@ class ImputeOp(MultiLayer):
         X_ND, loss1 = self.datalayer(**kwargs)
         M, loss2 = self.masklayer(**kwargs)
 
-        self._check_rank(X_ND)
+        self._check_rank_type(X_ND, M)
         self._set_mask(M)
 
         # Extra build/initialisation here
@@ -67,10 +91,13 @@ class ImputeOp(MultiLayer):
         X_imputed = None  # You imputation implementation
         return X_imputed
 
-    def _check_rank(self, X):
+    def _check_rank_type(self, X, M):
         """Check the rank of the input tensors."""
-        rank = len(X.shape)
-        assert rank == 3
+        data_rank = len(X.shape)
+        mask_rank = len(M.shape)
+        assert data_rank == 3
+        assert mask_rank == 2
+        assert tf.as_dtype(M.dtype).is_bool
 
     def _set_mask(self, M):
         """Create Tensor Masks."""

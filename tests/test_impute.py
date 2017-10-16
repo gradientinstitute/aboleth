@@ -6,6 +6,19 @@ import tensorflow as tf
 import aboleth as ab
 
 
+def test_mask_input(make_missing_data):
+    """Test the mask input layer."""
+    _, m, _, _ = make_missing_data
+    s = ab.MaskInputLayer(name='myname')
+
+    F, KL = s(myname=m)
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        f = F.eval()
+        assert KL == 0.0
+        assert np.array_equal(f, m)
+
+
 def test_mean_impute(make_missing_data):
     """Test the impute_mean."""
     _, m, X, _ = make_missing_data
