@@ -12,19 +12,21 @@ models to various types of neural networks. We'll also talk about how we can
 approximate other types of non linear regressors with Aboleth, such as support
 vector regressors and Gaussian processes.
 
-We fit all of the regressors to 100 noisy samples of the non-linear function:
+Firstly, for the purposes of this tutorial we have generated 100 noisy samples 
+from the non-linear function,
 
 .. math::
 
     y_i = \frac{\sin(x_i)}{x_i} + \epsilon_i,
 
-where we draw :math:`\epsilon_i \sim \mathcal{N}(0, 0.05)`. The aim here is for
-the regressors to reconstruct the latent function:
+where we draw :math:`\epsilon_i \sim \mathcal{N}(0, 0.05)`. We will use this
+data to fit the regressors, with the aim of getting them to reconstruct the 
+latent function,
 
 .. math::
     f = \frac{\sin(x)}{x},
 
-from these noisy observations. This is what this data set looks like:
+with as little error as possible. This is what this data set looks like:
 
 .. figure:: regression_figs/data.png
 
@@ -35,25 +37,35 @@ from these noisy observations. This is what this data set looks like:
 We use :math:`R^2`, AKA the `coefficient of determination
 <https://en.wikipedia.org/wiki/Coefficient_of_determination>`_ to evaluate how
 good the estimate of the latent functions is. An :math:`R^2` of 1.0 is a
-perfect fit, and 0 means no better than a Normal distribution fit only to the
+perfect fit, and 0.0 means no better than a Normal distribution fit only to the
 targets, :math:`y_i`.
 
 Note in the figure above that we have only generated training data for
 :math:`x` from -10 to 10, but we evaluate the algorithms from -14 to 14! This
 is because we want to see how well the algorithms extrapolate away from the
 data, which is a very hard problem. We don't evaluate the :math:`R^2` in this
-extrapolation region (it makes it harder to differentiate the performance of
-the algorithms in the bounds of the training data), however, it is interesting
-to see how the algorithms represent their uncertainty (or don't) in this
-region.
+extrapolation region since it makes it harder to differentiate the performance
+of the algorithms in the bounds of the training data. However, it is
+interesting to see how the algorithms represent their uncertainty (or don't) in
+this region.
 
 
 Linear regression
 -----------------
 
-.. figure:: regression_figs/linear.png
+The easiest algorithms to build with Aboleth are linear regressors, and so this
+is where we'll start this tutorial. Specifically, we'll start with ridge
+regression that has the following objective function,
 
-    Simple linear regression, R-square :math:`\approx 0`.
+.. math::
+    \min_w \frac{1}{2N} \sum_{i=1}^N \|w x_i - y_i\|^2_2 + \lambda \|w\|^2_2,
+
+where :math:`w` are the regression weights, and :math:`\lambda` the
+regularization coefficient that penalises large magnitude weights. This can be
+simply implemented in Aboleth from the following code,
+
+.. code::
+    
 
 .. figure:: regression_figs/ridge_linear.png
 

@@ -31,18 +31,17 @@ n_epochs = 4000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
-model = "gaussian_process"
+model = "linear"
 
 
 # Models for regression
 def linear(X, Y):
     """Linear regression with l2 regularization."""
-    # reg = 1e-4  # Weight regularizer
-    reg = 0.  # Weight regularizer
-    noise = .5  # Likelihood st. dev.
+    reg = 1e-4  # Weight regularizer
+    noise = 1.  # Likelihood st. dev.
 
     net = (
-        ab.InputLayer(name="X", n_samples=1) >>
+        ab.InputLayer(name="X") >>
         ab.DenseMAP(output_dim=1, l2_reg=reg, l1_reg=0.)
     )
 
@@ -55,8 +54,8 @@ def linear(X, Y):
 
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
-    reg = 1e-4  # Initial weight prior std. dev, this is optimised later
-    noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
+    reg = 1e-1  # Initial weight prior std. dev, this is optimised later
+    noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>

@@ -5,6 +5,6 @@ learning tasks. These are a great place to start getting more familiar with how
 to use Aboleth for more complex problems.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
 
     some_regressors
