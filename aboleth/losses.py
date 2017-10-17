@@ -50,19 +50,17 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
     return nELBO
 
 
-def max_posterior(likelihood, Y, regulariser, like_weights=None,
-                  observation_axis=1):
+def max_posterior(likelihood, Y, regulariser, like_weights=None):
     r"""Build maximum a-posteriori (MAP) loss for a neural net.
 
     Parameters
     ----------
     likelihood : tf.distributions.Distribution
-        the likelihood object that takes neural network(s) as an input. One
-        axis of this object's ``batch_shape`` should refer to ``N``, which is
-        the number of observations (can be ``?`` if you are using a placeholder
-        and mini-batching). The axis that indexes observations is set by the
-        ``observation_axis`` setting. For data that is ``(n_samples, N, ...)``
-        this should automatically work.
+        the likelihood object that takes neural network(s) as an input. The
+        ``batch_shape`` of this object should be ``(n_samples, N, ...)``, where
+        ``n_samples`` is the number of likelihood samples (defined by
+        ab.InputLayer) and ``N`` is the number of observations (can be ``?`` if
+        you are using a placeholder and mini-batching).
     Y : ndarray, Tensor
         the targets of shape ``(N, tasks)``.
     regulariser : float, Tensor
@@ -72,10 +70,6 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None,
         weights to apply to each observation in the expected log likelihood.
         This should be an array of shape ``(N,)`` or can be called as
         ``like_weights(Y)`` and should return a ``(N,)`` array.
-    observation_axis : int
-        The axis that indexes the observations (``N``). This will assume the
-        obserations are on the *second* axis, i.e. ``(n_samples, N, ...)``.
-        This is used to calculate the mini-batch size.
 
     Returns
     -------
@@ -84,7 +78,7 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None,
 
     """
     # Get the batch size to average the likelihood over
-    M = tf.to_float(likelihood.batch_shape_tensor()[observation_axis])
+    M = tf.to_float(likelihood.batch_shape_tensor()[1])
 
     # Average likelihood for batch
     AVLL = _sum_likelihood(likelihood, Y, like_weights) / M
@@ -101,6 +95,9 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None,
 
 def _sum_likelihood(likelihood, Y, like_weights):
     """Sum the log-likelihood of the Y's under the model."""
+    if not (likelihood.batch_shape[2:] == Y.shape[1:]):
+        raise ValueError("Incompatible target and likelihood shapes.")
+
     log_prob = likelihood.log_prob(Y)
     if callable(like_weights):
         log_prob *= like_weights(Y)
