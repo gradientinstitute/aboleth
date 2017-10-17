@@ -1,3 +1,10 @@
+Release 0.6.5
+=============
+
+Hotfix: Test batch shape of likelihoods to see if they are compatible with
+models. Without this test the likelihoods may be broadcast, and result in poor
+performance.
+
 Release 0.6.4
 =============
 
