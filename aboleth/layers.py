@@ -264,7 +264,8 @@ class RandomFourier(SampleLayer3):
         """Build the graph of this layer."""
         # Random weights
         n_samples, input_dim = self._get_X_dims(X)
-        P, KL = self.kernel.weights(input_dim, self.n_features)
+        dtype = X.dtype.as_numpy_dtype
+        P, KL = self.kernel.weights(input_dim, self.n_features, dtype)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
 
         # Random features
