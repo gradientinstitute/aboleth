@@ -80,7 +80,7 @@ simply implemented in Aboleth using the following code,
     loss = ab.max_posterior(lkhood, Y, reg) 
 
 Here ``reg`` is the second regularizing term in the objective function, and
-putting a ``Normal`` likelihood distribution with a standard deviation of 1.0
+putting a ``Normal`` likelihood distribution with a standard deviation of 1.0,
 gives us the first term (up to a constant value) when using ``max_posterior``.
 Alternatively, if we didn't want to use a likelihood function we could have
 constructed the ``loss`` as
@@ -89,7 +89,8 @@ constructed the ``loss`` as
 
     loss = 0.5 * tf.reduce_mean((Y - Xw)**2) + reg
 
-Naturally, this gives terrible results:
+This is also called `maximum a-posteriori` inference. Naturally, this gives 
+terrible results:
 
 .. figure:: regression_figs/ridge_linear.png
 
@@ -110,30 +111,42 @@ being drawn from a Normal likelihood, and the weights from a Normal prior,
     y_i &\sim \mathcal{N}(w x_i, \sigma^2), \\
     w &\sim \mathcal{N}(0, \lambda^{-1})
 
-Typically the objective function used to learn the parameters is log-marginal
-likelihood,
+where the aim is to estimate the parameters of the posterior distribution over
+the weights (and optionally :math:`\lambda, \sigma`),
 
 .. math::
-    \min_{w, \lambda, \sigma} - \log \int \prod_{i=1}^N 
-        \mathcal{N}(y_i | w x_i, \sigma^2)
-        \mathcal{N}(w | 0, \lambda^{-1}) dw.
 
-Note how the parameters :math:`\lambda, \sigma` can also be optimised with the
-objective (for a discussion of why this is the case, I recommend Section 3.5 of
-[2]_). However, we don't use this objective in Aboleth since the integral is,
-in general, intractable - although it is tractable in this particular instance.
-We use the `evidence lower bound`, or `ELBO`, which lower-bounds log-marginal
-likelihood, as our objective
+    w \sim \mathcal{N}(m, v).
 
+The objective we use in this case is the `evidence lower bound` or `ELBO` as it
+is easy to use with stochastic gradient descent for a variety of different
+models [3]_. For Bayesian linear regression the ELBO takes the form,
+
+.. math::
+
+    \min_{m, v, \sigma, \lambda} - \sum_{i=1}^N 
+        \mathbb{E}_{\mathcal{N}(w | m, v)}\!
+        \left[ \log \mathcal{N}(y_i | w x_i, \sigma^2) \right]
+        + \text{KL}\left[\mathcal{N}(w | m, v) \|
+        \mathcal{N}(w | 0, \lambda^{-1})\right].
+
+This looks complicated, but it's actually not too bad, especially when we
+compare it to the ridge regression objective. Firstly, the expectation acts
+like a data-fitting term (expected log likelihood of the targets given the
+inputs and the weights), which corresponds to the l2 reconstruction term. Next,
+the Kullback Leibler term (KL) is acting as a regularizer on the weights,
+penalizing the posterior diverging from the prior. We can implement this model
+with Aboleth using the following code,
 
 .. code::
 
-    lambda_ = 1e-1  # Initial weight prior std. dev
+    lambda_ = 100.
+    std = (1 / lambda_) ** .5  # Weight st. dev. prior
     noise = tf.Variable(1.)  # Likelihood st. dev. initialisation
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
-        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
+        ab.DenseVariational(output_dim=1, std=std, full=True)
     )
 
     phi, kl = net(X=X)
@@ -142,13 +155,21 @@ likelihood, as our objective
 
     return phi, loss
     
-
+Again, since we're using a linear model, we don't get great performance.
 
 .. figure:: regression_figs/bayesian_linear.png
 
     Bayesian linear regression, R-square :math:`\approx 0`.
 
-TODO: something about our samples not covering our observations.
+What's the point of going to all this effort implementing the ELBO over just
+the ridge regression? Well a few reasons, firstly we can use this objective to
+fairly reliably estimate the parameters :math:`\sigma~\&~\lambda` (this is
+called empirical Bayes, see [2]_ Section 3.5 for a good explanation). Secondly,
+since we have a posterior distribution over :math:`w`, we can get a
+distribution over prediction of the latent functions, samples from which we can
+see in the above figure. This tells us how confident out model is in its
+predictions. This will come in handy later with some of the more complex
+models.
 
 .. note::
     
@@ -156,6 +177,8 @@ TODO: something about our samples not covering our observations.
     `observations` instead of just the `latent function`, we would also need to
     draw sample from our likelihood (e.g. ``lkhood.sample()``) and add them to
     our random latent function draws.
+
+Ok, now lets move beyond building linear models with Aboleth.
 
 
 Neural Networks
@@ -225,7 +248,7 @@ References
 .. [1] Rasmussen, C.E., and Williams, C.K.I. Gaussian processes for machine
        learning. Vol. 1. Cambridge: MIT press, 2006.
 .. [2] Bishop, C. M. Pattern recognition and machine learning. Springer, 2006.
+.. [3] Kingma, D. P. and Welling, M. Auto-encoding variational Bayes. In ICLR,
+       2014.
 .. .. [2] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. Random Feature 
 ..        Expansions for Deep Gaussian Processes. In ICML, 2017.
-.. .. [3] Kingma, D. P. and Welling, M. Auto-encoding variational Bayes. In ICLR,
-..        2014.

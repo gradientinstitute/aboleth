@@ -31,7 +31,7 @@ n_epochs = 4000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
-model = "linear"
+model = "bayesian_linear"
 
 
 # Models for regression
@@ -55,12 +55,13 @@ def linear(X, Y):
 
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
-    lambda_ = 1e-1  # Initial weight prior std. dev, this is optimised later
+    lambda_ = 100.
+    std = (1 / lambda_) ** .5  # Weight st. dev. prior
     noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
-        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
+        ab.DenseVariational(output_dim=1, std=std, full=True)
     )
 
     phi, kl = net(X=X)
