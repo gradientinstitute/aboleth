@@ -58,12 +58,12 @@ is where we'll start this tutorial. Specifically, we'll start with ridge
 regression that has the following objective function,
 
 .. math::
-    \min_w \frac{1}{2N} \sum_{i=1}^N \|w x_i - y_i\|^2_2 + \frac{\lambda}{2}
-        \|w\|^2_2,
+    \min_{w, b} \frac{1}{2N} \sum_{i=1}^N \|w x_i + b - y_i\|^2_2
+    + \frac{\lambda}{2} \left( \|w\|^2_2 + \|b\|^2_2 \right),
 
-where :math:`w` are the regression weights, and :math:`\lambda` the
-regularization coefficient that penalises large magnitude weights. This can be
-simply implemented in Aboleth using the following code,
+where :math:`w` and :math:`b` are the regression weights and bias, and
+:math:`\lambda` the regularization coefficient that penalises large magnitude
+weights. This can be simply implemented in Aboleth using the following code,
 
 .. code::
 
@@ -104,7 +104,8 @@ this regressor using Aboleth, and we can also easily obtain predictive
 uncertainty from it.
 
 In a Bayesian linear regressor (following [1]_) we model the observations as
-being drawn from a Normal likelihood, and the weights from a Normal prior,
+being drawn from a Normal likelihood, and the weights from a Normal prior (we
+have ignored the bias, :math:`b`, for simplicity),
 
 .. math::
 
