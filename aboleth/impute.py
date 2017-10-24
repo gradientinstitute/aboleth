@@ -57,7 +57,7 @@ class ImputeOp(MultiLayer):
         M, loss2 = self.masklayer(**kwargs)
 
         self._check_rank_type(X_ND, M)
-        self._set_mask(M)
+        self._set_mask(M, X_ND.dtype)
 
         # Extra build/initialisation here
         self._initialise_variables(X_ND)
@@ -74,7 +74,7 @@ class ImputeOp(MultiLayer):
         This function is mapped over the rank 3 data tensors, additionally it
         has access to two properties:
         - ``self.missing_ind`` a row and column index of the missing data
-        - ``self.real_val_mask`` a tf.float32 mask of the non missing values
+        - ``self.real_val_mask`` a mask of the non missing values
 
         Parameters
         ----------
@@ -99,11 +99,11 @@ class ImputeOp(MultiLayer):
         assert mask_rank == 2
         assert tf.as_dtype(M.dtype).is_bool
 
-    def _set_mask(self, M):
+    def _set_mask(self, M, dtype):
         """Create Tensor Masks."""
         # Identify indices of the missing datapoints
         self.missing_ind = tf.where(M)
-        self.real_val_mask = tf.cast(tf.logical_not(M), tf.float32)
+        self.real_val_mask = tf.cast(tf.logical_not(M), dtype)
 
     def _initialise_variables(self, X):
         """Optional extra build stage."""
