@@ -102,18 +102,18 @@ def gaus_posterior(dim, std0):
     ``std0`` and a beta of 1.
 
     """
-    O, I = dim
+    o, i = dim
 
     # Optimize only values in lower triangular
-    u, v = np.tril_indices(I)
-    indices = (u * I + v)[:, np.newaxis]
-    l0 = np.tile(np.eye(I), [O, 1, 1])[:, u, v].T
+    u, v = np.tril_indices(i)
+    indices = (u * i + v)[:, np.newaxis]
+    l0 = np.tile(np.eye(i), [o, 1, 1])[:, u, v].T
     l0 = l0 * tf.random_gamma(alpha=std0, shape=l0.shape, seed=next(seedgen))
-    l = tf.Variable(l0, name="W_cov_q")
-    Lt = tf.transpose(tf.scatter_nd(indices, l, shape=(I * I, O)))
-    L = tf.reshape(Lt, (O, I, I))
+    lflat = tf.Variable(l0, name="W_cov_q")
+    Lt = tf.transpose(tf.scatter_nd(indices, lflat, shape=(i * i, o)))
+    L = tf.reshape(Lt, (o, i, i))
 
-    mu_0 = tf.random_normal((O, I), stddev=std0, seed=next(seedgen))
+    mu_0 = tf.random_normal((o, i), stddev=std0, seed=next(seedgen))
     mu = tf.Variable(mu_0, name="W_mu_q")
     Q = MultivariateNormalTriL(mu, L)
     return Q
@@ -188,6 +188,6 @@ def _kl_gaussian_normal(q, p, name=None):
 
 def _chollogdet(L):
     """Log det of a cholesky, where L is (..., D, D)."""
-    l = pos(tf.matrix_diag_part(L))  # keep > 0, and no vanashing gradient
-    logdet = 2. * tf.reduce_sum(tf.log(l))
+    ldiag = pos(tf.matrix_diag_part(L))  # keep > 0, and no vanashing gradient
+    logdet = 2. * tf.reduce_sum(tf.log(ldiag))
     return logdet
