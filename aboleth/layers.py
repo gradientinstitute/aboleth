@@ -616,7 +616,7 @@ class EmbedVariational(DenseVariational):
         features = tf.gather(Wsamples, X[0, ...], axis=1)
 
         # Now concatenate the resulting features on the last axis
-        f_dims = np.prod(features.shape[2:])  # we can't do a reshape with -1
+        f_dims = int(np.prod(features.shape[2:]))  # need this for placeholders
         Net = tf.reshape(features, [n_samples, n_batch, f_dims])
 
         # Regularizers
