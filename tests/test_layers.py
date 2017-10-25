@@ -10,7 +10,7 @@ from aboleth.layers import SampleLayer
 
 D = 10
 DIM = (10, 2)
-EDIM = (10, 5)
+EDIM = (10, 20)
 
 
 def test_net_outputs(make_graph):
@@ -69,9 +69,10 @@ def test_activation(make_data):
         assert KL == 0
 
 
-def test_dropout(make_data):
+def test_dropout(random):
     """Test dropout layer."""
-    x, _, X = make_data
+    X = np.repeat(random.randn(1, 30, 20), 3, axis=0)
+    ab.set_hyperseed(666)
     drop = ab.DropOut(0.5)
 
     F, KL = drop(X)
@@ -81,8 +82,8 @@ def test_dropout(make_data):
         f = F.eval()
         prop_zero = np.sum(f == 0) / np.prod(f.shape)
 
-        assert f.shape == X.eval().shape
-        assert (prop_zero > 0.4) and (prop_zero < 0.6)
+        assert f.shape == X.shape
+        assert (prop_zero >= 0.4) and (prop_zero <= 0.6)
         assert KL == 0
 
 
@@ -151,9 +152,11 @@ def test_arc_cosine(make_data):
         assert KL == 0
 
 
-def test_dense_embeddings(make_categories):
+@pytest.mark.parametrize('reps', [1, 3, 10])
+def test_dense_embeddings(make_categories, reps):
     """Test the embedding layer."""
     x, K = make_categories
+    x = np.repeat(x, reps, axis=-1)
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
@@ -169,7 +172,7 @@ def test_dense_embeddings(make_categories):
 
         Phi = output.eval(feed_dict={x_: x})
 
-        assert Phi.shape == (S, N, D)
+        assert Phi.shape == (S, N, D * reps)
 
 
 @pytest.mark.parametrize('dense', [ab.DenseMAP, ab.DenseVariational])

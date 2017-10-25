@@ -518,9 +518,10 @@ class DenseVariational(SampleLayer3):
 class EmbedVariational(DenseVariational):
     r"""Dense (fully connected) embedding layer, with variational inference.
 
-    This layer works directly on shape ``(N, 1)`` inputs of *K* category
-    *indices* rather than one-hot representations, for efficiency, and is a
-    dense linear layer,
+    This layer works directly inputs of *K* category *indices* rather than
+    one-hot representations, for efficiency. Each column of the input is
+    embedded seperately, and the result concatenated alond the last axis.
+    It is a dense linear layer,
 
     .. math::
         f(\mathbf{X}) = \mathbf{X} \mathbf{W},
@@ -604,8 +605,7 @@ class EmbedVariational(DenseVariational):
         """Build the graph of this layer."""
         n_samples, input_dim = self._get_X_dims(X)
         W_shape, _ = self._weight_shapes(self.n_categories)
-
-        assert input_dim == 1, "X must be a *column* of indices!"
+        n_batch = tf.shape(X)[1]
 
         # Layer weights
         self.pW = self._make_prior(self.pW, W_shape)
@@ -613,7 +613,8 @@ class EmbedVariational(DenseVariational):
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = self._sample_W(self.qW, n_samples)
-        Net = tf.gather(Wsamples, X[0, :, 0], axis=1)
+        features = tf.gather(Wsamples, X[0, :], axis=1)
+        Net = tf.reshape(features, [n_samples, n_batch, -1])
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)

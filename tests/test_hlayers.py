@@ -1,4 +1,5 @@
 """Test the hlayers module."""
+import pytest
 import numpy as np
 import tensorflow as tf
 import aboleth as ab
@@ -25,26 +26,42 @@ def test_concat(make_data):
         assert KL.eval() == 0.0
 
 
-def test_perfeature(make_data):
+@pytest.mark.parametrize('reps', [1, 3, 10])
+def test_perfeature(make_data, reps):
     """Test per-feature application of layers."""
-    x, _, X = make_data
+    x, _, _ = make_data
+    x = np.repeat(x, reps, axis=-1)
+    X = x[np.newaxis, ...]
 
     def make_idxlayer(i):
         def idlayer(X):
             return X + i, float(i)
         return idlayer
 
-    catlayer = ab.PerFeature(make_idxlayer(2), make_idxlayer(3))
+    if reps > 1:
+        begin = range(0, 2 * reps, 2)
+        end = range(2, 2 * reps + 2, 2)
+        slices = [slice(b, e) for b, e in zip(begin, end)]
+        layers = [make_idxlayer(i) for i in range(reps)]
+    else:
+        slices = None
+        layers = [make_idxlayer(2), make_idxlayer(3)]
+
+    catlayer = ab.PerFeature(*layers, slices=slices)
     F, KL = catlayer(X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         catted = F.eval()
-        orig = X.eval()
-        assert catted.shape == orig.shape
-        assert np.allclose(catted[:, :, 0], orig[:, :, 0] + 2)
-        assert np.allclose(catted[:, :, 1], orig[:, :, 1] + 3)
-        assert KL.eval() == 5.0
+        assert catted.shape == X.shape
+        if reps == 1:
+            assert np.allclose(catted[:, :, 0], X[:, :, 0] + 2)
+            assert np.allclose(catted[:, :, 1], X[:, :, 1] + 3)
+            assert KL.eval() == 5.0
+        else:
+            for i, s in enumerate(slices):
+                assert np.allclose(catted[:, :, s], X[:, :, s] + i)
+                KL.eval() == np.sum(range(reps))
 
 
 def test_sum(make_data):
