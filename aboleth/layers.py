@@ -613,8 +613,11 @@ class EmbedVariational(DenseVariational):
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = self._sample_W(self.qW, n_samples)
-        features = tf.gather(Wsamples, X[0, :], axis=1)
-        Net = tf.reshape(features, [n_samples, n_batch, -1])
+        features = tf.gather(Wsamples, X[0, ...], axis=1)
+
+        # Now concatenate the resulting features on the last axis
+        f_dims = np.prod(features.shape[2:])  # we can't do a reshape with -1
+        Net = tf.reshape(features, [n_samples, n_batch, f_dims])
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
