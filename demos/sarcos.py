@@ -7,6 +7,7 @@ import tensorflow as tf
 from tensorflow.contrib.data import Dataset, Iterator
 from scipy.stats import norm
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import r2_score
 
 import aboleth as ab
 from aboleth.datasets import fetch_gpml_sarcos_data
@@ -90,9 +91,6 @@ def main():
         global_step = tf.train.create_global_step()
         train = optimizer.minimize(loss, global_step=global_step)
 
-    with tf.name_scope("Test"):
-        r2 = rsquare(data['Y'], phi)
-
     # Logging
     log = tf.train.LoggingTensorHook(
         {'step': global_step, 'loss': loss},
@@ -108,33 +106,26 @@ def main():
             save_summaries_secs=20,
             hooks=[log]
     ) as sess:
-        summary_writer = sess._hooks[1]._summary_writer
         for i in range(NEPOCHS):
 
             # Train for one epoch
             try:
                 while not sess.should_stop():
-                    sess.run(train)
+                    _, g = sess.run([train, global_step])
             except tf.errors.OutOfRangeError:
                 pass
 
             # Init testing and assess and log R-square score on test set
             sess.run(testing_init)
-            r2_score = sess.run(r2)
-            score_sum = tf.Summary(value=[
-                tf.Summary.Value(tag='r-square', simple_value=r2_score)
-            ])
-            summary_writer.add_summary(score_sum, sess.run(global_step))
+            Ey = ab.predict_samples(phi, feed_dict=None,
+                                    n_groups=NPREDICTSAMPLES, session=sess)
+            sigma = sess.run(std)
+            r2 = r2_score(Ys, Ey.mean(axis=0))
+            print("Training epoch {}, r-square = {}".format(i, r2))
+            rsquare_summary(r2, sess, g)
 
             # Re-init training
             sess.run(training_init)
-
-        # Prediction
-        sess.run(testing_init)
-        Ey = ab.predict_samples(phi, feed_dict=None, n_groups=NPREDICTSAMPLES,
-                                session=sess)
-        sigma = sess.run(std)
-        r2_score = sess.run(r2)
 
     # Score mean standardised log likelihood
     Eymean = Ey.mean(axis=0)
@@ -143,7 +134,7 @@ def main():
 
     print("------------")
     print("r-square: {:.4f}, smse: {:.4f}, msll: {:.4f}."
-          .format(r2_score, 1 - r2_score, snlp))
+          .format(r2, 1 - r2, snlp))
 
 
 def msll(Y_true, Y_pred, V_pred, Y_train):
@@ -155,12 +146,12 @@ def msll(Y_true, Y_pred, V_pred, Y_train):
     return msll
 
 
-def rsquare(Y, P):
-    """Coefficient of Determinantion (R-square) in TensorFlow."""
-    SS_ref = tf.reduce_sum((Y - tf.reduce_mean(P, axis=0))**2)
-    SS_tot = tf.reduce_sum((Y - tf.reduce_mean(Y))**2)
-    R2 = 1 - SS_ref / SS_tot
-    return R2
+def rsquare_summary(r2, session, step=None):
+    # Get a summary writer for R-square
+    summary_writer = session._hooks[1]._summary_writer
+    sum_val = tf.Summary.Value(tag='r-square', simple_value=r2)
+    score_sum = tf.Summary(value=[sum_val])
+    summary_writer.add_summary(score_sum, step)
 
 
 if __name__ == "__main__":

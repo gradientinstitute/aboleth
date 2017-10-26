@@ -115,7 +115,7 @@ class SampleLayer3(SampleLayer):
 
 
 #
-# Activation Layers
+# Activation and Transformation Layers
 #
 
 class Activation(Layer):
@@ -240,9 +240,6 @@ class Reshape(Layer):
 class RandomFourier(SampleLayer3):
     r"""Random Fourier feature (RFF) kernel approximation layer.
 
-    NOTE: This should be followed by a dense layer to properly implement a
-        kernel approximation.
-
     Parameters
     ----------
     n_features : int
@@ -252,6 +249,11 @@ class RandomFourier(SampleLayer3):
         the kernel object that yeilds the random samples from the fourier
         spectrum of a particular kernel to approximate. See the :ref:`kernels`
         module.
+
+    Note
+    ----
+    This should be followed by a dense layer to properly implement a kernel
+    approximation.
 
     """
 
@@ -284,9 +286,6 @@ class RandomFourier(SampleLayer3):
 class RandomArcCosine(RandomFourier):
     r"""Random arc-cosine kernel layer.
 
-    NOTE: This should be followed by a dense layer to properly implement a
-        kernel approximation.
-
     Parameters
     ----------
     n_features : int
@@ -309,6 +308,11 @@ class RandomArcCosine(RandomFourier):
         initial value per input dimension). If this is left as None, it will be
         set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto' setting
         for a scikit learn SVM with a RBF kernel).
+
+    Note
+    ----
+    This should be followed by a dense layer to properly implement a kernel
+    approximation.
 
     See Also
     --------
@@ -520,7 +524,7 @@ class EmbedVariational(DenseVariational):
 
     This layer works directly inputs of *K* category *indices* rather than
     one-hot representations, for efficiency. Each column of the input is
-    embedded seperately, and the result concatenated alond the last axis.
+    embedded seperately, and the result concatenated along the last axis.
     It is a dense linear layer,
 
     .. math::
@@ -613,7 +617,8 @@ class EmbedVariational(DenseVariational):
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = self._sample_W(self.qW, n_samples)
-        features = tf.gather(Wsamples, X[0, ...], axis=1)
+        features = tf.map_fn(lambda wx: tf.gather(*wx, axis=0), (Wsamples, X),
+                             dtype=Wsamples.dtype)
 
         # Now concatenate the resulting features on the last axis
         f_dims = int(np.prod(features.shape[2:]))  # need this for placeholders
@@ -664,7 +669,6 @@ class DenseMAP(SampleLayer):
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_shape = self._get_X_dims(X)
-
         Wdim = tuple(input_shape) + (self.output_dim,)
 
         W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
@@ -682,6 +686,66 @@ class DenseMAP(SampleLayer):
                                              seed=next(seedgen)), name="b_map")
             Net += b
             penalty += self.l2 * tf.nn.l2_loss(b) + self.l1 * _l1_loss(b)
+
+        return Net, penalty
+
+
+class EmbedMAP(SampleLayer3):
+    r"""Dense (fully connected) embedding layer, with MAP inference.
+
+    This layer works directly inputs of *K* category *indices* rather than
+    one-hot representations, for efficiency. Each column of the input is
+    embedded seperately, and the result concatenated along the last axis.
+    It is a dense linear layer,
+
+    .. math::
+        f(\mathbf{X}) = \mathbf{X} \mathbf{W}
+
+    Here :math:`\mathbf{X} \in \mathbb{N}_2^{N \times K}` and :math:`\mathbf{W}
+    \in \mathbb{R}^{K \times D_{out}}`. Though in code we represent
+    :math:`\mathbf{X}` as a vector of indices in :math:`\mathbb{N}_K^{N \times
+    1}`. This layer uses maximum *a-posteriori* inference to learn the weights
+    and so also returns complexity penalities (l1 or l2) for the weights.
+
+    Parameters
+    ----------
+    output_dim : int
+        the dimension of the output (embedding) of this layer
+    n_categories : int
+        the number of categories in the input variable
+    l1_reg : float
+        the value of the l1 weight regularizer,
+        :math:`\text{l1_reg} \times \|\mathbf{W}\|_1`
+    l2_reg : float
+        the value of the l2 weight regularizer,
+        :math:`\frac{1}{2} \text{l2_reg} \times \|\mathbf{W}\|^2_2`
+
+    """
+
+    def __init__(self, output_dim, n_categories, l1_reg=1., l2_reg=1.):
+        """Create and instance of a MAP embedding layer."""
+        assert n_categories >= 2, "Need 2 or more categories for embedding!"
+        self.output_dim = output_dim
+        self.n_categories = n_categories
+        self.l1 = l1_reg
+        self.l2 = l2_reg
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, input_dim = self._get_X_dims(X)
+        Wdim = (self.n_categories, self.output_dim)
+        n_batch = tf.shape(X)[1]
+
+        W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
+                        name="W_map")
+
+        # Index into the relevant weights rather than using sparse matmul
+        features = tf.gather(W, X, axis=0)
+        f_dims = int(np.prod(features.shape[2:]))  # need this for placeholders
+        Net = tf.reshape(features, [n_samples, n_batch, f_dims])
+
+        # Regularizers
+        penalty = self.l2 * tf.nn.l2_loss(W) + self.l1 * _l1_loss(W)
 
         return Net, penalty
 

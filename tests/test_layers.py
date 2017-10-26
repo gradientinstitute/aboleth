@@ -153,22 +153,23 @@ def test_arc_cosine(make_data):
 
 
 @pytest.mark.parametrize('reps', [1, 3, 10])
-def test_dense_embeddings(make_categories, reps):
+@pytest.mark.parametrize('layer', [ab.EmbedVariational, ab.EmbedMAP])
+def test_dense_embeddings(make_categories, reps, layer):
     """Test the embedding layer."""
     x, K = make_categories
     x = np.repeat(x, reps, axis=-1)
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K)(X_)
+    output, reg = layer(output_dim=D, n_categories=K)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
-        kl = KL.eval()
+        r = reg.eval()
 
-        assert np.isscalar(kl)
-        assert kl > 0
+        assert np.isscalar(r)
+        assert r >= 0
 
         Phi = output.eval(feed_dict={x_: x})
 
