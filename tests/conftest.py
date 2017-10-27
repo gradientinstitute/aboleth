@@ -63,7 +63,7 @@ def make_missing_data():
 def make_categories():
     """Make some simple categorical data."""
     N = 100
-    K = 5
+    K = 20
     x = RAND.randint(0, K, size=N)[:, np.newaxis]
     x = x.astype(np.int32)
     return x, K

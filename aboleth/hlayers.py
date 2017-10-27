@@ -64,20 +64,29 @@ class PerFeature(Layer):
     ----------
     layers : [Layer]
         The layers to concatenate.
+    slices : [slice]
+        The slices into X to give to each layer, this has to be the same length
+        as layers. If this is None, it will give *columns* of X to each layer,
+        the number of columns is determined by the number of layers.
 
     """
 
-    def __init__(self, *layers):
+    def __init__(self, *layers, slices=None):
         """Initialise with the individual layers."""
         self.layers = layers
+        self.slices = slices if slices is not None \
+            else [slice(i, i + 1) for i in range(len(layers))]
+
+        if len(self.layers) != len(self.slices):
+            raise ValueError("This requires one slice per layer.")
 
     def _build(self, X):
         """Build slice concatenation operation. ``X`` is a rank 3 Tensor."""
         rank = len(X.shape)
         assert rank == 3
 
-        tensors, losses = zip(*[l(X[..., i:i + 1])
-                                for i, l in enumerate(self.layers)])
+        tensors, losses = zip(*[l(X[..., s])
+                                for s, l in zip(self.slices, self.layers)])
         result = tf.concat(tensors, axis=-1)
         loss = tf.add_n(losses)
         return result, loss
