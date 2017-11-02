@@ -196,8 +196,17 @@ def test_dense_outputs(dense, make_data):
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
 
 
-@pytest.mark.parametrize('conv2d', [ab.Conv2DVariational])
-def test_conv2d_outputs(conv2d, make_image_data):
+@pytest.mark.parametrize('kwargs', [
+    dict(filters=D, kernel_size=(4, 4)),
+    dict(filters=D, kernel_size=(2, 3)),
+    dict(filters=D, kernel_size=(4, 4), strides=(5, 2)),
+    dict(filters=D, kernel_size=(2, 3), strides=(5, 2)),
+    dict(filters=D, kernel_size=(4, 4), padding='VALID'),
+    dict(filters=D, kernel_size=(2, 3), padding='VALID'),
+    dict(filters=D, kernel_size=(4, 4), strides=(5, 2), padding='VALID'),
+    dict(filters=D, kernel_size=(2, 3), strides=(5, 2), padding='VALID'),
+])
+def test_conv2d_outputs(kwargs, make_image_data):
     """Make sure the dense layers output expected dimensions."""
     x, _, X = make_image_data
     S = 3
@@ -205,13 +214,23 @@ def test_conv2d_outputs(conv2d, make_image_data):
     x_, X_ = _make_placeholders(x, S)
     N, height, width, channels = x.shape
 
-    Phi, KL = conv2d(filters=D, kernel_size=(4, 4))(X_)
+    Phi, KL = ab.Conv2DVariational(**kwargs)(X_)
+
+    if kwargs.get('padding', 'SAME') == 'SAME':
+        filter_height = filter_width = 1
+    else:
+        filter_height, filter_width = kwargs['kernel_size']
+
+    strides = kwargs.get('strides', (1, 1))
+
+    out_height = np.ceil((height - filter_height + 1) / strides[0])
+    out_width = np.ceil((width - filter_width + 1) / strides[1])
 
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
         P = Phi.eval(feed_dict={x_: x})
-        assert P.shape == (S, N, height, width, D)
+        assert P.shape == (S, N, out_height, out_width, D)
         assert P.dtype == np.float32
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
 
