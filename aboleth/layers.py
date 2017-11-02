@@ -78,7 +78,8 @@ class SampleLayer(Layer):
     @staticmethod
     def _get_X_dims(X):
         r"""Get the dimensions of the rank >= 3 input tensor, X."""
-        n_samples, _, *input_shape = X.shape.as_list()
+        n_samples = tf.to_int32(tf.shape(X)[0])
+        input_shape = X.shape[2:].as_list()
         return n_samples, input_shape
 
 
@@ -427,7 +428,7 @@ class Conv2DVariational(SampleLayer):
         KL = kl_sum(self.qW, self.pW)
 
         # Linear layer
-        Wsamples = self._sample_W(self.qW, n_samples)
+        Wsamples = _sample_W(self.qW, n_samples, False)
         Net = tf.map_fn(
             lambda args: tf.nn.conv2d(*args,
                                       padding=self.padding,
@@ -444,7 +445,7 @@ class Conv2DVariational(SampleLayer):
             KL += kl_sum(self.qb, self.pb)
 
             # Linear layer
-            bsamples = tf.reshape(self._sample_W(self.qb, n_samples),
+            bsamples = tf.reshape(_sample_W(self.qb, n_samples, False),
                                   [n_samples, 1, 1, 1, self.filters])
             Net += bsamples
 
@@ -476,12 +477,6 @@ class Conv2DVariational(SampleLayer):
         bias_shape = (self.filters,)
 
         return weight_shape, bias_shape
-
-    @staticmethod
-    def _sample_W(dist, n_samples):
-        samples = tf.stack([dist.sample(seed=next(seedgen))
-                            for _ in range(n_samples)])
-        return samples
 
 
 class DenseVariational(SampleLayer3):
@@ -593,7 +588,7 @@ class DenseVariational(SampleLayer3):
         KL = kl_sum(self.qW, self.pW)
 
         # Linear layer
-        Wsamples = self._sample_W(self.qW, n_samples)
+        Wsamples = _sample_W(self.qW, n_samples)
         Net = tf.matmul(X, Wsamples)
 
         # Optional bias
@@ -606,7 +601,7 @@ class DenseVariational(SampleLayer3):
             KL += kl_sum(self.qb, self.pb)
 
             # Linear layer
-            bsamples = tf.expand_dims(self._sample_W(self.qb, n_samples), 1)
+            bsamples = tf.expand_dims(_sample_W(self.qb, n_samples), 1)
             Net += bsamples
 
         return Net, KL
@@ -641,12 +636,6 @@ class DenseVariational(SampleLayer3):
         bias_shape = (self.output_dim,)
 
         return weight_shape, bias_shape
-
-    @staticmethod
-    def _sample_W(dist, n_samples):
-        samples = tf.stack([tf.transpose(dist.sample(seed=next(seedgen)))
-                            for _ in range(n_samples)])
-        return samples
 
 
 class EmbedVariational(DenseVariational):
@@ -746,7 +735,7 @@ class EmbedVariational(DenseVariational):
         self.qW = self._make_posterior(self.qW, W_shape)
 
         # Index into the relevant weights rather than using sparse matmul
-        Wsamples = self._sample_W(self.qW, n_samples)
+        Wsamples = _sample_W(self.qW, n_samples)
         features = tf.map_fn(lambda wx: tf.gather(*wx, axis=0), (Wsamples, X),
                              dtype=Wsamples.dtype)
 
@@ -894,3 +883,13 @@ def _is_dim(distribution, dims):
     r"""Check if ``X``'s dimension is the same as the tuple ``dims``."""
     shape = tuple(distribution.loc.shape)
     return shape == dims
+
+
+def _sample_W(dist, n_samples, transpose=True):
+    Wsamples = dist.sample(seed=next(seedgen), sample_shape=n_samples)
+    rank = len(Wsamples.shape)
+    if rank > 2 and transpose:
+        perm = list(range(rank))
+        perm[-1], perm[-2] = perm[-2], perm[-1]
+        Wsamples = tf.transpose(Wsamples, perm)
+    return Wsamples

@@ -55,8 +55,9 @@ kern = ab.RBFVariational(lenscale=lenscale)  # This is VAR-FIXED kernel from
 # computationally. "full" indicates we want a full-covariance matrix Gaussian
 # posterior of the model weights. This is optional, but it does greatly improve
 # the model uncertainty away from the data.
+n_samples_ = tf.placeholder(tf.int32)
 net = (
-    ab.InputLayer(name="X", n_samples=n_samples) >>
+    ab.InputLayer(name="X", n_samples=n_samples_) >>
     ab.RandomFourier(n_features=100, kernel=kern) >>
     ab.DenseVariational(output_dim=1, std=reg, full=True)
 )
@@ -121,15 +122,19 @@ def main():
     ) as sess:
         try:
             while not sess.should_stop():
-                sess.run(train)
+                sess.run(train, feed_dict={n_samples_: n_samples})
         except tf.errors.OutOfRangeError:
             print('Input queues have been exhausted!')
             pass
 
         # Prediction, the [[None]] is to stop the default placeholder queue
-        Ey = ab.predict_samples(phi, feed_dict={X_: Xq, Y_: [[None]]},
+        Ey = ab.predict_samples(phi,
+                                feed_dict={X_: Xq, Y_: [[None]],
+                                           n_samples_: n_samples},
                                 n_groups=n_pred_samples, session=sess)
-        logPY = ab.predict_expected(logprob, feed_dict={Y_: Yi, X_: Xi},
+        logPY = ab.predict_expected(logprob,
+                                    feed_dict={Y_: Yi, X_: Xi, n_samples_:
+                                               n_samples},
                                     n_groups=n_pred_samples, session=sess)
 
     Eymean = Ey.mean(axis=0)  # Average samples to get mean predicted funtion
