@@ -110,7 +110,7 @@ class SampleLayer3(SampleLayer):
     @staticmethod
     def _get_X_dims(X):
         """Get the dimensions of the rank 3 input tensor, X."""
-        n_samples, (input_dim,) = super(SampleLayer3, self)._get_X_dims(X)
+        n_samples, (input_dim,) = SampleLayer._get_X_dims(X)
         return n_samples, input_dim
 
 
@@ -354,7 +354,7 @@ class RandomArcCosine(RandomFourier):
 # Weight layers
 #
 
-class Conv2DVariational(SampleLayer3):
+class Conv2DVariational(SampleLayer):
     r"""A 2D convolution layer, with variational inference.
 
     (Does not currently support full covariance weights.)
@@ -481,7 +481,7 @@ class Conv2DVariational(SampleLayer3):
 
     @staticmethod
     def _sample_W(dist, n_samples):
-        samples = tf.stack([tf.transpose(dist.sample(seed=next(seedgen)))
+        samples = tf.stack([dist.sample(seed=next(seedgen))
                             for _ in range(n_samples)])
         return samples
 

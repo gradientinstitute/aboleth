@@ -5,7 +5,7 @@ import tensorflow as tf
 import aboleth as ab
 
 from aboleth.distributions import norm_prior, gaus_posterior
-from aboleth.layers import SampleLayer
+from aboleth.layers import SampleLayer, SampleLayer3
 
 
 D = 10
@@ -131,7 +131,7 @@ def test_reshape(make_image_data):
         f = F.eval()
 
         assert f.shape[-1] == np.prod(X.eval().shape[2:])
-        assert np.all(f == np.reshape(X.eval(), (5, 100, 28*28*3)))
+        assert np.all(f == np.reshape(X.eval(), (3, 100, 28*28*3)))
 
         assert KL == 0
 
@@ -196,11 +196,33 @@ def test_dense_outputs(dense, make_data):
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
 
 
+@pytest.mark.parametrize('conv2d', [ab.Conv2DVariational])
+def test_conv2d_outputs(conv2d, make_image_data):
+    """Make sure the dense layers output expected dimensions."""
+    x, _, X = make_image_data
+    S = 3
+
+    x_, X_ = _make_placeholders(x, S)
+    N, height, width, channels = x.shape
+
+    Phi, KL = conv2d(filters=D, kernel_size=(4, 4))(X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        P = Phi.eval(feed_dict={x_: x})
+        assert P.shape == (S, N, height, width, D)
+        assert P.dtype == np.float32
+        assert np.isscalar(KL.eval(feed_dict={x_: x}))
+
+
 @pytest.mark.parametrize('layer_args', [
     (SampleLayer, ()),
+    (SampleLayer3, ()),
     (ab.DenseMAP, (D,)),
     (ab.DenseVariational, (D,)),
     (ab.EmbedVariational, (2, D)),
+    (ab.Conv2DVariational, (8, (4, 4))),
     (ab.RandomFourier, (2, ab.RBF())),
     (ab.RandomArcCosine, (2,)),
 ])
@@ -293,5 +315,5 @@ def test_embeddings_distribution(dists, make_categories):
 
 def _make_placeholders(x, S, xtype=tf.float32):
     x_ = tf.placeholder(xtype, x.shape)
-    X_ = tf.tile(tf.expand_dims(x_, 0), [S, 1, 1])
+    X_ = tf.tile(tf.expand_dims(x_, 0), [S] + np.ones_like(x.shape).tolist())
     return x_, X_
