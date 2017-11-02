@@ -34,7 +34,7 @@ def make_data():
 def make_image_data():
     """Make some simple data."""
     N = 100
-    M = 5
+    M = 3
     # N 28x28 RGB float images
     x = expit(RAND.randn(N, 28, 28, 3)).astype(np.float32)
     w = np.linspace(-2.5, 2.5, 28*28*3)
@@ -63,7 +63,7 @@ def make_missing_data():
 def make_categories():
     """Make some simple categorical data."""
     N = 100
-    K = 5
+    K = 20
     x = RAND.randint(0, K, size=N)[:, np.newaxis]
     x = x.astype(np.int32)
     return x, K

@@ -28,7 +28,7 @@ class ShiftInvariant:
         """Constuct a shift invariant kernel object."""
         self.lenscale = lenscale
 
-    def weights(self, input_dim, n_features):
+    def weights(self, input_dim, n_features, dtype=np.float32):
         """Generate the random fourier weights for this kernel.
 
         Parameters
@@ -38,6 +38,9 @@ class ShiftInvariant:
         n_features : int
             the number of unique random features, the actual output dimension
             of this layer will be ``2 * n_features``.
+        dtype : np.dtype
+            the dtype of the features to draw, this should match the
+            observations.
 
         Returns
         -------
@@ -66,7 +69,7 @@ class RBF(ShiftInvariant):
 
     """
 
-    def weights(self, input_dim, n_features):
+    def weights(self, input_dim, n_features, dtype=np.float32):
         """Generate the random fourier weights for this kernel.
 
         Parameters
@@ -76,6 +79,9 @@ class RBF(ShiftInvariant):
         n_features : int
             the number of unique random features, the actual output dimension
             of this layer will be ``2 * n_features``.
+        dtype : np.dtype
+            the dtype of the features to draw, this should match the
+            observations.
 
         Returns
         -------
@@ -87,7 +93,7 @@ class RBF(ShiftInvariant):
 
         """
         rand = np.random.RandomState(next(seedgen))
-        e = rand.randn(input_dim, n_features).astype(np.float32)
+        e = rand.randn(input_dim, n_features).astype(dtype)
         P = e / self.lenscale
         return P, 0.
 
@@ -120,7 +126,7 @@ class RBFVariational(ShiftInvariant):
         super().__init__(lenscale)
         self.lenscale_post = lenscale_posterior
 
-    def weights(self, input_dim, n_features):
+    def weights(self, input_dim, n_features, dtype=np.float32):
         """Generate the random fourier weights for this kernel.
 
         Parameters
@@ -130,6 +136,9 @@ class RBFVariational(ShiftInvariant):
         n_features : int
             the number of unique random features, the actual output dimension
             of this layer will be ``2 * n_features``.
+        dtype : np.dtype
+            the dtype of the features to draw, this should match the
+            observations.
 
         Returns
         -------
@@ -158,7 +167,7 @@ class RBFVariational(ShiftInvariant):
         # We implement the VAR-FIXED method here from Cutajar et. al 2017, so
         # we pre-generate and fix the standard normal samples
         rand = np.random.RandomState(next(seedgen))
-        e = rand.randn(*dim).astype(np.float32)
+        e = rand.randn(*dim).astype(dtype)
         P = qP.mean() + qP.stddev() * e
 
         return P, KL
@@ -193,7 +202,7 @@ class Matern(ShiftInvariant):
         assert isinstance(p, int) and p >= 0
         self.p = p
 
-    def weights(self, input_dim, n_features):
+    def weights(self, input_dim, n_features, dtype=np.float32):
         """Generate the random fourier weights for this kernel.
 
         Parameters
@@ -203,6 +212,9 @@ class Matern(ShiftInvariant):
         n_features : int
             the number of unique random features, the actual output dimension
             of this layer will be ``2 * n_features``.
+        dtype : np.dtype
+            the dtype of the features to draw, this should match the
+            observations.
 
         Returns
         -------
@@ -226,5 +238,5 @@ class Matern(ShiftInvariant):
         rand = np.random.RandomState(next(seedgen))
         y = rand.randn(input_dim, n_features)
         u = rand.chisquare(df, size=(n_features,))
-        P = (y * np.sqrt(df / u)).astype(np.float32) / self.lenscale
+        P = (y * np.sqrt(df / u)).astype(dtype) / self.lenscale
         return P, 0.

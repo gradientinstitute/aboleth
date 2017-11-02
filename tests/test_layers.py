@@ -5,12 +5,12 @@ import tensorflow as tf
 import aboleth as ab
 
 from aboleth.distributions import norm_prior, gaus_posterior
-from aboleth.layers import SampleLayer
+from aboleth.layers import SampleLayer, SampleLayer3
 
 
 D = 10
 DIM = (10, 2)
-EDIM = (10, 5)
+EDIM = (10, 20)
 
 
 def test_net_outputs(make_graph):
@@ -69,9 +69,10 @@ def test_activation(make_data):
         assert KL == 0
 
 
-def test_dropout(make_data):
+def test_dropout(random):
     """Test dropout layer."""
-    x, _, X = make_data
+    X = np.repeat(random.randn(1, 30, 20), 3, axis=0)
+    ab.set_hyperseed(666)
     drop = ab.DropOut(0.5)
 
     F, KL = drop(X)
@@ -81,8 +82,8 @@ def test_dropout(make_data):
         f = F.eval()
         prop_zero = np.sum(f == 0) / np.prod(f.shape)
 
-        assert f.shape == X.eval().shape
-        assert (prop_zero > 0.4) and (prop_zero < 0.6)
+        assert f.shape == X.shape
+        assert (prop_zero >= 0.4) and (prop_zero <= 0.6)
         assert KL == 0
 
 
@@ -130,7 +131,7 @@ def test_reshape(make_image_data):
         f = F.eval()
 
         assert f.shape[-1] == np.prod(X.eval().shape[2:])
-        assert np.all(f == np.reshape(X.eval(), (5, 100, 28*28*3)))
+        assert np.all(f == np.reshape(X.eval(), (3, 100, 28*28*3)))
 
         assert KL == 0
 
@@ -151,25 +152,28 @@ def test_arc_cosine(make_data):
         assert KL == 0
 
 
-def test_dense_embeddings(make_categories):
+@pytest.mark.parametrize('reps', [1, 3, 10])
+@pytest.mark.parametrize('layer', [ab.EmbedVariational, ab.EmbedMAP])
+def test_dense_embeddings(make_categories, reps, layer):
     """Test the embedding layer."""
     x, K = make_categories
+    x = np.repeat(x, reps, axis=-1)
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K)(X_)
+    output, reg = layer(output_dim=D, n_categories=K)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
-        kl = KL.eval()
+        r = reg.eval()
 
-        assert np.isscalar(kl)
-        assert kl > 0
+        assert np.isscalar(r)
+        assert r >= 0
 
         Phi = output.eval(feed_dict={x_: x})
 
-        assert Phi.shape == (S, N, D)
+        assert Phi.shape == (S, N, D * reps)
 
 
 @pytest.mark.parametrize('dense', [ab.DenseMAP, ab.DenseVariational])
@@ -192,11 +196,52 @@ def test_dense_outputs(dense, make_data):
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
 
 
+@pytest.mark.parametrize('kwargs', [
+    dict(filters=D, kernel_size=(4, 4)),
+    dict(filters=D, kernel_size=(2, 3)),
+    dict(filters=D, kernel_size=(4, 4), strides=(5, 2)),
+    dict(filters=D, kernel_size=(2, 3), strides=(5, 2)),
+    dict(filters=D, kernel_size=(4, 4), padding='VALID'),
+    dict(filters=D, kernel_size=(2, 3), padding='VALID'),
+    dict(filters=D, kernel_size=(4, 4), strides=(5, 2), padding='VALID'),
+    dict(filters=D, kernel_size=(2, 3), strides=(5, 2), padding='VALID'),
+])
+def test_conv2d_outputs(kwargs, make_image_data):
+    """Make sure the dense layers output expected dimensions."""
+    x, _, X = make_image_data
+    S = 3
+
+    x_, X_ = _make_placeholders(x, S)
+    N, height, width, channels = x.shape
+
+    Phi, KL = ab.Conv2DVariational(**kwargs)(X_)
+
+    if kwargs.get('padding', 'SAME') == 'SAME':
+        filter_height = filter_width = 1
+    else:
+        filter_height, filter_width = kwargs['kernel_size']
+
+    strides = kwargs.get('strides', (1, 1))
+
+    out_height = np.ceil((height - filter_height + 1) / strides[0])
+    out_width = np.ceil((width - filter_width + 1) / strides[1])
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        P = Phi.eval(feed_dict={x_: x})
+        assert P.shape == (S, N, out_height, out_width, D)
+        assert P.dtype == np.float32
+        assert np.isscalar(KL.eval(feed_dict={x_: x}))
+
+
 @pytest.mark.parametrize('layer_args', [
     (SampleLayer, ()),
+    (SampleLayer3, ()),
     (ab.DenseMAP, (D,)),
     (ab.DenseVariational, (D,)),
     (ab.EmbedVariational, (2, D)),
+    (ab.Conv2DVariational, (8, (4, 4))),
     (ab.RandomFourier, (2, ab.RBF())),
     (ab.RandomArcCosine, (2,)),
 ])
@@ -240,6 +285,30 @@ def test_fourier_features(kernels, make_data):
         # Make sure we get a valid KL
         kl = KL.eval() if isinstance(KL, tf.Tensor) else KL
         assert kl >= 0
+
+
+@pytest.mark.parametrize('dists', [
+    {'prior_W': norm_prior((4, 4, 3, D), 1.), 'prior_b': norm_prior((D,), 1.)},
+    {'post_W': norm_prior((4, 4, 3, D), 1.), 'post_b': norm_prior((D,), 1.)},
+    {'prior_W': norm_prior((4, 4, 3, D), 1.),
+     'post_W': norm_prior((4, 4, 3, D), 1.)}
+])
+def test_conv2d_distribution(dists, make_image_data):
+    """Test initialising dense variational layers with distributions."""
+    x, _, X = make_image_data
+    S = 3
+
+    x_, X_ = _make_placeholders(x, S)
+    N, height, width, channels = x.shape
+
+    Phi, KL = ab.Conv2DVariational(filters=D, kernel_size=(4, 4), **dists)(X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        P = Phi.eval(feed_dict={x_: x})
+        assert P.shape == (S, N, height, width, D)
+        assert KL.eval() >= 0.
 
 
 @pytest.mark.parametrize('dists', [
@@ -289,5 +358,5 @@ def test_embeddings_distribution(dists, make_categories):
 
 def _make_placeholders(x, S, xtype=tf.float32):
     x_ = tf.placeholder(xtype, x.shape)
-    X_ = tf.tile(tf.expand_dims(x_, 0), [S, 1, 1])
+    X_ = tf.tile(tf.expand_dims(x_, 0), [S] + np.ones_like(x.shape).tolist())
     return x_, X_
