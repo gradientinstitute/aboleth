@@ -4,8 +4,8 @@ from .version import __version__
 from .losses import elbo, max_posterior
 from .baselayers import stack
 from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
-                     EmbedVariational, DenseMAP, EmbedMAP, InputLayer,
-                     RandomFourier, RandomArcCosine)
+                     EmbedVariational, DenseMAP, EmbedMAP, Conv2DVariational,
+                     InputLayer, RandomFourier, RandomArcCosine)
 from .hlayers import Concat, Sum, PerFeature
 from .impute import (MaskInputLayer, MeanImpute, FixedNormalImpute,
                      LearnedScalarImpute, LearnedNormalImpute)
@@ -24,6 +24,7 @@ __all__ = (
     'DropOut',
     'MaxPool2D',
     'Reshape',
+    'Conv2DVariational',
     'DenseVariational',
     'EmbedVariational',
     'DenseMAP',
