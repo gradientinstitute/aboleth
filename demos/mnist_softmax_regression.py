@@ -64,7 +64,7 @@ def main():
     # Data
     with tf.name_scope("inputs"):
         X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-        Y_ = tf.placeholder(dtype=tf.float32, shape=(None, 10))
+        Y_ = tf.placeholder(dtype=tf.float32, shape=shape=(None,))
 
     with tf.name_scope("model"):
         nn_logits, nn_reg = net(X=X_)
