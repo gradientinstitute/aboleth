@@ -288,6 +288,30 @@ def test_fourier_features(kernels, make_data):
 
 
 @pytest.mark.parametrize('dists', [
+    {'prior_W': norm_prior((4, 4, 3, D), 1.), 'prior_b': norm_prior((D,), 1.)},
+    {'post_W': norm_prior((4, 4, 3, D), 1.), 'post_b': norm_prior((D,), 1.)},
+    {'prior_W': norm_prior((4, 4, 3, D), 1.),
+     'post_W': norm_prior((4, 4, 3, D), 1.)}
+])
+def test_conv2d_distribution(dists, make_image_data):
+    """Test initialising dense variational layers with distributions."""
+    x, _, X = make_image_data
+    S = 3
+
+    x_, X_ = _make_placeholders(x, S)
+    N, height, width, channels = x.shape
+
+    Phi, KL = ab.Conv2DVariational(filters=D, kernel_size=(4, 4), **dists)(X_)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        P = Phi.eval(feed_dict={x_: x})
+        assert P.shape == (S, N, height, width, D)
+        assert KL.eval() >= 0.
+
+
+@pytest.mark.parametrize('dists', [
     {'prior_W': norm_prior(DIM, 1.), 'prior_b': norm_prior((D,), 1.)},
     {'post_W': norm_prior(DIM, 1.), 'post_b': norm_prior((D,), 1.)},
     {'prior_W': norm_prior(DIM, 1.), 'post_W': norm_prior(DIM, 1.)},
