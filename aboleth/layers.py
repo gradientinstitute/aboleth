@@ -452,7 +452,6 @@ class Conv2DVariational(SampleLayer):
 
     def _make_prior(self, prior_W, weight_shape):
         """Check/make prior."""
-
         if prior_W is None:
             prior_W = norm_prior(dim=weight_shape, std=self.std)
 
@@ -463,7 +462,6 @@ class Conv2DVariational(SampleLayer):
 
     def _make_posterior(self, post_W, weight_shape):
         """Check/make posterior."""
-
         if post_W is None:
             post_W = norm_posterior(dim=weight_shape, std0=self.std)
 
