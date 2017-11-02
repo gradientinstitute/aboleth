@@ -94,13 +94,14 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        ps = ab.predict_expected(llh.probs, {X_: Xs}, PSAMPLES)
+        Ep = ab.predict_samples(llh.probs, {X_: Xs}, PSAMPLES)
 
-        Ep = np.hstack((1. - ps, ps))
+    p = Ep.mean(axis=0)
+    Ey = p.argmax(axis=1)
 
-        print("BayesianConvNet: accuracy = {:.4g}, log-loss = {:.4g}"
-              .format(accuracy_score(ys, Ep.argmax(axis=1)),
-                      log_loss(ys, Ep)))
+    print("BayesianConvNet: accuracy = {:.4g}, log-loss = {:.4g}"
+          .format(accuracy_score(ys, Ey),
+                  log_loss(ys, p)))
 
 
 if __name__ == "__main__":
