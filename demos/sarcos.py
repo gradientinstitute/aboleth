@@ -4,7 +4,6 @@ import logging
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.contrib.data import Dataset, Iterator
 from scipy.stats import norm
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
@@ -31,8 +30,9 @@ KERNEL = ab.RBF(ab.pos(LENSCALE))
 # KERNEL = ab.RBFVariational(lenscale=LENSCALE, lenscale_posterior=LENSCALE)
 
 # Build the approximate GP
+n_samples_ = tf.placeholder_with_default(NSAMPLES, [])
 net = ab.stack(
-    ab.InputLayer(name='X', n_samples=NSAMPLES),
+    ab.InputLayer(name='X', n_samples=n_samples_),
     ab.RandomFourier(n_features=NFEATURES, kernel=KERNEL),
     ab.DenseVariational(output_dim=1, full=True)
 )
@@ -40,7 +40,7 @@ net = ab.stack(
 # Learning and prediction settings
 BATCH_SIZE = 50  # number of observations per mini batch
 NEPOCHS = 100  # Number of times to iterate though the dataset
-NPREDICTSAMPLES = 10  # results in NSAMPLES * NPREDICTSAMPLES samples
+NPREDICTSAMPLES = 20  # Number of prediction samples
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
 
@@ -65,16 +65,16 @@ def main():
     Ys -= ym
 
     # Training batches
-    data_tr = Dataset.from_tensor_slices({'X': Xr, 'Y': Yr}) \
+    data_tr = tf.data.Dataset.from_tensor_slices({'X': Xr, 'Y': Yr}) \
         .shuffle(buffer_size=1000) \
         .batch(BATCH_SIZE)
 
     # Testing iterators
-    data_ts = Dataset.from_tensors({'X': Xs, 'Y': Ys}).repeat()
+    data_ts = tf.data.Dataset.from_tensors({'X': Xs, 'Y': Ys}).repeat()
 
     with tf.name_scope("DataIterators"):
-        iterator = Iterator.from_structure(data_tr.output_types,
-                                           data_tr.output_shapes)
+        iterator = tf.data.Iterator.from_structure(data_tr.output_types,
+                                                   data_tr.output_shapes)
         data = iterator.get_next()
         training_init = iterator.make_initializer(data_tr)
         testing_init = iterator.make_initializer(data_ts)
@@ -90,6 +90,10 @@ def main():
         optimizer = tf.train.AdamOptimizer()
         global_step = tf.train.create_global_step()
         train = optimizer.minimize(loss, global_step=global_step)
+
+    with tf.name_scope("Test"):
+        Ey = tf.reduce_mean(phi, axis=0)
+        Vy = tf.reduce_mean((data['Y'] - Ey)**2) + std**2
 
     # Logging
     log = tf.train.LoggingTensorHook(
@@ -109,6 +113,7 @@ def main():
         for i in range(NEPOCHS):
 
             # Train for one epoch
+            sess.run(training_init)
             try:
                 while not sess.should_stop():
                     _, g = sess.run([train, global_step])
@@ -117,19 +122,13 @@ def main():
 
             # Init testing and assess and log R-square score on test set
             sess.run(testing_init)
-            Ey = ab.predict_samples(phi, feed_dict=None,
-                                    n_groups=NPREDICTSAMPLES, session=sess)
-            sigma = sess.run(std)
-            r2 = r2_score(Ys, Ey.mean(axis=0))
+            Eymean = sess.run(Ey, feed_dict={n_samples_: NPREDICTSAMPLES})
+            Eyvar = sess.run(Vy, feed_dict={n_samples_: NPREDICTSAMPLES})
+            r2 = r2_score(Ys, Eymean)
             print("Training epoch {}, r-square = {}".format(i, r2))
             rsquare_summary(r2, sess, g)
 
-            # Re-init training
-            sess.run(training_init)
-
     # Score mean standardised log likelihood
-    Eymean = Ey.mean(axis=0)
-    Eyvar = Ey.var(axis=0) + sigma**2  # add sigma2 for obervation noise
     snlp = msll(Ys.flatten(), Eymean, Eyvar, Yr.flatten())
 
     print("------------")

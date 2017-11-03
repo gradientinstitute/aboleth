@@ -4,7 +4,6 @@ import logging
 
 import tensorflow as tf
 import numpy as np
-from tensorflow.contrib.data import Dataset
 from sklearn.datasets import fetch_covtype
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, log_loss, confusion_matrix
@@ -31,13 +30,14 @@ NEPOCHS = 5  # Number of times to see the data in training
 BSIZE = 100  # Mini batch size
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 LSAMPLES = 5  # Number of samples the mode returns
-PSAMPLES = 10  # This will give LSAMPLES * PSAMPLES predictions
+PSAMPLES = 50  # Number of predictions samples
 
 NCLASSES = 7  # Number of target classes
 NFEATURES = 100  # Number of random features to use
 
 # Network construction
-data_input = ab.InputLayer(name='X', n_samples=LSAMPLES)  # Data input
+n_samples_ = tf.placeholder_with_default(LSAMPLES, [])
+data_input = ab.InputLayer(name='X', n_samples=n_samples_)  # Data input
 mask_input = ab.MaskInputLayer(name='M')  # Missing data mask input
 
 lenscale = ab.pos(tf.Variable(np.ones((54, 1), dtype=np.float32)))
@@ -95,6 +95,7 @@ def main():
         nn, kl = net(X=X_, M=M_) if USE_ABOLETH else net(X=X_)
         lkhood = tf.distributions.Categorical(logits=nn)
         loss = ab.elbo(lkhood, Y_, N_tr, kl)
+        prob = tf.reduce_mean(lkhood.probs, axis=0)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
@@ -122,15 +123,13 @@ def main():
             pass
 
         # Prediction
-        feed_dict = {X_: X_ts, Y_: [0]}
+        feed_dict = {X_: X_ts, Y_: [0], n_samples_: PSAMPLES}
         if USE_ABOLETH:
             feed_dict[M_] = M_ts
 
-        Ep = ab.predict_samples(lkhood.probs, feed_dict=feed_dict,
-                                n_groups=PSAMPLES, session=sess)
+        p = sess.run(prob, feed_dict=feed_dict)
 
     # Get mean of samples for prediction, and max probability assignments
-    p = Ep.mean(axis=0)
     Ey = p.argmax(axis=1)
 
     # Score results
@@ -144,7 +143,7 @@ def main():
 
 def batch_training(X, Y, M, batch_size, n_epochs):
     """Batch training queue convenience function."""
-    data_tr = Dataset.from_tensor_slices({'X': X, 'Y': Y, 'M': M}) \
+    data_tr = tf.data.Dataset.from_tensor_slices({'X': X, 'Y': Y, 'M': M}) \
         .shuffle(buffer_size=1000, seed=RSEED) \
         .repeat(n_epochs) \
         .batch(batch_size)

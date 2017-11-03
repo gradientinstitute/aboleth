@@ -5,7 +5,6 @@ import logging
 import numpy as np
 import bokeh.plotting as bk
 import tensorflow as tf
-from tensorflow.contrib.data import Dataset
 from sklearn.metrics import r2_score
 
 import aboleth as ab
@@ -26,10 +25,11 @@ true_noise = 0.05  # Add noise to the GP draws, to make things a little harder
 
 # Model settings
 n_samples = 5  # Number of random samples to get from an Aboleth net
-n_pred_samples = 20  # This will give n_samples by n_pred_samples predictions
+p_samples = 100  # Number of prediction samples
 n_epochs = 2000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
+n_samples_ = tf.placeholder_with_default(n_samples, [])
 
 model = "nnet_dropout"
 
@@ -58,7 +58,7 @@ def bayesian_linear(X, Y):
     noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
 
     net = (
-        ab.InputLayer(name="X", n_samples=n_samples) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.DenseVariational(output_dim=1, std=reg, full=True)
     )
 
@@ -99,7 +99,7 @@ def nnet_dropout(X, Y):
     noise = .5  # Likelihood st. dev.
 
     net = (
-        ab.InputLayer(name="X", n_samples=n_samples) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.DenseMAP(output_dim=30, l2_reg=reg, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.DropOut(keep_prob=0.95) >>
@@ -126,7 +126,7 @@ def nnet_bayesian(X, Y):
     noise = tf.Variable(0.01)  # Likelihood st. dev. initialisation
 
     net = (
-        ab.InputLayer(name="X", n_samples=n_samples) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.DenseVariational(output_dim=20, std=reg) >>
         ab.Activation(tf.nn.relu) >>
         ab.DenseVariational(output_dim=7, std=reg) >>
@@ -168,7 +168,7 @@ def gaussian_process(X, Y):
     kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
 
     net = (
-        ab.InputLayer(name="X", n_samples=n_samples) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
         ab.DenseVariational(output_dim=1, std=reg, full=True)
     )
@@ -187,7 +187,7 @@ def deep_gaussian_process(X, Y):
     lenscale = tf.Variable(1.)  # learn the length scale
 
     net = (
-        ab.InputLayer(name="X", n_samples=n_samples) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(ab.pos(lenscale))) >>
         ab.DenseVariational(output_dim=5, std=reg, full=True) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
@@ -284,8 +284,8 @@ def main():
 
         # Prediction, the [[None]] is to stop the default placeholder queue
         if model in probabilistic:
-            Ey = ab.predict_samples(phi, feed_dict={X_: Xs, Y_: [[None]]},
-                                    n_groups=n_pred_samples, session=sess)
+            Ey = sess.run(phi, feed_dict={X_: Xs, Y_: [[None]],
+                                          n_samples_: p_samples})
             Eymean = Ey.mean(axis=0)  # Average samples
         else:
             Eymean = sess.run(phi, feed_dict={X_: Xs, Y_: [[None]]})
@@ -293,7 +293,6 @@ def main():
     # Score
     r2 = r2_score(Ys.flatten()[test_bounds], Eymean.flatten()[test_bounds])
     print("Score: {:.4f}".format(r2))
-    # import IPython; IPython.embed()
 
     # Plot
     f = bk.figure(sizing_mode='stretch_both',
@@ -312,7 +311,7 @@ def main():
 
 def batch_training(X, Y, batch_size, n_epochs):
     """Batch training queue convenience function."""
-    data_tr = Dataset.from_tensor_slices({'X': X, 'Y': Y}) \
+    data_tr = tf.data.Dataset.from_tensor_slices({'X': X, 'Y': Y}) \
         .shuffle(buffer_size=1000, seed=RSEED) \
         .repeat(n_epochs) \
         .batch(batch_size)

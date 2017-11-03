@@ -19,7 +19,7 @@ This is a simple demo that draws a random, non linear function from a Gaussian
 process with a specified kernel and length scale. We then use Aboleth (in
 Gaussian process approximation mode) to try to learn this function given only a
 few noisy observations of it. This script also demonstrates how we can divide
-the data into mini-batches using utilities in the `tf.contrib.data
+the data into mini-batches using utilities in the `tf.data
 <https://www.tensorflow.org/programmers_guide/datasets>`_ module, and how we
 can use `tf.train.MonitoredTrainingSession
 <https://www.tensorflow.org/api_docs/python/tf/train/MonitoredTrainingSession>`_

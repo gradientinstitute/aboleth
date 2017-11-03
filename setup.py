@@ -19,7 +19,7 @@ setup(
     install_requires=[
         'numpy>=1.12.0',
         'scipy>=0.18.1',
-        'tensorflow>=1.3.0',
+        'tensorflow>=1.4.0',
         'six>=1.10.0'
     ],
     extras_require={

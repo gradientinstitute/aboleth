@@ -26,12 +26,13 @@ BSIZE = 10  # mini-batch size
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 LSAMPLES = 1  # We're only using 1 dropout "sample" for learning to be more
 # like a MAP network
-PSAMPLES = 50  # This will give LSAMPLES * PSAMPLES predictions
+PSAMPLES = 50  # Number of samples for prediction
 REG = 0.001  # weight regularizer
 
 # Network structure
+n_samples_ = tf.placeholder_with_default(LSAMPLES, [])
 net = ab.stack(
-    ab.InputLayer(name='X', n_samples=LSAMPLES),
+    ab.InputLayer(name='X', n_samples=n_samples_),
     ab.DropOut(0.95),
     ab.DenseMAP(output_dim=64, l1_reg=0., l2_reg=REG),
     ab.Activation(h=tf.nn.relu),
@@ -63,6 +64,7 @@ def main():
         nn, reg = net(X=X_)
         lkhood = tf.distributions.Bernoulli(logits=nn)
         loss = ab.max_posterior(lkhood, Y_, reg)
+        prob = tf.reduce_mean(lkhood.probs, axis=0)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
@@ -94,7 +96,7 @@ def main():
 
             # Predict, NOTE: we use the mean of the likelihood to get the
             # probabilies
-            ps = ab.predict_expected(lkhood.probs, {X_: Xs}, PSAMPLES)
+            ps = prob.eval(feed_dict={X_: Xs, n_samples_: PSAMPLES})
 
             print("Fold {}:".format(k))
             Ep = np.hstack((1. - ps, ps))
