@@ -25,8 +25,14 @@ class InputLayer(MultiLayer):
     ----------
     name : string
         The name of the input. Used as the argument for input into the net.
-    n_samples : int > 0
-        The number of samples.
+    n_samples : int, Tensor
+        The number of samples to propagate through the network. We recommend
+        making this a ``tf.placeholder`` so you can vary it as required.
+
+    Note
+    ----
+    We recommend making ``n_samples`` a ``tf.placeholder`` so it can be varied
+    between training and prediction!
 
     """
 
@@ -78,7 +84,8 @@ class SampleLayer(Layer):
     @staticmethod
     def _get_X_dims(X):
         r"""Get the dimensions of the rank >= 3 input tensor, X."""
-        n_samples, _, *input_shape = X.shape.as_list()
+        n_samples = tf.to_int32(tf.shape(X)[0])
+        input_shape = X.shape[2:].as_list()
         return n_samples, input_shape
 
 
@@ -110,7 +117,7 @@ class SampleLayer3(SampleLayer):
     @staticmethod
     def _get_X_dims(X):
         """Get the dimensions of the rank 3 input tensor, X."""
-        n_samples, _, input_dim = X.shape.as_list()
+        n_samples, (input_dim,) = SampleLayer._get_X_dims(X)
         return n_samples, input_dim
 
 
@@ -168,9 +175,8 @@ class DropOut(Layer):
         """Build the graph of this layer."""
         # Set noise shape to equivalent to different samples from posterior
         # i.e. share the samples along the data-observations axis
-        noise_shape = tf.TensorShape(
-            (*X.shape[:self.obsax], 1, *X.shape[(self.obsax + 1):])
-        )
+        noise_shape = tf.concat([tf.shape(X)[:self.obsax], [1],
+                                 tf.shape(X)[(self.obsax + 1):]], axis=0)
         Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
@@ -227,7 +233,7 @@ class Reshape(Layer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        new_shape = X.shape[:2].concatenate(tf.TensorShape(self.target_shape))
+        new_shape = (int(X.shape[0]), tf.shape(X)[1]) + self.target_shape
         Net = tf.reshape(X, new_shape)
         KL = 0.
         return Net, KL
@@ -354,6 +360,110 @@ class RandomArcCosine(RandomFourier):
 # Weight layers
 #
 
+class Conv2DVariational(SampleLayer):
+    r"""A 2D convolution layer, with variational inference.
+
+    (Does not currently support full covariance weights.)
+
+    Parameters
+    ----------
+    filters : int
+        the dimension of the output of this layer (i.e. the number of filters
+        in the convolution).
+    kernel_size : int, tuple or list
+        width and height of the 2D convolution window. Can be a single integer
+        to specify the same value for all spatial dimensions.
+    strides : int, tuple or list
+        the strides of the convolution along the height and width. Can be a
+        single integer to specify the same value for all spatial dimensions
+    padding : str
+        One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
+        algorithm to use.
+    std : float
+        the initial value of the weight prior standard deviation
+        (:math:`\sigma` above), this is optimized a la maximum likelihood type
+        II.
+    use_bias : bool
+        If true, also learn a bias weight, e.g. a constant offset weight.
+    prior_W : tf.distributions.Distribution, optional
+        This is the prior distribution object to use on the layer weights. It
+        must have parameters compatible with (input_dim, output_dim) shaped
+        weights. This ignores the ``std`` parameter.
+    prior_b : tf.distributions.Distribution, optional
+        This is the prior distribution object to use on the layer intercept. It
+        must have parameters compatible with (output_dim,) shaped weights.
+        This ignores the ``std`` and ``use_bias`` parameters.
+    post_W : tf.distributions.Distribution, optional
+        It must have parameters compatible with (input_dim, output_dim) shaped
+        weights. This ignores the ``full`` parameter. See also
+        ``distributions.gaus_posterior``.
+    post_b : tf.distributions.Distributions, optional
+        This is the posterior distribution object to use on the layer
+        intercept. It must have parameters compatible with (output_dim,) shaped
+        weights. This ignores the ``use_bias`` parameters.  See also
+        ``distributions.norm_posterior``.
+
+    """
+
+    def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
+                 std=1., use_bias=True, prior_W=None, prior_b=None,
+                 post_W=None, post_b=None):
+        """Create and instance of a variational Conv2D layer."""
+        self.filters = filters
+        self.kernel_size = kernel_size
+        self.strides = [1] + list(strides) + [1]
+        self.padding = padding
+        self.std = std
+        self.use_bias = use_bias
+        self.pW = prior_W
+        self.pb = prior_b
+        self.qW = post_W
+        self.qb = post_b
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, (height, width, channels) = self._get_X_dims(X)
+        W_shape, b_shape = self._weight_shapes(channels)
+
+        # Layer weights
+        self.pW = _make_prior(self.std, self.pW, W_shape)
+        self.qW = _make_posterior(self.std, self.qW, W_shape, False)
+
+        # Regularizers
+        KL = kl_sum(self.qW, self.pW)
+
+        # Linear layer
+        Wsamples = _sample_W(self.qW, n_samples, False)
+        Net = tf.map_fn(
+            lambda args: tf.nn.conv2d(*args,
+                                      padding=self.padding,
+                                      strides=self.strides),
+            elems=(X, Wsamples), dtype=tf.float32)
+
+        # Optional bias
+        if self.use_bias or not (self.prior_b is None and self.post_b is None):
+            # Layer intercepts
+            self.pb = _make_prior(self.std, self.pb, b_shape)
+            self.qb = _make_posterior(self.std, self.qb, b_shape, False)
+
+            # Regularizers
+            KL += kl_sum(self.qb, self.pb)
+
+            # Linear layer
+            bsamples = tf.reshape(_sample_W(self.qb, n_samples, False),
+                                  [n_samples, 1, 1, 1, self.filters])
+            Net += bsamples
+
+        return Net, KL
+
+    def _weight_shapes(self, channels):
+        """Generate weight and bias weight shape tuples."""
+        weight_shape = self.kernel_size + (channels, self.filters)
+        bias_shape = (self.filters,)
+
+        return weight_shape, bias_shape
+
+
 class DenseVariational(SampleLayer3):
     r"""A dense (fully connected) linear layer, with variational inference.
 
@@ -456,54 +566,30 @@ class DenseVariational(SampleLayer3):
         W_shape, b_shape = self._weight_shapes(input_dim)
 
         # Layer weights
-        self.pW = self._make_prior(self.pW, W_shape)
-        self.qW = self._make_posterior(self.qW, W_shape)
+        self.pW = _make_prior(self.std, self.pW, W_shape)
+        self.qW = _make_posterior(self.std, self.qW, W_shape, self.full)
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
 
         # Linear layer
-        Wsamples = self._sample_W(self.qW, n_samples)
+        Wsamples = _sample_W(self.qW, n_samples)
         Net = tf.matmul(X, Wsamples)
 
         # Optional bias
-        if self.use_bias is True or self.prior_b or self.post_b:
+        if self.use_bias or not (self.prior_b is None and self.post_b is None):
             # Layer intercepts
-            self.pb = self._make_prior(self.pb, b_shape)
-            self.qb = self._make_posterior(self.qb, b_shape)
+            self.pb = _make_prior(self.std, self.pb, b_shape)
+            self.qb = _make_posterior(self.std, self.qb, b_shape, False)
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
 
             # Linear layer
-            bsamples = tf.expand_dims(self._sample_W(self.qb, n_samples), 1)
+            bsamples = tf.expand_dims(_sample_W(self.qb, n_samples), 1)
             Net += bsamples
 
         return Net, KL
-
-    def _make_prior(self, prior_W, weight_shape):
-        """Check/make prior."""
-        if prior_W is None:
-            prior_W = norm_prior(weight_shape, std=self.std)
-
-        assert _is_dim(prior_W, weight_shape), \
-            "Prior inconsistent dimension!"
-
-        return prior_W
-
-    def _make_posterior(self, post_W, weight_shape):
-        """Check/make posterior."""
-        if post_W is None:
-            # We don't want a full-covariance on an intercept, check input_dim
-            if self.full and len(weight_shape) > 1:
-                post_W = gaus_posterior(weight_shape, std0=self.std)
-            else:
-                post_W = norm_posterior(weight_shape, std0=self.std)
-
-        assert _is_dim(post_W, weight_shape), \
-            "Posterior inconsistent dimension!"
-
-        return post_W
 
     def _weight_shapes(self, input_dim):
         """Generate weight and bias weight shape tuples."""
@@ -511,12 +597,6 @@ class DenseVariational(SampleLayer3):
         bias_shape = (self.output_dim,)
 
         return weight_shape, bias_shape
-
-    @staticmethod
-    def _sample_W(dist, n_samples):
-        samples = tf.stack([tf.transpose(dist.sample(seed=next(seedgen)))
-                            for _ in range(n_samples)])
-        return samples
 
 
 class EmbedVariational(DenseVariational):
@@ -612,11 +692,11 @@ class EmbedVariational(DenseVariational):
         n_batch = tf.shape(X)[1]
 
         # Layer weights
-        self.pW = self._make_prior(self.pW, W_shape)
-        self.qW = self._make_posterior(self.qW, W_shape)
+        self.pW = _make_prior(self.std, self.pW, W_shape)
+        self.qW = _make_posterior(self.std, self.qW, W_shape, self.full)
 
         # Index into the relevant weights rather than using sparse matmul
-        Wsamples = self._sample_W(self.qW, n_samples)
+        Wsamples = _sample_W(self.qW, n_samples)
         features = tf.map_fn(lambda wx: tf.gather(*wx, axis=0), (Wsamples, X),
                              dtype=Wsamples.dtype)
 
@@ -764,3 +844,40 @@ def _is_dim(distribution, dims):
     r"""Check if ``X``'s dimension is the same as the tuple ``dims``."""
     shape = tuple(distribution.loc.shape)
     return shape == dims
+
+
+def _sample_W(dist, n_samples, transpose=True):
+    """Get samples of the weight distributions for the re-param trick."""
+    Wsamples = dist.sample(seed=next(seedgen), sample_shape=n_samples)
+    rank = len(Wsamples.shape)
+    if rank > 2 and transpose:
+        perm = list(range(rank))
+        perm[-1], perm[-2] = perm[-2], perm[-1]
+        Wsamples = tf.transpose(Wsamples, perm)
+    return Wsamples
+
+
+def _make_prior(std, prior_W, weight_shape):
+    """Check/make prior weight distributions."""
+    if prior_W is None:
+        prior_W = norm_prior(weight_shape, std=std)
+
+    assert _is_dim(prior_W, weight_shape), \
+        "Prior inconsistent dimension!"
+
+    return prior_W
+
+
+def _make_posterior(std, post_W, weight_shape, full):
+    """Check/make posterior."""
+    if post_W is None:
+        # We don't want a full-covariance on an intercept, check input_dim
+        if full and len(weight_shape) > 1:
+            post_W = gaus_posterior(weight_shape, std0=std)
+        else:
+            post_W = norm_posterior(weight_shape, std0=std)
+
+    assert _is_dim(post_W, weight_shape), \
+        "Posterior inconsistent dimension!"
+
+    return post_W

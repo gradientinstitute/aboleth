@@ -50,29 +50,3 @@ def test_batch_predict():
         assert 'X' in d
         assert len(d['X']) == 10
         assert all(X[ind] == d['X'])
-
-
-def test_predict_samples():
-    """Test the predict_samples aggregator."""
-    X = np.ones((10, 100, 1), dtype=np.float32)
-    X_ = tf.placeholder(tf.float32, (10, None, 1))
-    Xt = tf.identity(X_)
-
-    tc = tf.test.TestCase()
-    with tc.test_session():
-        samps = ab.predict_samples(Xt, {X_: X}, n_groups=10)  # 10 replicates
-        assert samps.shape == (100, 100, 1)
-        assert np.allclose(samps, 1.)
-
-
-def test_predict_expected():
-    """Test the predict_expected computation."""
-    X = np.ones((10, 100, 1), dtype=np.float32)
-    X_ = tf.placeholder(tf.float32, (10, None, 1))
-    Xt = tf.identity(X_)
-
-    tc = tf.test.TestCase()
-    with tc.test_session():
-        samps = ab.predict_expected(Xt, {X_: X}, n_groups=10)  # 10 replicates
-        assert samps.shape == (100, 1)
-        assert np.allclose(samps, np.ones((100, 1)))  # test average on axis 0

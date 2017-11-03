@@ -34,7 +34,7 @@ EMBED_DIMS = 5   # Number of dimensions to embed the categorical columns into
 
 BSIZE = 50  # Mini batch size
 NITER = 60000  # Number of iterations (mini-batch views)
-P_SAMPLES = 5  # results in T_SAMPLES * P_SAMPLES predcitions
+P_SAMPLES = 50  # Number of samples to use for prediction
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
@@ -46,9 +46,11 @@ def main():
     df = pd.concat((df_train, df_test))
     X_con, X_cat, n_cats, Y = input_fn(df)
 
+    n_samples_ = tf.placeholder_with_default(T_SAMPLES, [])
+
     # Define the continuous layers
     con_layer = (
-        ab.InputLayer(name='con', n_samples=T_SAMPLES) >>
+        ab.InputLayer(name='con', n_samples=n_samples_) >>
         ab.DenseVariational(output_dim=5, full=True)
     )
 
@@ -56,7 +58,7 @@ def main():
     # Note every embed_var call can be different, this is just "lazy"
     cat_layer_list = [ab.EmbedVariational(EMBED_DIMS, i) for i in n_cats]
     cat_layer = (
-        ab.InputLayer(name='cat', n_samples=T_SAMPLES) >>
+        ab.InputLayer(name='cat', n_samples=n_samples_) >>
         ab.PerFeature(*cat_layer_list)  # Assign columns to an embedding layers
     )
 
@@ -78,12 +80,13 @@ def main():
 
     # Feed dicts
     train_dict = {X_con_: Xt_con, X_cat_: Xt_cat, Y_: Yt}
-    test_dict = {X_con_: Xs_con, X_cat_: Xs_cat}
+    test_dict = {X_con_: Xs_con, X_cat_: Xs_cat, n_samples_: P_SAMPLES}
 
     # Make model
     N = len(Xt_con)
     nn, kl = net(con=X_con_, cat=X_cat_)
     likelihood = tf.distributions.Bernoulli(logits=nn)
+    prob = tf.reduce_mean(likelihood.probs, axis=0)
 
     loss = ab.elbo(likelihood, Y_, N, kl)
     optimizer = tf.train.AdamOptimizer()
@@ -107,7 +110,7 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Ep = ab.predict_expected(nn, test_dict, P_SAMPLES)
+        Ep = prob.eval(feed_dict=test_dict)
 
     Ey = Ep > 0.5  # Max probability assignment
 

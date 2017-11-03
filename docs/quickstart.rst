@@ -129,14 +129,13 @@ model:
 This will run 1000 iterations of stochastic gradient optimization (using the
 Adam learning rate algorithm) where the model sees all of the data every
 iteration. We can also run this on mini-batches, see ``ab.batch`` for a simple
-batch generator, or TensorFlow's `train` module for a more comprehensive set of
+batch generator, or TensorFlow's `train` and `data` modules for a more comprehensive set of
 utilities (we recommend looking at 
 `tf.train.MonitoredTrainingSession
-<https://www.tensorflow.org/api_docs/python/tf/train/MonitoredTrainingSession>`_, 
-`tf.train.limit_epochs
-<https://www.tensorflow.org/api_docs/python/tf/train/limit_epochs>`_ and 
-`tf.train.shuffle_batch
-<https://www.tensorflow.org/api_docs/python/tf/train/shuffle_batch>`_).
+<https://www.tensorflow.org/api_docs/python/tf/train/MonitoredTrainingSession>`_,
+and 
+`tf.data.Dataset
+<https://www.tensorflow.org/api_docs/python/tf/data/Dataset>`_)
 
 Now that we have learned our classifier's weights, :math:`\hat{\mathbf{w}}`, we
 will probably want to use for predicting class label probabilities on unseen
@@ -252,8 +251,9 @@ following,
     import tensorflow as tf
     import aboleth as ab
 
+    n_samples_ = tf.placeholder_with_default(5, [])
     layers = (
-        ab.InputLayer(name="X", n_samples=5) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.DenseVariational(output_dim=1, std=1., full=True) >>
         ab.Activation(tf.nn.sigmoid)
     )
@@ -261,16 +261,18 @@ following,
 Note we are using ``DenseVariational`` instead of ``DenseMAP``. In the
 ``DenseVariational`` layer the ``full`` parameter tells the layer to use a full
 covariance Gaussian, and ``std`` is initial value of the weight prior standard
-deviation, :math:`\psi`, which is optimized. Also we've set ``n_samples=5`` in
-the ``InputLayer``, this lets the subsequent layers know that we are making a
-*stochastic* model, that is, whenever we call ``layers`` we are actually
-expecting back 5 samples of the model output. This argument defaults to 1,
-which is why we got a one-dimensional 0th axis in the last section. In this
-instance a setting of 5 makes the ``DenseVariational`` layer multiply its input
-with 5 samples of the weights from the approximate posterior,
-:math:`\mathbf{X}\mathbf{w}^{(s)}`, where :math:`\mathbf{w}^{(s)} \sim
-q(\mathbf{w}),~\text{for}~s = \{1 \ldots 5\}`.  These 5 samples are then passed
-to the ``Activation`` layer.
+deviation, :math:`\psi`, which is optimized. Also we've set ``n_samples=5`` (as
+a default value of a place holder) in the ``InputLayer``, this lets the
+subsequent layers know that we are making a *stochastic* model, that is,
+whenever we call ``layers`` we are actually expecting back 5 samples of the
+model output. This argument defaults to 1, which is why we got a
+one-dimensional 0th axis in the last section. In this instance a setting of 5
+makes the ``DenseVariational`` layer multiply its input with 5 samples of the
+weights from the approximate posterior, :math:`\mathbf{X}\mathbf{w}^{(s)}`,
+where :math:`\mathbf{w}^{(s)} \sim q(\mathbf{w}),~\text{for}~s = \{1 \ldots
+5\}`.  These 5 samples are then passed to the ``Activation`` layer. We have
+used a place holder here because we usually want to use more samples of the
+network for prediction than for training.
 
 Then like before to complete the model specification:
 
@@ -289,32 +291,25 @@ dataset, we need to know this term in order to properly calculate the evidence
 lower bound when using mini-batches of data.
 
 We train this model in exactly the same way as the logistic classifier, however
-prediction is slightly different - that is, ``probs``,
+prediction is slightly different - that is we need to average the samples drawn
+from the network to get a predicted probability (as in the sum over weight
+samples above),
 
 .. code::
 
-    probs = net.eval(feed_dict={X_: X_query})
+    predict_p = tf.reduce_mean(net, axis=0)
+    probs = net.eval(predict_p,
+                     feed_dict={X_: X_query, n_samples_: 20})
 
-now has a shape of :math:`(5, N^*, 1)` where we have 5 samples of :math:`N^*`
-predictions; before we had :math:`(N^*, 1)`. You can simply take the mean of
-these samples for the predicted class probability,
+So probs also has a shape of :math:`(N^*, 1)`, and we have used 20 samples to
+calculate the average probability.
 
-.. code::
-
-    expected_p = np.mean(probs, axis=0)
-
-or, you can generate *more* samples to get a more accurate expected
-probabilities (again with the TensorFlow session, ``sess``),
-
-.. code::
-
-    probabilities = ab.predict_samples(net, feed_dict={X_: X_query},
-                                       n_groups=10, session=sess)
-
-This effectively calls ``net`` 10 times (``n_groups``) and concatenates the
-results into 50 samples (``n_groups * n_samples``), then we can take the mean
-of these samples exactly as before.
-
+.. note::
+    If you used logits in the likelihood, then the prediction becomes::
+        
+        predict_p = tf.reduce_mean(likelihood.probs, axis=0)
+        probs = net.eval(predict_p,
+                         feed_dict={X_: X_query, n_samples_: 20})
 
 .. _gp:
 
@@ -352,8 +347,9 @@ We can easily do this using Aboleth, for example, with a radial basis kernel,
     lenscale = tf.Variable(1.)  # learn isotropic length scale
     kern = ab.RBF(lenscale=ab.pos(lenscale))
 
+    n_samples_ = tf.placeholder_with_default(5, [])
     layers = (
-        ab.InputLayer(name="X", n_samples=5) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=100, kernel=kern) >>
         ab.DenseVariational(output_dim=1, full=True)
     )

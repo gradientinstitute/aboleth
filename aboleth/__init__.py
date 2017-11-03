@@ -4,15 +4,14 @@ from .version import __version__
 from .losses import elbo, max_posterior
 from .baselayers import stack
 from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
-                     EmbedVariational, DenseMAP, EmbedMAP, InputLayer,
-                     RandomFourier, RandomArcCosine)
+                     EmbedVariational, DenseMAP, EmbedMAP, Conv2DVariational,
+                     InputLayer, RandomFourier, RandomArcCosine)
 from .hlayers import Concat, Sum, PerFeature
 from .impute import (MaskInputLayer, MeanImpute, FixedNormalImpute,
                      LearnedScalarImpute, LearnedNormalImpute)
 from .kernels import RBF, Matern, RBFVariational
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
-from .util import (batch, pos, predict_expected, predict_samples,
-                   batch_prediction)
+from .util import (batch, pos, batch_prediction)
 from .random import set_hyperseed
 
 __all__ = (
@@ -24,6 +23,7 @@ __all__ = (
     'DropOut',
     'MaxPool2D',
     'Reshape',
+    'Conv2DVariational',
     'DenseVariational',
     'EmbedVariational',
     'DenseMAP',
@@ -35,8 +35,6 @@ __all__ = (
     'gaus_posterior',
     'batch',
     'pos',
-    'predict_expected',
-    'predict_samples',
     'batch_prediction',
     'set_hyperseed',
     'InputLayer',
