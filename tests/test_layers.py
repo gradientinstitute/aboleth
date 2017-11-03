@@ -43,7 +43,8 @@ def test_input(make_data):
 def test_input_sample(make_data):
     """Test the input and tiling layer."""
     x, _, X = make_data
-    s = ab.InputLayer(name='myname', n_samples=3)
+    n_samples = tf.placeholder_with_default(3, [])
+    s = ab.InputLayer(name='myname', n_samples=n_samples)
 
     F, KL = s(myname=x)
     tc = tf.test.TestCase()

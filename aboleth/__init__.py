@@ -11,8 +11,7 @@ from .impute import (MaskInputLayer, MeanImpute, FixedNormalImpute,
                      LearnedScalarImpute, LearnedNormalImpute)
 from .kernels import RBF, Matern, RBFVariational
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
-from .util import (batch, pos, predict_expected, predict_samples,
-                   batch_prediction)
+from .util import (batch, pos, batch_prediction)
 from .random import set_hyperseed
 
 __all__ = (
@@ -36,8 +35,6 @@ __all__ = (
     'gaus_posterior',
     'batch',
     'pos',
-    'predict_expected',
-    'predict_samples',
     'batch_prediction',
     'set_hyperseed',
     'InputLayer',

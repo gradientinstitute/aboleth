@@ -6,7 +6,6 @@ import numpy as np
 import bokeh.plotting as bk
 import bokeh.palettes as bp
 import tensorflow as tf
-from tensorflow.contrib.data import Dataset
 # from sklearn.gaussian_process.kernels import Matern as kern
 from sklearn.gaussian_process.kernels import RBF as kern
 
@@ -30,7 +29,7 @@ true_noise = 0.1  # Add noise to the GP draws, to make things a little harder
 
 # Model settings
 n_samples = 5  # Number of random samples to get from an Aboleth net
-n_pred_samples = 10  # This will give n_samples by n_pred_samples predictions
+p_samples = 50  # Number of samples for prediction
 n_epochs = 200  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
@@ -105,7 +104,7 @@ def main():
 
     # This is used for building the predictive density image
     with tf.name_scope("Predict"):
-        logprob = lkhood.log_prob(Y_)
+        logprob = tf.reduce_mean(lkhood.log_prob(Y_), axis=0)
 
     # Logging learning progress
     log = tf.train.LoggingTensorHook(
@@ -128,14 +127,10 @@ def main():
             pass
 
         # Prediction, the [[None]] is to stop the default placeholder queue
-        Ey = ab.predict_samples(phi,
-                                feed_dict={X_: Xq, Y_: [[None]],
-                                           n_samples_: n_samples},
-                                n_groups=n_pred_samples, session=sess)
-        logPY = ab.predict_expected(logprob,
-                                    feed_dict={Y_: Yi, X_: Xi, n_samples_:
-                                               n_samples},
-                                    n_groups=n_pred_samples, session=sess)
+        Ey = sess.run(phi,
+                      feed_dict={X_: Xq, Y_: [[None]], n_samples_: p_samples})
+        logPY = sess.run(logprob,
+                         feed_dict={Y_: Yi, X_: Xi, n_samples_: p_samples})
 
     Eymean = Ey.mean(axis=0)  # Average samples to get mean predicted funtion
     Py = np.exp(logPY.reshape(Ns, Ns))  # Turn log-prob into prob
@@ -158,7 +153,7 @@ def main():
 
 def batch_training(X, Y, batch_size, n_epochs):
     """Batch training queue convenience function."""
-    data_tr = Dataset.from_tensor_slices({'X': X, 'Y': Y}) \
+    data_tr = tf.data.Dataset.from_tensor_slices({'X': X, 'Y': Y}) \
         .shuffle(buffer_size=1000, seed=RSEED) \
         .repeat(n_epochs) \
         .batch(batch_size)
