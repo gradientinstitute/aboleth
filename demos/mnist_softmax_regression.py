@@ -13,7 +13,7 @@ RSEED = 100
 ab.set_hyperseed(RSEED)
 
 # Optimization
-NITER = 20000
+NITER = 200000
 BSIZE = 50
 CONFIG = tf.ConfigProto(device_count={'GPU': 2})  # Use GPU ?
 LSAMPLES = 5
@@ -53,7 +53,7 @@ net = ab.stack(
 
 def main():
     """Run the demo."""
-    mnist = mnist_data.read_data_sets('./mnist_demo', one_hot=True)
+    mnist = mnist_data.read_data_sets('./mnist_demo', one_hot=False)
     X = mnist.train.images
     y = mnist.train.labels
     N, D = X.shape
@@ -64,7 +64,7 @@ def main():
     # Data
     with tf.name_scope("inputs"):
         X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-        Y_ = tf.placeholder(dtype=tf.float32, shape=shape=(None,))
+        Y_ = tf.placeholder(dtype=tf.int32, shape=(None,))
 
     with tf.name_scope("model"):
         nn_logits, nn_reg = net(X=X_)
@@ -78,15 +78,14 @@ def main():
     # Launch the graph.
     init = tf.global_variables_initializer()
 
-    with tf.Session(config=CONFIG):
+    with tf.Session(config=CONFIG) as sess:
 
         init.run()
 
         batches = ab.batch(
             {X_: X, Y_: y},
             batch_size=BSIZE,
-            n_iter=NITER,
-            N_=N_)
+            n_iter=NITER)
         for i, data in enumerate(batches):
             train.run(feed_dict=data)
             if not i % 10:
@@ -94,7 +93,8 @@ def main():
                 print("Iteration {}, loss = {}".format(i, loss_val))
 
         # Predict
-        Ep = ab.predict_samples(llh.probs, {X_: Xs}, PSAMPLES)
+        Ep = ab.predict_samples(llh.probs, feed_dict={X_: Xs, Y_: [0]},
+                                n_groups=PSAMPLES, session=sess)
 
     p = Ep.mean(axis=0)
     Ey = p.argmax(axis=1)
