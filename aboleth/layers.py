@@ -710,6 +710,87 @@ class EmbedVariational(DenseVariational):
         return Net, KL
 
 
+class Conv2DMAP(SampleLayer):
+    r"""A 2D convolution layer, with maximum a posteriori (MAP) inference.
+
+    This layer uses maximum *a-posteriori* inference to learn the
+    convolutional kernels and biases, and so also returns complexity
+    penalities (l1 or l2) for the weights and biases.
+
+    Parameters
+    ----------
+    filters : int
+        the dimension of the output of this layer (i.e. the number of filters
+        in the convolution).
+    kernel_size : int, tuple or list
+        width and height of the 2D convolution window. Can be a single integer
+        to specify the same value for all spatial dimensions.
+    strides : int, tuple or list
+        the strides of the convolution along the height and width. Can be a
+        single integer to specify the same value for all spatial dimensions
+    padding : str
+        One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
+        algorithm to use.
+    l1_reg : float
+        the value of the l1 weight regularizer,
+        :math:`\text{l1_reg} \times \|\mathbf{W}\|_1`
+    l2_reg : float
+        the value of the l2 weight regularizer,
+        :math:`\frac{1}{2} \text{l2_reg} \times \|\mathbf{W}\|^2_2`
+    use_bias : bool
+        If true, also learn a bias weight, e.g. a constant offset weight.
+
+    """
+
+    def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
+                 l1_reg=1., l2_reg=1., use_bias=True):
+        """Create and instance of a variational Conv2D layer."""
+        self.filters = filters
+        self.kernel_size = kernel_size
+        self.strides = [1] + list(strides) + [1]
+        self.padding = padding
+        self.l1 = l1_reg
+        self.l2 = l2_reg
+        self.use_bias = use_bias
+
+    def _build(self, X):
+        """Build the graph of this layer."""
+        n_samples, (height, width, channels) = self._get_X_dims(X)
+        W_shape, b_shape = self._weight_shapes(channels)
+
+        W = tf.Variable(tf.truncated_normal(
+            shape=W_shape,
+            seed=next(seedgen)),
+            name="W_map"
+        )
+
+        Net = tf.map_fn(
+            lambda x: tf.nn.conv2d(x, W,
+                                   padding=self.padding,
+                                   strides=self.strides), X)
+        # Regularizers
+        penalty = self.l2 * tf.nn.l2_loss(W) + self.l1 * _l1_loss(W)
+
+        # Optional Bias
+        if self.use_bias:
+            b = tf.Variable(tf.truncated_normal(
+                shape=b_shape,
+                seed=next(seedgen)),
+                name="b_map"
+            )
+            Net = tf.nn.bias_add(Net, b)
+            penalty += self.l2 * tf.nn.l2_loss(b) + self.l1 * _l1_loss(b)
+
+        return Net, penalty
+
+    def _weight_shapes(self, channels):
+        """Generate weight and bias weight shape tuples."""
+        weight_shape = self.kernel_size + (channels, self.filters)
+        bias_shape = (self.filters,)
+
+        return weight_shape, bias_shape
+
+
 class DenseMAP(SampleLayer):
     r"""Dense (fully connected) linear layer, with MAP inference.
 
