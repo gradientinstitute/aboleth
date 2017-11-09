@@ -106,6 +106,8 @@ def main():
 
             step, _ = sess.run([global_step, train])
 
+            # this part is a bit superfluous. Could get it working with
+            # Datasets too but just wanted to sanity test for now.
             if not step % 100:
                 val_acc = accuracy.eval(feed_dict={X: Xs, Y: Ys}, session=sess)
                 tf.logging.info("step = %d, validation accuracy: %f",
