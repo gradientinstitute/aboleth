@@ -9,32 +9,31 @@ from tensorflow.examples.tutorials.mnist import input_data as mnist_data
 from sklearn.metrics import accuracy_score, log_loss
 
 
-RSEED = 100
-ab.set_hyperseed(RSEED)
+rseed = 100
+ab.set_hyperseed(rseed)
 
 # Optimization
-NITER = 200000
-BSIZE = 50
-CONFIG = tf.ConfigProto(device_count={'GPU': 2})  # Use GPU ?
-LSAMPLES = 5
-PSAMPLES = 5  # This will give LSAMPLES * PSAMPLES predictions
-REG = 0.1
+n_epochs = 100
+batch_size = 50
+config = tf.ConfigProto(device_count={'GPU': 2})  # Use GPU ?
+l_samples = 5
+p_samples = 5  # This will give LSAMPLES * PSAMPLES predictions
+reg = 0.1
+
 
 # Network architecture
 net = ab.stack(
-    ab.InputLayer(name='X', n_samples=LSAMPLES),  # LSAMPLES, BATCH_SIZE, 28*28
+    ab.InputLayer(name='X', n_samples=l_samples),  # LSAMPLES,BATCH_SIZE,28*28
     ab.Reshape(target_shape=(28, 28, 1)),  # LSAMPLES, BATCH_SIZE, 28, 28, 1
 
-    ab.Conv2DVariational(filters=32,
-                         kernel_size=(5, 5),
-                         std=REG),  # LSAMPLES, BATCH_SIZE, 28, 28, 32
+    ab.Conv2DMAP(filters=32,
+                 kernel_size=(5, 5)),  # LSAMPLES, BATCH_SIZE, 28, 28, 32
     ab.Activation(h=tf.nn.relu),
     ab.MaxPool2D(pool_size=(2, 2),
                  strides=(2, 2)),  # LSAMPLES, BATCH_SIZE, 14, 14, 32
 
-    ab.Conv2DVariational(filters=64,
-                         kernel_size=(5, 5),
-                         std=REG),  # LSAMPLES, BATCH_SIZE, 14, 14, 64
+    ab.Conv2DMAP(filters=64,
+                 kernel_size=(5, 5)),  # LSAMPLES, BATCH_SIZE, 14, 14, 64
     ab.Activation(h=tf.nn.relu),
     ab.MaxPool2D(pool_size=(2, 2),
                  strides=(2, 2)),  # LSAMPLES, BATCH_SIZE, 7, 7, 64
@@ -42,66 +41,50 @@ net = ab.stack(
     ab.Reshape(target_shape=(7*7*64,)),  # LSAMPLES, BATCH_SIZE, 7*7*64
 
     ab.DenseVariational(output_dim=1024,
-                        std=REG),  # LSAMPLES, BATCH_SIZE, 1024
+                        std=reg),  # LSAMPLES, BATCH_SIZE, 1024
     ab.Activation(h=tf.nn.relu),
     ab.DropOut(0.5),
 
     ab.DenseVariational(output_dim=10,
-                        std=REG),  # LSAMPLES, BATCH_SIZE, 10
+                        std=reg),  # LSAMPLES, BATCH_SIZE, 10
 )
 
 
 def main():
-    """Run the demo."""
-    mnist = mnist_data.read_data_sets('./mnist_demo', one_hot=False)
-    X = mnist.train.images
-    y = mnist.train.labels
-    N, D = X.shape
 
-    Xs = mnist.test.images
-    ys = mnist.test.labels
+    # Dataset
 
-    # Data
-    with tf.name_scope("inputs"):
-        X_ = tf.placeholder(dtype=tf.float32, shape=(None, D))
-        Y_ = tf.placeholder(dtype=tf.int32, shape=(None,))
+    mnist_data = tf.contrib.learn.datasets.mnist.read_data_sets(
+        './mnist_demo', reshape=True)
+
+    N, D = mnist_data.train.images.shape
+
+    X, Y = tf.data.Dataset.from_tensor_slices(
+        (np.asarray(mnist_data.train.images, dtype=np.float32),
+         np.asarray(mnist_data.train.labels, dtype=np.int64))
+    ).repeat(n_epochs).shuffle(N).batch(batch_size) \
+     .make_one_shot_iterator().get_next()
+
+    # Model specification
 
     with tf.name_scope("model"):
-        nn_logits, nn_reg = net(X=X_)
-        llh = tf.distributions.Categorical(logits=nn_logits)
-        loss = ab.elbo(llh, Y_, N, nn_reg)
+        logits, reg = net(X=X)
+        llh = tf.distributions.Categorical(logits=logits)
+        loss = ab.elbo(llh, Y, N, reg)
+
+    # Training graph building
 
     with tf.name_scope("train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
         train = optimizer.minimize(loss)
 
-    # Launch the graph.
-    init = tf.global_variables_initializer()
+    with tf.train.MonitoredTrainingSession(
+        config=config
+    ) as sess:
 
-    with tf.Session(config=CONFIG) as sess:
+        while not sess.should_stop():
 
-        init.run()
-
-        batches = ab.batch(
-            {X_: X, Y_: y},
-            batch_size=BSIZE,
-            n_iter=NITER)
-        for i, data in enumerate(batches):
-            train.run(feed_dict=data)
-            if not i % 10:
-                loss_val = loss.eval(feed_dict=data)
-                print("Iteration {}, loss = {}".format(i, loss_val))
-
-        # Predict
-        Ep = ab.predict_samples(llh.probs, feed_dict={X_: Xs, Y_: [0]},
-                                n_groups=PSAMPLES, session=sess)
-
-    p = Ep.mean(axis=0)
-    Ey = p.argmax(axis=1)
-
-    print("BayesianConvNet: accuracy = {:.4g}, log-loss = {:.4g}"
-          .format(accuracy_score(ys, Ey),
-                  log_loss(ys, p)))
+            sess.run(train)
 
 
 if __name__ == "__main__":
