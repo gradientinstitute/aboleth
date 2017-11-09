@@ -764,8 +764,10 @@ class Conv2DMAP(SampleLayer):
             name="W_map"
         )
 
-        Net = tf.nn.conv2d(X, W, padding=self.padding, strides=self.strides),
-
+        Net = tf.map_fn(
+            lambda x: tf.nn.conv2d(x, W,
+                                   padding=self.padding,
+                                   strides=self.strides), X)
         # Regularizers
         penalty = self.l2 * tf.nn.l2_loss(W) + self.l1 * _l1_loss(W)
 
