@@ -930,6 +930,7 @@ def _is_dim(distribution, dims):
 def _sample_W(dist, n_samples, transpose=True):
     """Get samples of the weight distributions for the re-param trick."""
     Wsamples = dist.sample(seed=next(seedgen), sample_shape=n_samples)
+    tf.add_to_collection("SampleTensors", Wsamples)
     rank = len(Wsamples.shape)
     if rank > 2 and transpose:
         perm = list(range(rank))
