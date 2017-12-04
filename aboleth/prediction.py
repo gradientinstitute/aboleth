@@ -52,3 +52,39 @@ def sample_percentiles(predictor, per=[10, 90], interpolation='nearest'):
 
     percen = tf.stack(pers)
     return percen
+
+
+def sample_model(graph=None, sess=None, feed_dict=None):
+    """
+    Sample the model parameters.
+
+    This function returns a feed_dict containing values for the sample tensors
+    in the model. It means that multiple calls to eval() will not change the
+    model parameters as long as the output of this function is used as a
+    feed_dict.
+
+    Parameters
+    ----------
+    graph : tf.Graph
+        The current graph. If none provided use the default.
+    sess : tf.Session
+        The session to use for evaluating the tensors. If none provided
+        will use the default.
+    feed_dict : dict
+        An optional feed_dict to pass the session.
+
+    Returns
+    -------
+    collection : dict
+        A feed_dict to use when evaluating the model.
+
+    """
+    if not graph:
+        graph = tf.get_default_graph()
+    if not sess:
+        sess = tf.get_default_session()
+
+    params = graph.get_collection('SampleTensors')
+    param_values = sess.run(params, feed_dict=feed_dict)
+    sample_feed_dict = dict(zip(params, param_values))
+    return sample_feed_dict
