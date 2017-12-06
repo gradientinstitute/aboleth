@@ -64,7 +64,7 @@ def main():
         nn, reg = net(X=X_)
         lkhood = tf.distributions.Bernoulli(logits=nn)
         loss = ab.max_posterior(lkhood, Y_, reg)
-        prob = tf.reduce_mean(lkhood.probs, axis=0)
+        prob = ab.sample_mean(lkhood.probs)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer(learning_rate=0.001)

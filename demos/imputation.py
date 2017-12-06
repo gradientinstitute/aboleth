@@ -95,7 +95,7 @@ def main():
         nn, kl = net(X=X_, M=M_) if USE_ABOLETH else net(X=X_)
         lkhood = tf.distributions.Categorical(logits=nn)
         loss = ab.elbo(lkhood, Y_, N_tr, kl)
-        prob = tf.reduce_mean(lkhood.probs, axis=0)
+        prob = ab.sample_mean(lkhood.probs)
 
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()

@@ -4,7 +4,6 @@ import logging
 
 import numpy as np
 import tensorflow as tf
-from scipy.stats import norm
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 
@@ -17,7 +16,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 NSAMPLES = 10  # Number of random samples to get from an Aboleth net
-NFEATURES = 1500  # Number of random features/bases to use in the approximation
+NFEATURES = 500  # Number of random features/bases to use in the approximation
 NOISE = 3.0  # Initial estimate of the observation noise
 
 # Random Fourier Features, this is setting up an anisotropic length scale, or
@@ -38,8 +37,8 @@ net = ab.stack(
 )
 
 # Learning and prediction settings
-BATCH_SIZE = 50  # number of observations per mini batch
-NEPOCHS = 100  # Number of times to iterate though the dataset
+BATCH_SIZE = 200  # number of observations per mini batch
+NEPOCHS = 200  # Number of times to iterate though the dataset
 NPREDICTSAMPLES = 20  # Number of prediction samples
 
 CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
@@ -92,8 +91,7 @@ def main():
         train = optimizer.minimize(loss, global_step=global_step)
 
     with tf.name_scope("Test"):
-        Ey = tf.reduce_mean(phi, axis=0)
-        Vy = tf.reduce_mean((data['Y'] - Ey)**2) + std**2
+        Ey = ab.sample_mean(phi)
 
     # Logging
     log = tf.train.LoggingTensorHook(
@@ -123,30 +121,16 @@ def main():
             # Init testing and assess and log R-square score on test set
             sess.run(testing_init)
             Eymean = sess.run(Ey, feed_dict={n_samples_: NPREDICTSAMPLES})
-            Eyvar = sess.run(Vy, feed_dict={n_samples_: NPREDICTSAMPLES})
             r2 = r2_score(Ys, Eymean)
             print("Training epoch {}, r-square = {}".format(i, r2))
             rsquare_summary(r2, sess, g)
 
-    # Score mean standardised log likelihood
-    snlp = msll(Ys.flatten(), Eymean, Eyvar, Yr.flatten())
-
     print("------------")
-    print("r-square: {:.4f}, smse: {:.4f}, msll: {:.4f}."
-          .format(r2, 1 - r2, snlp))
-
-
-def msll(Y_true, Y_pred, V_pred, Y_train):
-    """Mean standardised log loss."""
-    mt, st = Y_train.mean(), Y_train.std()
-    ll = norm.logpdf(Y_true, loc=Y_pred, scale=np.sqrt(V_pred))
-    rand_ll = norm.logpdf(Y_true, loc=mt, scale=st)
-    msll = - (ll - rand_ll).mean()
-    return msll
+    print("r-square: {:.4f}, smse: {:.4f}".format(r2, 1 - r2))
 
 
 def rsquare_summary(r2, session, step=None):
-    # Get a summary writer for R-square
+    """Get a summary writer for R-square."""
     summary_writer = session._hooks[1]._summary_writer
     sum_val = tf.Summary.Value(tag='r-square', simple_value=r2)
     score_sum = tf.Summary(value=[sum_val])
