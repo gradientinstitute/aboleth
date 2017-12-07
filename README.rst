@@ -30,6 +30,10 @@ Some of the features of Aboleth:
 - Very flexible construction of networks, e.g. multiple inputs, ResNets etc.
 - Optional maximum-likelihood type II inference for model parameters such as
   weight priors/regularizers and regression observation noise.
+- Compatible and interoperable with other neural net frameworks such as `Keras
+  <https://keras.io/>`_ (see the `demos
+  <https://github.com/data61/aboleth/tree/develop/demos>`_ for more
+  information).
 
 
 Why?

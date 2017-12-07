@@ -262,8 +262,8 @@ Or use it to perform classification on sequences:
       WrapperLayer(tf.keras.layers.Dense, units=1)
    )
 
-You can find the script here: `regression_compat.py
-<https://github.com/data61/aboleth/blob/develop/demos/regression_compat.py>`_
+You can find the script here: `regression_keras.py
+<https://github.com/data61/aboleth/blob/develop/demos/regression_keras.py>`_
 
 .. [#] S. Ioffe and C. Szegedy, 
    "Batch Normalization: Accelerating Deep Network Training by Reducing 
