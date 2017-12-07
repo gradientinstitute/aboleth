@@ -20,10 +20,10 @@ def elbo(likelihood, Y, N, KL, like_weights=None):
     KL : float, Tensor
         the Kullback Leibler divergence between the posterior and prior
         parameters of the model (:math:`\text{KL}[q\|p]`).
-    like_weights : callable, ndarray, Tensor
+    like_weights : ndarray, Tensor
         weights to apply to each observation in the expected log likelihood.
-        This should be an array of shape ``(N,)`` or can be called as
-        ``like_weights(Y)`` and should return a ``(N,)`` array.
+        This should be a tensor/array of shape ``(N,)`` (or a shape that
+        prevents broadcasting).
 
     Returns
     -------
@@ -66,10 +66,10 @@ def max_posterior(likelihood, Y, regulariser, like_weights=None):
     regulariser : float, Tensor
         the regulariser on the parameters of the model to penalise model
         complexity.
-    like_weights : callable, ndarray, Tensor
+    like_weights : ndarray, Tensor
         weights to apply to each observation in the expected log likelihood.
-        This should be an array of shape ``(N,)`` or can be called as
-        ``like_weights(Y)`` and should return a ``(N,)`` array.
+        This should be a tensor/array of shape ``(N,)`` (or a shape that
+        prevents broadcasting).
 
     Returns
     -------
@@ -99,10 +99,11 @@ def _sum_likelihood(likelihood, Y, like_weights):
         raise ValueError("Incompatible target and likelihood shapes.")
 
     log_prob = likelihood.log_prob(Y)
-    if callable(like_weights):
-        log_prob *= like_weights(Y)
-    elif like_weights is not None:
+    log_prob_dims = log_prob.shape
+
+    if like_weights is not None:
         log_prob *= like_weights
+        assert log_prob.shape == log_prob_dims  # Guard against broadcasting
 
     sumlike = tf.reduce_sum(log_prob)
 

@@ -1,7 +1,9 @@
 """Test the layers module."""
 
+import pytest
 import numpy as np
 import tensorflow as tf
+from scipy.stats import norm
 
 import aboleth as ab
 from aboleth.losses import _sum_likelihood
@@ -78,25 +80,27 @@ def test_categorical_likelihood(make_data):
 
 def test_sum_likelihood():
     """Test we can do weighted sums of likelihoods."""
+    n_samples = 2
     N = 5
-    Net = np.ones(N, dtype=np.float32) * .5
+    Y = np.ones(N, dtype=np.float32)
+    Net = np.ones((n_samples, N), dtype=np.float32) * .5
     like = tf.distributions.Bernoulli(probs=Net)
-    Y = np.ones(N)
+    lp = np.log(0.5)
 
     def weight_fn(Y):
-        return Y * np.arange(N)
+        return Y * tf.range(N, dtype=tf.float32)
 
     unweighted = _sum_likelihood(like, Y, None)
     value = _sum_likelihood(like, Y, np.arange(N))
-    call = _sum_likelihood(like, Y, weight_fn)
+    call = _sum_likelihood(like, Y, weight_fn(Y))
 
     tc = tf.test.TestCase()
     with tc.test_session():
         sumll = unweighted.eval()
-        assert np.allclose(sumll, np.log(0.5) * N)
+        assert np.allclose(sumll, lp * n_samples * N)
 
         sumll = value.eval()
-        assert np.allclose(sumll, np.sum(np.log(0.5) * np.arange(N)))
+        assert np.allclose(sumll, np.sum(lp * n_samples * np.arange(N)))
 
         sumll = call.eval()
-        assert np.allclose(sumll, np.sum(np.log(0.5) * np.arange(N)))
+        assert np.allclose(sumll, np.sum(lp * n_samples * np.arange(N)))
