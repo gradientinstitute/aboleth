@@ -4,9 +4,6 @@ import numpy as np
 
 import aboleth as ab
 
-from tensorflow.examples.tutorials.mnist import input_data as mnist_data
-
-from sklearn.metrics import accuracy_score, log_loss
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -57,7 +54,6 @@ net = ab.stack(
 def main():
 
     # Dataset
-
     mnist_data = tf.contrib.learn.datasets.mnist.read_data_sets(
         './mnist_demo', reshape=True)
 
@@ -112,6 +108,7 @@ def main():
                 val_acc = accuracy.eval(feed_dict={X: Xs, Y: Ys}, session=sess)
                 tf.logging.info("step = %d, validation accuracy: %f",
                                 step, val_acc)
+
 
 if __name__ == "__main__":
     main()
