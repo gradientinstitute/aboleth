@@ -1,6 +1,6 @@
 .. _tut_regress:
 
-A regression masterclass with Aboleth
+A Regression Masterclass with Aboleth
 =====================================
 
 In this tutorial we will show you how to build a variety of linear and non
