@@ -96,7 +96,7 @@ def main():
         lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
         loss = ab.elbo(lkhood, Y_, N, kl)
 
-    # Set up the trainig graph
+    # Set up the training graph
     with tf.name_scope("Train"):
         optimizer = tf.train.AdamOptimizer()
         global_step = tf.train.create_global_step()
@@ -104,7 +104,7 @@ def main():
 
     # This is used for building the predictive density image
     with tf.name_scope("Predict"):
-        logprob = tf.reduce_mean(lkhood.log_prob(Y_), axis=0)
+        logprob = ab.sample_mean(lkhood.log_prob(Y_))
 
     # Logging learning progress
     log = tf.train.LoggingTensorHook(

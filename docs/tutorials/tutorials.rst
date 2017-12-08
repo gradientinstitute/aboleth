@@ -7,4 +7,6 @@ to use Aboleth for more complex problems.
 .. toctree::
     :maxdepth: 1
 
+    saving_loading
     some_regressors
+    keras_integration

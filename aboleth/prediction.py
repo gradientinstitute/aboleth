@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow.contrib.distributions import percentile
 
 
-def sample_mean(predictor):
+def sample_mean(predictor, name=None):
     """
     Get the mean of the samples of a predictor.
 
@@ -11,6 +11,8 @@ def sample_mean(predictor):
     ---------
     predictor : Tensor
         A tensor of samples, where the first dimension indexes the samples.
+    name : str
+        name to give this operation
 
     Returns
     -------
@@ -18,11 +20,12 @@ def sample_mean(predictor):
         A tensor that contains the mean of the predicted samples.
 
     """
-    expec = tf.reduce_mean(predictor, axis=0)
+    expec = tf.reduce_mean(predictor, axis=0, name=name)
     return expec
 
 
-def sample_percentiles(predictor, per=[10, 90], interpolation='nearest'):
+def sample_percentiles(predictor, per=[10, 90], interpolation='nearest',
+                       name=None):
     """
     Get the percentiles of the samples of a predictor.
 
@@ -36,6 +39,8 @@ def sample_percentiles(predictor, per=[10, 90], interpolation='nearest'):
     interpolation : string
         The type of interpolation method to use, see
         tf.contrib.distributions.percentile for details.
+    name : str
+        name to give this operation
 
     Returns
     -------
@@ -50,7 +55,7 @@ def sample_percentiles(predictor, per=[10, 90], interpolation='nearest'):
     pers = [percentile(predictor, p, interpolation=interpolation, axis=0)
             for p in per]
 
-    percen = tf.stack(pers)
+    percen = tf.stack(pers, name=name)
     return percen
 
 
