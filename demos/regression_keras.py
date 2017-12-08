@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-"""This demo uses Aboleth for approximate Gaussian process regression."""
+"""This is a demonstration of how to use Keras with Aboleth."""
 import logging
 
 import numpy as np
@@ -13,7 +13,6 @@ from sklearn.gaussian_process.kernels import RBF as kern
 
 import aboleth as ab
 from aboleth.datasets import gp_draws
-
 from aboleth.layers import SampleLayer
 
 
@@ -41,40 +40,22 @@ config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
 # Model initialisation
 noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
-reg = 1.  # Initial weight prior std. dev, this is optimised later
-
-# Random Fourier Features
-# lenscale = tf.Variable(1.)  # learn the length scale
-# kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
-
-# Variational Fourier Features -- length-scale setting here is the "prior", we
-# can choose to optimise this or not
-lenscale = 1.
-kern = ab.RBFVariational(lenscale=lenscale)  # This is VAR-FIXED kernel from
-# Cutjar et. al. 2017
 
 
 class WrapperLayer(SampleLayer):
 
     def __init__(self, layer, *args, **kwargs):
-
         self.layer = layer(*args, **kwargs)
 
     def _build(self, X):
         """Build the graph of this layer."""
-
         Net = self.layer(X)
         # aggregate layer regularization terms
         KL = tf.reduce_sum(self.layer.losses)
 
         return Net, KL
 
-# This is how we make the "latent function" of a Gaussian process, here
-# n_features controls how many random basis functions we use in the
-# approximation. The more of these, the more accurate, but more costly
-# computationally. "full" indicates we want a full-covariance matrix Gaussian
-# posterior of the model weights. This is optional, but it does greatly improve
-# the model uncertainty away from the data.
+
 n_samples_ = tf.placeholder(tf.int32)
 
 l1_l2_reg = tf.keras.regularizers.l1_l2(l1=0., l2=0.01)
@@ -89,17 +70,6 @@ net = (
    WrapperLayer(tf.keras.layers.Dense, units=1, kernel_regularizer=l1_l2_reg,
                 bias_regularizer=l1_l2_reg)
 )
-
-# net = (
-#    ab.InputLayer(name="X", n_samples=n_samples_) >>
-#    ab.DenseMAP(output_dim=64, l2_reg=0.01, l1_reg=0.) >>
-#    ab.Activation(tf.tanh) >>
-#    ab.DropOut(keep_prob=.5) >>
-#    ab.DenseMAP(output_dim=64, l2_reg=0.01, l1_reg=0.) >>
-#    ab.Activation(tf.tanh) >>
-#    ab.DropOut(keep_prob=.5) >>
-#    ab.DenseMAP(output_dim=1, l2_reg=0.01, l1_reg=0.)
-# )
 
 
 def main():

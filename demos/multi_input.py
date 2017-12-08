@@ -86,7 +86,7 @@ def main():
     N = len(Xt_con)
     nn, kl = net(con=X_con_, cat=X_cat_)
     likelihood = tf.distributions.Bernoulli(logits=nn)
-    prob = tf.reduce_mean(likelihood.probs, axis=0)
+    prob = ab.sample_mean(likelihood.probs)
 
     loss = ab.elbo(likelihood, Y_, N, kl)
     optimizer = tf.train.AdamOptimizer()
