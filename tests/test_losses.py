@@ -94,6 +94,11 @@ def test_sum_likelihood():
     value = _sum_likelihood(like, Y, np.arange(N))
     call = _sum_likelihood(like, Y, weight_fn(Y))
 
+    with pytest.raises(AssertionError, message='Expecting broadcasting error'):
+        # contrive non-sensical weight that would be
+        # accepted due to broadcasting rules
+        _sum_likelihood(like, Y, np.random.randn(20, 2, 5))
+
     tc = tf.test.TestCase()
     with tc.test_session():
         sumll = unweighted.eval()
