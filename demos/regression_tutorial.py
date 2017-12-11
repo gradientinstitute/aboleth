@@ -31,7 +31,7 @@ batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 n_samples_ = tf.placeholder_with_default(n_samples, [])
 
-model = "bayesian_linear"
+model = "deep_gaussian_process"
 
 
 # Models for regression
@@ -64,11 +64,11 @@ def bayesian_linear(X, Y):
         ab.DenseVariational(output_dim=1, std=std, full=True)
     )
 
-    phi, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
+    f, kl = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
     loss = ab.elbo(lkhood, Y, N, kl)
 
-    return phi, loss
+    return f, loss
 
 
 def nnet(X, Y):
@@ -87,10 +87,10 @@ def nnet(X, Y):
         ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
-    phi, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=phi, scale=noise)
+    f, reg = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise)
     loss = ab.max_posterior(lkhood, Y, reg)
-    return phi, loss
+    return f, loss
 
 
 def nnet_dropout(X, Y):
@@ -111,10 +111,10 @@ def nnet_dropout(X, Y):
         ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
-    phi, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=phi, scale=noise)
+    f, reg = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise)
     loss = ab.max_posterior(lkhood, Y, reg)
-    return phi, loss
+    return f, loss
 
 
 def nnet_bayesian(X, Y):
@@ -133,10 +133,10 @@ def nnet_bayesian(X, Y):
         ab.DenseVariational(output_dim=1, std=lambda_)
     )
 
-    phi, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
+    f, kl = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
     loss = ab.elbo(lkhood, Y, N, kl)
-    return phi, loss
+    return f, loss
 
 
 def svr(X, Y):
@@ -145,7 +145,9 @@ def svr(X, Y):
     eps = 0.01
     lenscale = 1.
 
-    kern = ab.RBF(lenscale=lenscale)  # keep the length scale positive
+    # Specify which kernel to approximate with the random Fourier features
+    kern = ab.RBF(lenscale=lenscale)
+
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
@@ -153,9 +155,9 @@ def svr(X, Y):
         ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
-    phi, reg = net(X=X)
-    loss = tf.reduce_mean(tf.nn.relu(tf.abs(Y - phi - eps))) + reg
-    return phi, loss
+    f, reg = net(X=X)
+    loss = tf.reduce_mean(tf.nn.relu(tf.abs(Y - f - eps))) + reg
+    return f, loss
 
 
 def gaussian_process(X, Y):
@@ -172,12 +174,12 @@ def gaussian_process(X, Y):
         ab.DenseVariational(output_dim=1, std=lambda_, full=True)
     )
 
-    phi, kl = net(X=X)
-    # lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
-    lkhood = tf.distributions.StudentT(df=1., loc=phi, scale=ab.pos(noise))
+    f, kl = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
+    # lkhood = tf.distributions.StudentT(df=1., loc=f, scale=ab.pos(noise))
     loss = ab.elbo(lkhood, Y, N, kl)
 
-    return phi, loss
+    return f, loss
 
 
 def deep_gaussian_process(X, Y):
@@ -188,17 +190,17 @@ def deep_gaussian_process(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.RandomFourier(n_features=10, kernel=ab.RBF(ab.pos(lenscale))) >>
-        ab.DenseVariational(output_dim=5, full=True) >>
+        ab.RandomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale))) >>
+        ab.DenseVariational(output_dim=5, std=lambda_, full=False) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
+        ab.DenseVariational(output_dim=1, std=lambda_, full=False)
     )
 
-    phi, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
+    f, kl = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
     loss = ab.elbo(lkhood, Y, N, kl)
 
-    return phi, loss
+    return f, loss
 
 
 # Allow us to easily select models
@@ -258,7 +260,7 @@ def main():
 
     # This is where we build the actual GP model
     with tf.name_scope("Model"):
-        phi, loss = model_dict[model](X_, Y_)
+        f, loss = model_dict[model](X_, Y_)
 
     # Set up the trainig graph
     with tf.name_scope("Train"):
@@ -288,11 +290,11 @@ def main():
 
         # Prediction, the [[None]] is to stop the default placeholder queue
         if model in probabilistic:
-            Ey = sess.run(phi, feed_dict={X_: Xs, Y_: [[None]],
-                                          n_samples_: p_samples})
+            Ey = sess.run(f, feed_dict={X_: Xs, Y_: [[None]],
+                                        n_samples_: p_samples})
             Eymean = Ey.mean(axis=0)  # Average samples
         else:
-            Eymean = sess.run(phi, feed_dict={X_: Xs, Y_: [[None]]})
+            Eymean = sess.run(f, feed_dict={X_: Xs, Y_: [[None]]})
 
     # Score
     r2 = r2_score(Ys.flatten()[test_bounds], Eymean.flatten()[test_bounds])
