@@ -12,6 +12,7 @@ Documentation Contents
    authors
    contributing
 
+   tutorials/tutorials
    api/api
 
 

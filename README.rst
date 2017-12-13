@@ -116,7 +116,9 @@ Getting Started
 ---------------
 
 See the `quick start guide
-<http://aboleth.readthedocs.io/en/latest/quickstart.html>`_ to get started.
+<http://aboleth.readthedocs.io/en/latest/quickstart.html>`_ to get started, and
+for more in depth guide, have a look at our `tutorials
+<http://aboleth.readthedocs.io/en/latest/tutorials/tutorials.html>`_.
 Also see the `demos
 <https://github.com/data61/aboleth/tree/develop/demos>`_ folder for more
 examples of creating and training algorithms with Aboleth.
