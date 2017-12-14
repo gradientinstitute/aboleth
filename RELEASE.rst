@@ -1,3 +1,22 @@
+Release 0.7.0
+=============
+
+- Update to TensorFlow r1.4.
+- Tutorials in the documentation on:
+
+  1. Interfacing with Keras
+  2. Saving/loading models
+  3. How to build a variety of regressors with Aboleth
+
+- New prediction module with some convenience functions, including freezing the 
+  weight samples during prediction.
+- Bayesian convolutional layers with accompanying demo.
+- Allow the number of samples drawn from a model to be varied by using 
+  placeholders.
+- Generalise the feature embedding layers to work on matrix inputs (instead of
+  just column vectors).
+- Numerous numerical and useability fixes.
+
 Release 0.6.5
 =============
 
