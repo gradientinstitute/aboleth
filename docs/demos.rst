@@ -30,7 +30,7 @@ This demo can be used to generate figures like the following:
 .. figure:: GP_approx.png
 
 You can find the full script here: `regression.py
-<https://github.com/data61/aboleth/blob/develop/demos/regression.py>`_.
+<https://github.com/data61/aboleth/blob/master/demos/regression.py>`_.
     
 
 .. _sarcos_reg:
@@ -71,7 +71,7 @@ TensorBoard, run the following::
     $ tensorboard --logdir=./sarcos
 
 The full script is here: `sarcos.py
-<https://github.com/data61/aboleth/blob/develop/demos/sarcos.py>`_.
+<https://github.com/data61/aboleth/blob/master/demos/sarcos.py>`_.
 
 
 .. _multi_in:
@@ -100,7 +100,7 @@ Using this set up we get an accuracy of about 85.3%, compared to the wide and
 deep model that achieves 84.4%.
 
 The full script is here: `multi_input.py
-<https://github.com/data61/aboleth/blob/develop/demos/multi_input.py>`_.
+<https://github.com/data61/aboleth/blob/master/demos/multi_input.py>`_.
 
 
 .. _clas_drop:
@@ -125,7 +125,7 @@ dataset
 with 5-fold cross validation, and get quite good and robust performance.
 
 The script can be found here: `classification.py
-<https://github.com/data61/aboleth/blob/develop/demos/classification.py>`_
+<https://github.com/data61/aboleth/blob/master/demos/classification.py>`_
 
 
 .. _impute_layers:
@@ -154,7 +154,7 @@ Naive mean imputation gives 68.7% accuracy (0.717 log loss), and the per-column
 Normal imputation gives 69.1% accuracy (0.713 log loss). 
 
 You can find the script here: `imputation.py
-<https://github.com/data61/aboleth/blob/develop/demos/imputation.py>`_
+<https://github.com/data61/aboleth/blob/master/demos/imputation.py>`_
 
 
 
@@ -176,4 +176,4 @@ associated with the demo that you can find here: :ref:`tut_keras`.
 .. figure:: tutorials/regression_keras.png
 
 You can find the script here: `regression_keras.py
-<https://github.com/data61/aboleth/blob/develop/demos/regression_keras.py>`_
+<https://github.com/data61/aboleth/blob/master/demos/regression_keras.py>`_

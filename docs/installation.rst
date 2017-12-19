@@ -14,7 +14,7 @@ To get up and running quickly you can use pip and get the Aboleth package from
     $ pip install aboleth
 
 Or, to install additional dependencies required by the `demos
-<https://github.com/data61/aboleth/tree/develop/demos>`_::
+<https://github.com/data61/aboleth/tree/master/demos>`_::
 
     $ pip install aboleth[demos]
 

@@ -31,7 +31,7 @@ batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 n_samples_ = tf.placeholder_with_default(n_samples, [])
 
-model = "deep_gaussian_process"
+model = "svr"
 
 
 # Models for regression
@@ -140,7 +140,7 @@ def nnet_bayesian(X, Y):
 
 
 def svr(X, Y):
-    """Support vector regressor."""
+    """Support vector regressor, kind of..."""
     lambda_ = 1e-4
     eps = 0.01
     lenscale = 1.
@@ -149,6 +149,7 @@ def svr(X, Y):
     kern = ab.RBF(lenscale=lenscale)
 
     net = (
+        # ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.InputLayer(name="X", n_samples=1) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
         # ab.DropOut(keep_prob=0.9) >>
@@ -156,7 +157,7 @@ def svr(X, Y):
     )
 
     f, reg = net(X=X)
-    loss = tf.reduce_mean(tf.nn.relu(tf.abs(Y - f - eps))) + reg
+    loss = tf.reduce_mean(tf.nn.relu(tf.abs(Y - f) - eps)) + reg
     return f, loss
 
 
@@ -223,6 +224,7 @@ probabilistic = [
     "bayesian_svr",
     "gaussian_process",
     "deep_gaussian_process",
+    # "svr"
 ]
 
 

@@ -1,7 +1,7 @@
 .. _tut_regress:
 
-A Regression Masterclass with Aboleth
-=====================================
+A Regression Master Class with Aboleth
+======================================
 
 In this tutorial we will show you how to build a variety of linear and non
 linear regressors with the building blocks in Aboleth - and demonstrate how
@@ -41,13 +41,12 @@ perfect fit, and 0.0 means no better than a Normal distribution fit only to the
 targets, :math:`y_i`.
 
 Note in the figure above that we have only generated training data for
-:math:`x` from -10 to 10, but we evaluate the algorithms from -14 to 14! This
+:math:`x` from -10 to 10, but we evaluate the algorithms from -14 to 14. This
 is because we want to see how well the algorithms extrapolate away from the
-data, which is a very hard problem. We don't evaluate the :math:`R^2` in this
+data; which is a hard problem. We don't evaluate the :math:`R^2` in this
 extrapolation region since it makes it harder to differentiate the performance
-of the algorithms in the bounds of the training data. However, it is
-interesting to see how the algorithms represent their uncertainty (or don't) in
-this region.
+of the algorithms within the bounds of the training data. However, it is
+interesting to see how the algorithms perform in this region.
 
 
 Linear regression
@@ -55,15 +54,23 @@ Linear regression
 
 The easiest algorithms to build with Aboleth are linear regressors, and so this
 is where we'll start this tutorial. Specifically, we'll start with ridge
-regression that has the following objective (or "loss") function,
+regression, which represents the latent function as,
+
+.. math::
+
+    f = w x + b,
+
+where :math:`w` and :math:`b` are the regression weights and bias we wish to
+learn. It has the following objective function (:math:`l2` "reconstruction
+error" loss and :math:`l2` regularisation),
 
 .. math::
     \min_{w, b} \frac{1}{2N} \sum_{i=1}^N \|w x_i + b - y_i\|^2_2
     + \frac{\lambda}{2} \left( \|w\|^2_2 + \|b\|^2_2 \right),
 
-where :math:`w` and :math:`b` are the regression weights and bias, and
-:math:`\lambda` the regularization coefficient that penalises large magnitude
-weights. This can be simply implemented in Aboleth using the following code,
+where :math:`\lambda` is the regularization coefficient that penalises large
+magnitude weights. This can be simply implemented in Aboleth using the
+following code,
 
 .. code::
 
@@ -75,26 +82,27 @@ weights. This can be simply implemented in Aboleth using the following code,
         ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
-    Xw, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=Xw, scale=noise)
+    f, reg = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise)
     loss = ab.max_posterior(lkhood, Y, reg) 
 
 Here ``reg`` is the second regularizing term in the objective function, and
 putting a ``Normal`` likelihood distribution with a standard deviation of 1.0,
-gives us the first term (up to a constant value) when using ``max_posterior``.
-Alternatively, if we didn't want to use a likelihood function we could have
-constructed the ``loss`` as
+gives us the first term, up to a constant value, when using ``max_posterior``
+(we are performing `maximum a-posteriori` inference here, hence the name of the
+function). Alternatively, if we didn't want to use a likelihood function we
+could have constructed the ``loss`` as
 
 .. code::
 
-    loss = 0.5 * tf.reduce_mean((Y - Xw)**2) + reg
+    loss = 0.5 * tf.reduce_mean((Y - f)**2) + reg
 
-This is also called `maximum a-posteriori` inference. We can then give this
-``loss`` tensor to a TensorFlow optimisation routine, such as the
-``AdamOptimizer`` that we use in the `regression
+We can then give this ``loss`` tensor to a TensorFlow optimisation routine,
+such as the ``AdamOptimizer`` that we use in the `regression
 <https://github.com/data61/aboleth/blob/develop/demos/regression.py>`_ demo. 
 
-Naturally, this gives terrible results:
+When we evaluate the model (the tensor ``f``) on the testing inputs we get
+a terrible result:
 
 .. figure:: regression_figs/ridge_linear.png
 
@@ -114,10 +122,10 @@ have ignored the bias, :math:`b`, for simplicity),
 .. math::
 
     y_i &\sim \mathcal{N}(w x_i, \sigma^2), \\
-    w &\sim \mathcal{N}(0, \lambda^{-1})
+    w &\sim \mathcal{N}(0, \lambda^{-1}),
 
-where the aim is to estimate the parameters of the posterior distribution over
-the weights (and optionally point estimates for :math:`\lambda, \sigma`),
+where the aim is to estimate the parameters of the *posterior* distribution
+over the weights (and optionally point estimates for :math:`\lambda, \sigma`),
 
 .. math::
 
@@ -150,7 +158,7 @@ with Aboleth using the following code,
     noise = tf.Variable(1.)  # Likelihood st. dev. initialisation
 
     net = (
-        ab.InputLayer(name="X", n_samples=n_samples) >>
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.DenseVariational(output_dim=1, std=std, full=True)
     )
 
@@ -158,10 +166,11 @@ with Aboleth using the following code,
     lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
     loss = ab.elbo(lkhood, Y, N, kl)
 
-Note here that we have set ``n_samples`` to some value (e.g. 5) because the
-``DenseVariational`` layer uses samples from its posterior distribution on the
-weights for evaluation -- the more samples the smoother the estimates of the
-model gradients.
+Note here that we have set ``n_samples_`` to some value (e.g. 5, or use a place
+holder) because the ``DenseVariational`` layer uses samples from its posterior
+distribution on the weights for evaluation. The more samples, the smoother the
+estimates of the model gradients during training, and the better the estimate
+of the posterior predictive distribution when querying (more on this soon).
 
 Again, since we're using a linear model, we don't get great performance.
 
@@ -174,9 +183,10 @@ the ridge regression? Well a few reasons, firstly we can use this objective to
 estimate the parameters :math:`\sigma~\&~\lambda` (this is called empirical
 Bayes, see [2]_ Section 3.5 for a good explanation). Secondly, since we have a
 posterior distribution over :math:`w`, we can get a distribution over
-prediction of the latent functions, samples from which we can see in the above
-figure. This tells us how confident out model is in its predictions. This will
-come in handy later with some of the more complex models.
+predictions of the latent function, :math:`f` -- samples from which we can see
+in the above figure. This tells us how confident out model is in its
+predictions. This will come in handy later with some of the more complex
+models.
 
 .. note::
     
@@ -196,17 +206,24 @@ Neural Networks
 ---------------
 
 The first family of non-linear regressors we'll look at now are neural
-networks, which classically have an objective something like,
+networks and represent the latent function as,
+
+.. math::
+
+    f = \text{NN}(x).
+
+Here :math:`\text{NN}` refers to the neural net function, which is a sequential
+composition of linear layers (like our linear regressor) and non-linear
+activation functions. Learning a neural net classically has an objective
+something like,
 
 .. math::
     \min_{w, b} \frac{1}{2N} \sum_{i=1}^N \|\text{NN}(x_i) - y_i\|^2_2
     + \sum_{l=1}^L
       \frac{\lambda_l}{2} \left( \|w_l\|^2_2 + \|b_l\|^2_2 \right).
 
-Here :math:`\text{NN}` refers to the neural net function, which is a sequential
-composition of linear layers (like our linear regressor) and non-linear
-activation functions. We also have regularisers for each of the :math:`L`
-linear layers.
+Note that it also has regularisers for each of the :math:`L` linear layers in
+the network.
 
 In this tutorial we use 4 layers, and the code for constructing this model in
 Aboleth is here:
@@ -330,18 +347,26 @@ Support Vector-like Regression
 
 We can also approximate a non linear `support vector regressor (SVR)
 <https://en.wikipedia.org/wiki/Support_vector_machine#Regression>`_ with
-Aboleth using the following objective,
+Aboleth. This approximation represents the latent function as,
+
+.. math::
+
+    f = w \times \text{RFF}(x) + b
+
+Where :math:`\text{RFF}` are random Fourier features [5]_, that approximate the
+radial basis functions used in kernel support vector machines. We learn the
+parameters using the following objective,
 
 .. math::
     \min_{w, b} \frac{1}{N} \sum_{i=1}^N 
-    \max\left(|w \times \text{RFF}(x_i) + b - y_i - \epsilon|, 0\right)
+    \max\left(|w \times \text{RFF}(x_i) + b - y_i| - \epsilon, 0\right)
     + \frac{\lambda}{2} \left( \|w\|^2_2 + \|b\|^2_2 \right),
 
-Naturally we will be using stochastic gradients to solve this objective, and
-not the original convex formulation. Also we are using random Fourier features
-[5]_ to approximate the radial basis functions used in kernel support vector
-machines. None-the-less, we would expect support vector regressor-like
-behaviour! The code for this is as follows:
+were :math:`\epsilon \geq 0` is the SVR's threshold parameter, under which
+errors go un-penalised. Naturally we will be using stochastic gradients to
+solve this objective, and not the original convex SVR formulation. Despite
+these approximations, we would expect support vector regressor-like behaviour!
+The code for this is as follows:
 
 .. code::
 
@@ -349,7 +374,7 @@ behaviour! The code for this is as follows:
     eps = 0.01
     lenscale = 1.
 
-    # Specify which kernel to approximate with the random Fourier features
+    # Specify kernel to approximate with the random Fourier features
     kern = ab.RBF(lenscale=lenscale)
 
     net = (
@@ -359,7 +384,7 @@ behaviour! The code for this is as follows:
     )
 
     f, reg = net(X=X)
-    loss = tf.reduce_mean(tf.nn.relu(tf.abs(Y - f - eps))) + reg
+    loss = tf.reduce_mean(tf.nn.relu(tf.abs(Y - f) - eps)) + reg
 
 This results in the following prediction, which is the best we have achieved so
 far (not including the 1000 training point Bayesian neural net). Though its
@@ -367,7 +392,7 @@ extrapolation performance leaves quite a lot to be desired.
 
 .. figure:: regression_figs/svr.png
 
-    Support vector regression, R-square :math:`0.9948`.
+    Support vector regression, R-square :math:`0.9962`.
 
 
 Interestingly, because Aboleth is just a set of "building blocks" we can employ
@@ -378,7 +403,7 @@ this gives the following prediction.
 
 .. figure:: regression_figs/svr_dropout.png
 
-    Support vector regression with dropout, R-square :math:`0.9957`.
+    Support vector regression with dropout, R-square :math:`0.9972`.
 
 This is better than our last SVR prediction, and adding the dropout layer seems
 to have somewhat controlled our extrapolation problem.
@@ -388,13 +413,17 @@ Gaussian process
 ----------------
 
 The final class of non-linear regressors we will construct with Aboleth are
-(approximate) Gaussian process (GP) regressors.
+(approximate) Gaussian process (GP) regressors. They represent the latent
+function in a similar manner to SVRs, but have a different learning objective.
+See [1]_ for a full discussion and derivation of GPs, we'll not go into detail
+in this tutorial.
 
-Typically Gaussian processes have a computational complexity of
+Full Gaussian processes have a computational complexity of
 :math:`\mathcal{O}(N^3)` in training where :math:`N` is the training set size.
-This limits their application to fairly small problems. However, again using
-random Fourier features [5]_, we can approximate them by slightly modifying the
-Bayesian linear regressor from before,
+This limits their application to fairly small problems; a few thousands of
+training points. However, again using random Fourier features [5]_, we can
+approximate them by slightly modifying the Bayesian linear regressor from
+before,
 
 .. code::
 
@@ -418,11 +447,12 @@ to trivially use mini-batch stochastic gradient optimisation! The tradeoff is,
 of course, how well they approximate GPs (in much the same way using random
 Fourier features approximated SVRs before).
 
-When we look at our prediction, we can see that we approximate a GP pretty
+When we look at our prediction, we can see that we can approximate a GP pretty
 well, and we get the sensible extrapolation behaviour we would expect from a GP
-too (falling back to zero away from the data in this case). Though, perhaps it
+too - falling back to zero away from the data in this case. Though, perhaps it
 over-estimates the uncertainty in the latent function relative to a regular GP.
-It also does better than the "Bayesian" SVR in terms of :math:`R^2`.
+And as expected, the GP performs similarly to the "Bayesian" SVR in terms of
+:math:`R^2` within the training domain.
 
 .. figure:: regression_figs/gpr.png
 
@@ -437,8 +467,8 @@ It also does better than the "Bayesian" SVR in terms of :math:`R^2`.
 
 ..     Robust Gaussian process, RBF kernel, R-square = 0.9984.
 
-We can also implement some of the recent Fourier feature Deep-GP algorithms
-with Aboleth, such as those presented in [6]_:
+Finally, we can also easily implement some of the recent Fourier feature
+Deep-GP algorithms with Aboleth, such as those presented in [6]_:
 
 .. code::
 
@@ -467,13 +497,13 @@ property of Deep-GPs.
 
 .. figure:: regression_figs/deep_gpr.png
 
-    Deep Gaussian process regression, RBF kernel, R-square = 0.9939.
+    Deep Gaussian process regression, RBF kernel, R-square = 0.9969.
 
 
 And that is it! We hope this tutorial conveys just how flexible Aboleth is in
 allowing you to construct different models. You can find the code used to
-generate this figures and results in this tutorial with the demos `here
-<https://github.com/data61/aboleth/blob/develop/demos/regression_tutorial.py>`_.
+generate these figures and results in this tutorial with the demos `here
+<https://github.com/data61/aboleth/blob/master/demos/regression_tutorial.py>`_.
 
 
 References
