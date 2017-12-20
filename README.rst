@@ -58,7 +58,7 @@ hidden layer and Normal prior/posterior distributions on the network weights:
     # the InputLayer gives a kwarg for this network, and
     # allows us to specify the number of samples for stochastic
     # gradient variational Bayes.
-    layers = (
+    net = (
         ab.InputLayer(name="X", n_samples=5) >>
         ab.DenseVariational(output_dim=100) >>
         ab.Activation(tf.nn.relu) >>

@@ -100,7 +100,7 @@ weights:
 
 .. code::
         
-    loss = ab.max_posterior(net, Y_, reg, likelihood)
+    loss = ab.max_posterior(likelihood, Y_, reg)
 
 This is a *maximum a-posteriori* loss function, which can be thought of as a 
 maximum likelihood objective with a penalty on the magnitude of the weights
