@@ -88,6 +88,9 @@ capability.
 Installation
 ------------
 
+**NOTE**: Aboleth is a *Python 3* library only. Some of the functionality 
+within it depends on features only found in python 3. Sorry.    
+
 To get up and running quickly you can use pip and get the Aboleth package from
 `PyPI <https://pypi.python.org/pypi>`_::
 
