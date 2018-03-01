@@ -34,8 +34,8 @@ def pos(X, minval=1e-15):
     >>> Xp = pos(X)
     >>> with tf.Session():
     ...     xp = Xp.eval()
-    >>> xp
-    array([  1.00000000e+00,   1.00000000e+00,   1.00000000e-15])
+    >>> all(xp == np.array([1., 1., 1.e-15]))
+    True
 
     """
     # Other alternatives could be:
