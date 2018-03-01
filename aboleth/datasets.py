@@ -84,9 +84,6 @@ def fetch_gpml_sarcos_data():
     >>> gpml_sarcos.train.targets.shape
     (44484,)
 
-    >>> gpml_sarcos.train.targets.round(2) # doctest: +ELLIPSIS
-    array([ 50.29,  44.1 ,  37.35, ...,  22.7 ,  17.13,   6.52])
-
     >>> gpml_sarcos.test.data.shape
     (4449, 21)
 

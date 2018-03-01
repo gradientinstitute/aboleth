@@ -8,6 +8,7 @@ jobs:
       - checkout
       - run: mkdir -p test_output/pytest test_output/flake8 test_output/coverage
       - run: pip3 install -e .[dev]
+      - run: pip3 install numpy --upgrade  # Fix circleci image issue
       - run: make lint
       - run: make coverage
       - store_artifacts:
