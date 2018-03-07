@@ -4,7 +4,7 @@ import tensorflow as tf
 
 from tensorflow.contrib.distributions import MultivariateNormalTriL
 
-from aboleth.util import pos
+from aboleth.util import pos, summary_histogram
 from aboleth.random import seedgen
 
 
@@ -13,13 +13,13 @@ from aboleth.random import seedgen
 #
 
 def norm_prior(dim, std):
-    """Initialise a prior (zero mean, isotropic) Normal distribution.
+    """Make a prior (zero mean, isotropic) Normal distribution.
 
     Parameters
     ----------
     dim : tuple or list
         the dimension of this distribution.
-    std : float
+    std : float, np.array, tf.Tensor, tf.Variable
         the prior standard deviation of this distribution.
 
     Returns
@@ -27,19 +27,13 @@ def norm_prior(dim, std):
     P : tf.distributions.Normal
         the initialised prior Normal object.
 
-    Note
-    ----
-    This will make a tf.Variable on the variance of the prior that is
-    initialised with ``std``.
-
     """
     mu = tf.zeros(dim)
-    std = pos(tf.Variable(std, name="W_mu_p"))
     P = tf.distributions.Normal(loc=mu, scale=std)
     return P
 
 
-def norm_posterior(dim, std0):
+def norm_posterior(dim, std0, suffix=None):
     """Initialise a posterior (diagonal) Normal distribution.
 
     Parameters
@@ -48,6 +42,9 @@ def norm_posterior(dim, std0):
         the dimension of this distribution.
     std0 : float
         the initial (unoptimized) standard deviation of this distribution.
+    suffix : str
+        suffix to add to the names of the variables of the parameters of this
+        distribution.
 
     Returns
     -------
@@ -64,16 +61,19 @@ def norm_posterior(dim, std0):
 
     """
     mu_0 = tf.random_normal(dim, stddev=std0, seed=next(seedgen))
-    mu = tf.Variable(mu_0, name="W_mu_q")
+    mu = tf.Variable(mu_0, name=_add_suffix("W_mu_q", suffix))
 
     std_0 = tf.random_gamma(alpha=std0, shape=dim, seed=next(seedgen))
-    std = pos(tf.Variable(std_0, name="W_std_q"))
+    std = tf.Variable(std_0, name=_add_suffix("W_std_q", suffix))
 
-    Q = tf.distributions.Normal(loc=mu, scale=std)
+    summary_histogram(mu)
+    summary_histogram(std)
+
+    Q = tf.distributions.Normal(loc=mu, scale=pos(std))
     return Q
 
 
-def gaus_posterior(dim, std0):
+def gaus_posterior(dim, std0, suffix=None):
     """Initialise a posterior Gaussian distribution with a diagonal covariance.
 
     Even though this is initialised with a diagonal covariance, a full
@@ -86,6 +86,9 @@ def gaus_posterior(dim, std0):
         the dimension of this distribution.
     std0 : float
         the initial (unoptimized) diagonal standard deviation of this
+        distribution.
+    suffix : str
+        suffix to add to the names of the variables of the parameters of this
         distribution.
 
     Returns
@@ -109,12 +112,16 @@ def gaus_posterior(dim, std0):
     indices = (u * i + v)[:, np.newaxis]
     l0 = np.tile(np.eye(i), [o, 1, 1])[:, u, v].T
     l0 = l0 * tf.random_gamma(alpha=std0, shape=l0.shape, seed=next(seedgen))
-    lflat = tf.Variable(l0, name="W_cov_q")
+    lflat = tf.Variable(l0, name=_add_suffix("W_cov_q", suffix))
     Lt = tf.transpose(tf.scatter_nd(indices, lflat, shape=(i * i, o)))
     L = tf.reshape(Lt, (o, i, i))
 
     mu_0 = tf.random_normal((o, i), stddev=std0, seed=next(seedgen))
-    mu = tf.Variable(mu_0, name="W_mu_q")
+    mu = tf.Variable(mu_0, name=_add_suffix("W_mu_q", suffix))
+
+    summary_histogram(mu)
+    summary_histogram(lflat)
+
     Q = MultivariateNormalTriL(mu, L)
     return Q
 
@@ -140,6 +147,7 @@ def kl_sum(q, p):
     kl : Tensor
         the result of the sum of the KL divergences of the ``q`` and ``p``
         distibutions.
+
     """
     kl = tf.reduce_sum(tf.distributions.kl_divergence(q, p))
     return kl
@@ -191,3 +199,10 @@ def _chollogdet(L):
     ldiag = pos(tf.matrix_diag_part(L))  # keep > 0, and no vanashing gradient
     logdet = 2. * tf.reduce_sum(tf.log(ldiag))
     return logdet
+
+
+def _add_suffix(name, suffix):
+    """Add a suffix to a name, do nothing if suffix is None."""
+    suffix = "" if suffix is None else "_" + suffix
+    new_name = name + suffix
+    return new_name

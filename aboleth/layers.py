@@ -7,6 +7,7 @@ from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_sum)
 from aboleth.baselayers import Layer, MultiLayer
+from aboleth.util import summary_histogram
 
 
 #
@@ -379,41 +380,42 @@ class Conv2DVariational(SampleLayer):
     padding : str
         One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
         algorithm to use.
-    std : float
-        the initial value of the weight prior standard deviation
-        (:math:`\sigma` above), this is optimized a la maximum likelihood type
-        II.
+    prior_std : float, np.array, tf.Tensor
+        the value of the weight prior standard deviation (:math:`\sigma` above)
+    post_std : float
+        the initial value of the posterior standard deviation.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
     prior_W : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``std`` parameter.
+        weights. This ignores the ``prior_std`` parameter.
     prior_b : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer intercept. It
         must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``std`` and ``use_bias`` parameters.
+        This ignores the ``prior_std`` and ``use_bias`` parameters.
     post_W : tf.distributions.Distribution, optional
         It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` parameter. See also
-        ``distributions.gaus_posterior``.
+        weights. This ignores the ``full`` and ``post_std`` parameters. See
+        also ``distributions.norm_posterior``.
     post_b : tf.distributions.Distributions, optional
         This is the posterior distribution object to use on the layer
         intercept. It must have parameters compatible with (output_dim,) shaped
-        weights. This ignores the ``use_bias`` parameters.  See also
-        ``distributions.norm_posterior``.
+        weights. This ignores the ``full`` and ``post_std`` parameters. See
+        also ``distributions.norm_posterior``.
 
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
-                 std=1., use_bias=True, prior_W=None, prior_b=None,
-                 post_W=None, post_b=None):
+                 prior_std=1., post_std=1., use_bias=True, prior_W=None,
+                 prior_b=None, post_W=None, post_b=None):
         """Create and instance of a variational Conv2D layer."""
         self.filters = filters
         self.kernel_size = kernel_size
         self.strides = [1] + list(strides) + [1]
         self.padding = padding
-        self.std = std
+        self.pstd = prior_std
+        self.qstd = post_std
         self.use_bias = use_bias
         self.pW = prior_W
         self.pb = prior_b
@@ -423,11 +425,11 @@ class Conv2DVariational(SampleLayer):
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, (height, width, channels) = self._get_X_dims(X)
-        W_shape, b_shape = self._weight_shapes(channels)
+        W_shp, b_shp = self._weight_shapes(channels)
 
         # Layer weights
-        self.pW = _make_prior(self.std, self.pW, W_shape)
-        self.qW = _make_posterior(self.std, self.qW, W_shape, False)
+        self.pW = _make_prior(self.pstd, self.pW, W_shp)
+        self.qW = _make_posterior(self.qstd, self.qW, W_shp, False)
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -443,8 +445,8 @@ class Conv2DVariational(SampleLayer):
         # Optional bias
         if self.use_bias or not (self.prior_b is None and self.post_b is None):
             # Layer intercepts
-            self.pb = _make_prior(self.std, self.pb, b_shape)
-            self.qb = _make_posterior(self.std, self.qb, b_shape, False)
+            self.pb = _make_prior(self.pstd, self.pb, b_shp)
+            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False, "bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -518,10 +520,10 @@ class DenseVariational(SampleLayer3):
     ----------
     output_dim : int
         the dimension of the output of this layer
-    std : float
-        the initial value of the weight prior standard deviation
-        (:math:`\sigma` above), this is optimized a la maximum likelihood type
-        II.
+    prior_std : float, np.array, tf.Tensor
+        the value of the weight prior standard deviation (:math:`\sigma` above)
+    post_std : float
+        the initial value of the posterior standard deviation.
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
@@ -531,28 +533,30 @@ class DenseVariational(SampleLayer3):
     prior_W : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``std`` parameter.
+        weights. This ignores the ``prior_std`` parameter.
     prior_b : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer intercept. It
         must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``std`` and ``use_bias`` parameters.
+        This ignores the ``prior_std`` and ``use_bias`` parameters.
     post_W : tf.distributions.Distribution, optional
         It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` parameter. See also
-        ``distributions.gaus_posterior``.
+        weights. This ignores the ``full`` and ``post_std`` parameters. See
+        also ``distributions.gaus_posterior``.
     post_b : tf.distributions.Distributions, optional
         This is the posterior distribution object to use on the layer
         intercept. It must have parameters compatible with (output_dim,) shaped
-        weights. This ignores the ``use_bias`` parameters.  See also
-        ``distributions.norm_posterior``.
+        weights. This ignores the ``use_bias`` and ``post_std`` parameters.
+        See also ``distributions.norm_posterior``.
 
     """
 
-    def __init__(self, output_dim, std=1., full=False, use_bias=True,
-                 prior_W=None, prior_b=None, post_W=None, post_b=None):
+    def __init__(self, output_dim, prior_std=1., post_std=1., full=False,
+                 use_bias=True, prior_W=None, prior_b=None, post_W=None,
+                 post_b=None):
         """Create and instance of a variational dense layer."""
         self.output_dim = output_dim
-        self.std = std
+        self.pstd = prior_std
+        self.qstd = post_std
         self.full = full
         self.use_bias = use_bias
         self.pW = prior_W
@@ -563,11 +567,11 @@ class DenseVariational(SampleLayer3):
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self._get_X_dims(X)
-        W_shape, b_shape = self._weight_shapes(input_dim)
+        W_shp, b_shp = self._weight_shapes(input_dim)
 
         # Layer weights
-        self.pW = _make_prior(self.std, self.pW, W_shape)
-        self.qW = _make_posterior(self.std, self.qW, W_shape, self.full)
+        self.pW = _make_prior(self.pstd, self.pW, W_shp)
+        self.qW = _make_posterior(self.qstd, self.qW, W_shp, self.full)
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -579,8 +583,8 @@ class DenseVariational(SampleLayer3):
         # Optional bias
         if self.use_bias or not (self.prior_b is None and self.post_b is None):
             # Layer intercepts
-            self.pb = _make_prior(self.std, self.pb, b_shape)
-            self.qb = _make_posterior(self.std, self.qb, b_shape, False)
+            self.pb = _make_prior(self.pstd, self.pb, b_shp)
+            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False, "bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -654,10 +658,10 @@ class EmbedVariational(DenseVariational):
         the dimension of the output (embedding) of this layer
     n_categories : int
         the number of categories in the input variable
-    std : float
-        the initial value of the weight prior standard deviation
-        (:math:`\sigma` above), this is optimized a la maximum likelihood type
-        II.
+    prior_std : float, np.array, tf.Tensor
+        the value of the weight prior standard deviation (:math:`\sigma` above)
+    post_std : float
+        the initial value of the posterior standard deviation.
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
@@ -665,22 +669,23 @@ class EmbedVariational(DenseVariational):
     prior_W : tf.distributions.Distribution, optional
         This is the prior distribution object to use on the layer weights. It
         must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``std`` parameter.
+        weights. This ignores the ``prior_std`` parameter.
     post_W : tf.distributions.Distribution, optional
         This is the posterior distribution object to use on the layer weights.
         It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` parameter. See also
-        ``distributions.gaus_posterior``.
+        weights. This ignores the ``full`` and ``post_std`` parameters. See
+        also ``distributions.gaus_posterior``.
 
     """
 
-    def __init__(self, output_dim, n_categories, std=1., full=False,
-                 prior_W=None, post_W=None):
+    def __init__(self, output_dim, n_categories, prior_std=1., post_std=1.,
+                 full=False, prior_W=None, post_W=None):
         """Create and instance of a variational dense embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
         self.n_categories = n_categories
-        self.std = std
+        self.pstd = prior_std
+        self.qstd = post_std
         self.full = full
         self.pW = prior_W
         self.qW = post_W
@@ -692,8 +697,8 @@ class EmbedVariational(DenseVariational):
         n_batch = tf.shape(X)[1]
 
         # Layer weights
-        self.pW = _make_prior(self.std, self.pW, W_shape)
-        self.qW = _make_posterior(self.std, self.qW, W_shape, self.full)
+        self.pW = _make_prior(self.pstd, self.pW, W_shape)
+        self.qW = _make_posterior(self.qstd, self.qW, W_shape, self.full)
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = _sample_W(self.qW, n_samples)
@@ -763,6 +768,7 @@ class Conv2DMAP(SampleLayer):
             seed=next(seedgen)),
             name="W_map"
         )
+        summary_histogram(W)
 
         Net = tf.map_fn(
             lambda x: tf.nn.conv2d(x, W,
@@ -778,6 +784,8 @@ class Conv2DMAP(SampleLayer):
                 seed=next(seedgen)),
                 name="b_map"
             )
+            summary_histogram(b)
+
             Net = tf.nn.bias_add(Net, b)
             penalty += self.l2 * tf.nn.l2_loss(b) + self.l1 * _l1_loss(b)
 
@@ -834,6 +842,7 @@ class DenseMAP(SampleLayer):
 
         W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
                         name="W_map")
+        summary_histogram(W)
 
         # We don't want to copy tf.Variable W so map over X
         Net = tf.map_fn(lambda x: tf.matmul(x, W), X)
@@ -845,6 +854,8 @@ class DenseMAP(SampleLayer):
         if self.use_bias is True:
             b = tf.Variable(tf.random_normal(shape=(1, self.output_dim),
                                              seed=next(seedgen)), name="b_map")
+            summary_histogram(b)
+
             Net += b
             penalty += self.l2 * tf.nn.l2_loss(b) + self.l1 * _l1_loss(b)
 
@@ -899,6 +910,7 @@ class EmbedMAP(SampleLayer3):
 
         W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
                         name="W_map")
+        summary_histogram(W)
 
         # Index into the relevant weights rather than using sparse matmul
         features = tf.gather(W, X, axis=0)
@@ -950,14 +962,14 @@ def _make_prior(std, prior_W, weight_shape):
     return prior_W
 
 
-def _make_posterior(std, post_W, weight_shape, full):
+def _make_posterior(std, post_W, weight_shape, full, suffix=None):
     """Check/make posterior."""
     if post_W is None:
         # We don't want a full-covariance on an intercept, check input_dim
         if full and len(weight_shape) > 1:
-            post_W = gaus_posterior(weight_shape, std0=std)
+            post_W = gaus_posterior(weight_shape, std0=std, suffix=suffix)
         else:
-            post_W = norm_posterior(weight_shape, std0=std)
+            post_W = norm_posterior(weight_shape, std0=std, suffix=suffix)
 
     assert _is_dim(post_W, weight_shape), \
         "Posterior inconsistent dimension!"
