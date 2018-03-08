@@ -41,10 +41,11 @@ data_input = ab.InputLayer(name='X', n_samples=n_samples_)  # Data input
 mask_input = ab.MaskInputLayer(name='M')  # Missing data mask input
 
 lenscale = ab.pos(tf.Variable(np.ones((54, 1), dtype=np.float32)))
+sigma = ab.pos(tf.Variable(1.))
 
 layers = (
     ab.RandomArcCosine(n_features=NFEATURES, lenscale=lenscale) >>
-    ab.DenseVariational(output_dim=NCLASSES)
+    ab.DenseVariational(output_dim=NCLASSES, prior_std=sigma)
 )
 
 

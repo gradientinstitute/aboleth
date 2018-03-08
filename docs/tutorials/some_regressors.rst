@@ -133,11 +133,11 @@ over the weights (and optionally point estimates for :math:`\lambda, \sigma`),
 
 The objective we use in this case is the `evidence lower bound` or `ELBO` as it
 is easy to use with stochastic gradient descent for a variety of different
-models [3]_. For Bayesian linear regression the ELBO takes the form,
+models [2]_. For Bayesian linear regression the ELBO takes the form,
 
 .. math::
 
-    \min_{m, v, \sigma, \lambda} - \sum_{i=1}^N 
+    \min_{m, v, \sigma} - \sum_{i=1}^N 
         \mathbb{E}_{\mathcal{N}(w | m, v)}\!
         \left[ \log \mathcal{N}(y_i | w x_i, \sigma^2) \right]
         + \text{KL}\left[\mathcal{N}(w | m, v) \|
@@ -159,7 +159,7 @@ with Aboleth using the following code,
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseVariational(output_dim=1, std=std, full=True)
+        ab.DenseVariational(output_dim=1, prior_std=std, full=True)
     )
 
     f, kl = net(X=X)
@@ -179,14 +179,11 @@ Again, since we're using a linear model, we don't get great performance.
     Bayesian linear regression, R-square :math:`\approx 0`.
 
 What's the point of going to all this effort implementing the ELBO over just
-the ridge regression? Well a few reasons, firstly we can use this objective to
-estimate the parameters :math:`\sigma~\&~\lambda` (this is called empirical
-Bayes, see [2]_ Section 3.5 for a good explanation). Secondly, since we have a
-posterior distribution over :math:`w`, we can get a distribution over
-predictions of the latent function, :math:`f` -- samples from which we can see
-in the above figure. This tells us how confident out model is in its
-predictions. This will come in handy later with some of the more complex
-models.
+the ridge regression? Well, since we have a posterior distribution over
+:math:`w`, we can get a distribution over predictions of the latent function,
+:math:`f` -- samples from which we can see in the above figure. This tells us
+how confident out model is in its predictions. This will come in handy later
+with some of the more complex models.
 
 .. note::
     
@@ -257,7 +254,7 @@ performance on our regression task!
 
 There is a very easy trick to turn the above network into a Bayesian neural
 net, courtesy of `Yarin Gal
-<http://www.cs.ox.ac.uk/people/yarin.gal/website/blog_2248.html>`_ [4]_. All we
+<http://www.cs.ox.ac.uk/people/yarin.gal/website/blog_2248.html>`_ [3]_. All we
 have to do is to add dropout to our network, and then keep dropout on during
 prediction! We can optionally also sample the network more than once during
 learning since the dropout makes it a stochastic network like our variational
@@ -304,27 +301,26 @@ building the Bayesian neural net regressor is,
 
 .. code::
 
-    lambda_ = 1e-1  # Weight prior
-    noise = tf.Variable(0.01)  # Likelihood st. dev. initialisation
+    noise = 0.05
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseVariational(output_dim=20, std=lambda_) >>
+        ab.DenseVariational(output_dim=5) >>
         ab.Activation(tf.nn.relu) >>
-        ab.DenseVariational(output_dim=7, std=lambda_) >>
+        ab.DenseVariational(output_dim=4) >>
         ab.Activation(tf.nn.relu) >>
-        ab.DenseVariational(output_dim=5, std=lambda_) >>
+        ab.DenseVariational(output_dim=3) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseVariational(output_dim=1, std=lambda_)
+        ab.DenseVariational(output_dim=1)
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
+    lkhood = tf.distributions.Normal(loc=f, scale=noise)
     loss = ab.elbo(lkhood, Y, N, kl)
 
 Unfortunately, this prediction is even smoother than the previous one. This
 behaviour with Gaussian weight distributions is also something observed in
-[4]_, and is likely because of the strong complexity penalty coming from the KL
+[3]_, and is likely because of the strong complexity penalty coming from the KL
 regulariser.
 
 .. figure:: regression_figs/nnet_bayesian.png
@@ -353,7 +349,7 @@ Aboleth. This approximation represents the latent function as,
 
     f = w \times \text{RFF}(x) + b
 
-Where :math:`\text{RFF}` are random Fourier features [5]_, that approximate the
+Where :math:`\text{RFF}` are random Fourier features [4]_, that approximate the
 radial basis functions used in kernel support vector machines. We learn the
 parameters using the following objective,
 
@@ -421,7 +417,7 @@ in this tutorial.
 Full Gaussian processes have a computational complexity of
 :math:`\mathcal{O}(N^3)` in training where :math:`N` is the training set size.
 This limits their application to fairly small problems; a few thousands of
-training points. However, again using random Fourier features [5]_, we can
+training points. However, again using random Fourier features [4]_, we can
 approximate them by slightly modifying the Bayesian linear regressor from
 before,
 
@@ -435,7 +431,7 @@ before,
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
-        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
+        ab.DenseVariational(output_dim=1, prior_std=lambda_, full=True)
     )
 
     f, kl = net(X=X)
@@ -468,7 +464,7 @@ And as expected, the GP performs similarly to the "Bayesian" SVR in terms of
 ..     Robust Gaussian process, RBF kernel, R-square = 0.9984.
 
 Finally, we can also easily implement some of the recent Fourier feature
-Deep-GP algorithms with Aboleth, such as those presented in [6]_:
+Deep-GP algorithms with Aboleth, such as those presented in [5]_:
 
 .. code::
 
@@ -479,9 +475,9 @@ Deep-GP algorithms with Aboleth, such as those presented in [6]_:
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale))) >>
-        ab.DenseVariational(output_dim=5, std=lambda_, full=False) >>
+        ab.DenseVariational(output_dim=5, prior_std=lambda_, full=False) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, std=lambda_, full=False)
+        ab.DenseVariational(output_dim=1, prior_std=lambda_, full=False)
     )
 
     f, kl = net(X=X)
@@ -511,12 +507,11 @@ References
 
 .. [1] Rasmussen, C.E., and Williams, C.K.I. "Gaussian processes for machine
        learning." Vol. 1. Cambridge: MIT press, 2006.
-.. [2] Bishop, C. M. "Pattern recognition and machine learning." Springer, 2006.
-.. [3] Kingma, D. P. and Welling, M. "Auto-encoding variational Bayes." In
+.. [2] Kingma, D. P. and Welling, M. "Auto-encoding variational Bayes." In
        ICLR, 2014.
-.. [4] Gal, Yarin. "Uncertainty in deep learning." PhD thesis, University of 
+.. [3] Gal, Yarin. "Uncertainty in deep learning." PhD thesis, University of 
        Cambridge, 2016.
-.. [5] Rahimi, Ali, and Benjamin Recht. "Random features for large-scale kernel
+.. [4] Rahimi, Ali, and Benjamin Recht. "Random features for large-scale kernel
        machines." In NIPS, 2007.
-.. [6] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. "Random Feature 
+.. [5] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. "Random Feature 
        Expansions for Deep Gaussian Processes." In ICML, 2017.

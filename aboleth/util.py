@@ -134,7 +134,8 @@ def summary_histogram(values):
         the Tensor to add to the summaries.
 
     """
-    tf.summary.histogram(name=values.name + "_hist", values=values)
+    name = values.name.replace(':', '_') + "_hist"
+    tf.summary.histogram(name=name, values=values)
 
 
 def __data_len(feed_dict):

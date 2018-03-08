@@ -29,23 +29,23 @@ true_noise = 0.1  # Add noise to the GP draws, to make things a little harder
 
 # Model settings
 n_samples = 5  # Number of random samples to get from an Aboleth net
-p_samples = 50  # Number of samples for prediction
+p_samples = 30  # Number of samples for prediction
 n_epochs = 200  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
 # Model initialisation
 noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
-reg = 1.  # Initial weight prior std. dev, this is optimised later
+reg = tf.Variable(1.)  # Weight prior std. dev, learn this too
 
 # Random Fourier Features
-# lenscale = tf.Variable(1.)  # learn the length scale
-# kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
+lenscale = tf.Variable(1.)  # learn the length scale
+kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
 
 # Variational Fourier Features -- length-scale setting here is the "prior", we
 # can choose to optimise this or not
-lenscale = 1.
-kern = ab.RBFVariational(lenscale=lenscale)  # This is VAR-FIXED kernel from
+# lenscale = 1.
+# kern = ab.RBFVariational(lenscale=lenscale)  # This is VAR-FIXED kernel from
 # Cutjar et. al. 2017
 
 # This is how we make the "latent function" of a Gaussian process, here
@@ -57,8 +57,8 @@ kern = ab.RBFVariational(lenscale=lenscale)  # This is VAR-FIXED kernel from
 n_samples_ = tf.placeholder(tf.int32)
 net = (
     ab.InputLayer(name="X", n_samples=n_samples_) >>
-    ab.RandomFourier(n_features=100, kernel=kern) >>
-    ab.DenseVariational(output_dim=1, std=reg, full=True)
+    ab.RandomFourier(n_features=200, kernel=kern) >>
+    ab.DenseVariational(output_dim=1, prior_std=ab.pos(reg), full=True)
 )
 
 

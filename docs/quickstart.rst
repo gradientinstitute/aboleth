@@ -24,7 +24,7 @@ regularisation on the model weights:
 
     layers = (
         ab.InputLayer(name="X") >>
-        ab.DenseMap(output_dim=1, l1_reg=0, l2_reg=.05) >>
+        ab.DenseMAP(output_dim=1, l1_reg=0, l2_reg=.05) >>
         ab.Activation(tf.nn.sigmoid)
     )
 
@@ -89,7 +89,7 @@ as shorthand for :math:`p(y_n = 1)`.
 
         layers = (
             ab.InputLayer(name="X") >>
-            ab.DenseMap(output_dim=1, l1_reg=0, l2_reg=.05) >>
+            ab.DenseMAP(output_dim=1, l1_reg=0, l2_reg=.05) >>
         )
         net, reg = layers(X=X_)
 
@@ -254,25 +254,25 @@ following,
     n_samples_ = tf.placeholder_with_default(5, [])
     layers = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseVariational(output_dim=1, std=1., full=True) >>
+        ab.DenseVariational(output_dim=1, prior_std=1., full=True) >>
         ab.Activation(tf.nn.sigmoid)
     )
 
 Note we are using ``DenseVariational`` instead of ``DenseMAP``. In the
 ``DenseVariational`` layer the ``full`` parameter tells the layer to use a full
-covariance Gaussian, and ``std`` is initial value of the weight prior standard
-deviation, :math:`\psi`, which is optimized. Also we've set ``n_samples=5`` (as
-a default value of a place holder) in the ``InputLayer``, this lets the
-subsequent layers know that we are making a *stochastic* model, that is,
-whenever we call ``layers`` we are actually expecting back 5 samples of the
-model output. This argument defaults to 1, which is why we got a
-one-dimensional 0th axis in the last section. In this instance a setting of 5
-makes the ``DenseVariational`` layer multiply its input with 5 samples of the
-weights from the approximate posterior, :math:`\mathbf{X}\mathbf{w}^{(s)}`,
-where :math:`\mathbf{w}^{(s)} \sim q(\mathbf{w}),~\text{for}~s = \{1 \ldots
-5\}`.  These 5 samples are then passed to the ``Activation`` layer. We have
-used a place holder here because we usually want to use more samples of the
-network for prediction than for training.
+covariance Gaussian, and ``prior_std`` is value of the weight prior standard
+deviation, :math:`\psi`. Also we've set ``n_samples=5`` (as a default value of
+a place holder) in the ``InputLayer``, this lets the subsequent layers know
+that we are making a *stochastic* model, that is, whenever we call ``layers``
+we are actually expecting back 5 samples of the model output. This argument
+defaults to 1, which is why we got a one-dimensional 0th axis in the last
+section. In this instance a setting of 5 makes the ``DenseVariational`` layer
+multiply its input with 5 samples of the weights from the approximate
+posterior, :math:`\mathbf{X}\mathbf{w}^{(s)}`, where :math:`\mathbf{w}^{(s)}
+\sim q(\mathbf{w}),~\text{for}~s = \{1 \ldots 5\}`.  These 5 samples are then
+passed to the ``Activation`` layer. We have used a place holder here because we
+usually want to use more samples of the network for prediction than for
+training.
 
 Then like before to complete the model specification:
 

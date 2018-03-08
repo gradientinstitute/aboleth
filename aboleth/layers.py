@@ -223,7 +223,7 @@ class Reshape(Layer):
 
     Parameters
     ----------
-    targe_shape : tuple of ints
+    target_shape : tuple of ints
         Does not include the samples or batch axes.
 
     """
@@ -501,8 +501,9 @@ class DenseVariational(SampleLayer3):
     where :math:`\mathbf{m}_j \in \mathbb{R}^{D_{in}}` and
     :math:`\mathbf{C}_j \in \mathbb{R}^{D_{in} \times D_{in}}`.
 
-    This layer will use variational inference to learn *all* of the non-zero
-    *prior* and posterior parameters.
+    This layer will use variational inference to learn the posterior
+    parameters, and optionally the ``prior_std`` parameter can be passed in as
+    a ``tf.Variable``, in which case it will also be learned.
 
     Whenever this layer is called, it will return the result,
 
@@ -638,8 +639,9 @@ class EmbedVariational(DenseVariational):
     where :math:`\mathbf{m}_j \in \mathbb{R}^{K}` and
     :math:`\mathbf{C}_j \in \mathbb{R}^{K \times K}`.
 
-    This layer will use variational inference to learn *all* of the non-zero
-    *prior* and posterior parameters.
+    This layer will use variational inference to learn the posterior
+    parameters, and optionally the ``prior_std`` parameter can be passed in as
+    a ``tf.Variable``, in which case it will also be learned.
 
     Whenever this layer is called, it will return the result,
 
