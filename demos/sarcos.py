@@ -22,6 +22,7 @@ NOISE = 3.0  # Initial estimate of the observation noise
 # Random Fourier Features, this is setting up an anisotropic length scale, or
 # one length scale per dimension
 LENSCALE = tf.Variable(5 * np.ones((21, 1), dtype=np.float32))
+tf.summary.histogram(name="lenscale", values=LENSCALE)
 KERNEL = ab.RBF(ab.pos(LENSCALE))
 
 # Variational Fourier Features -- length-scale setting here is the "prior"

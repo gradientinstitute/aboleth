@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from aboleth.baselayers import MultiLayer
 from aboleth.random import seedgen
-from aboleth.util import pos
+from aboleth.util import pos, summary_histogram
 
 
 class MaskInputLayer(MultiLayer):
@@ -229,6 +229,7 @@ class LearnedScalarImpute(ImputeOp):
             tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
             name="impute_scalars"
         )
+        summary_histogram(self.impute_scalars)
 
     def _impute2D(self, X_2D):
         r"""Randomly impute a rank 2 tensor.
@@ -294,6 +295,10 @@ class LearnedNormalImpute(ImputeOp):
             tf.random_gamma(alpha=1., shape=(1, datadim), seed=next(seedgen)),
             name="impute_scalars"
         )
+
+        summary_histogram(impute_means)
+        summary_histogram(impute_stddev)
+
         self.normal = tf.distributions.Normal(
             impute_means,
             tf.sqrt(pos(impute_stddev))

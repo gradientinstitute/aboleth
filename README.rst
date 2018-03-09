@@ -28,8 +28,6 @@ Some of the features of Aboleth:
   Optional variational optimisation of these feature weights as per [1]_.
 - Imputation layers with parameters that are learned as part of a model.
 - Very flexible construction of networks, e.g. multiple inputs, ResNets etc.
-- Optional maximum-likelihood type II inference for model parameters such as
-  weight priors/regularizers and regression observation noise.
 - Compatible and interoperable with other neural net frameworks such as `Keras
   <https://keras.io/>`_ (see the `demos
   <https://github.com/data61/aboleth/tree/develop/demos>`_ for more

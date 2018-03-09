@@ -123,6 +123,21 @@ def batch_prediction(feed_dict, batch_size):
         yield ind, batch_dict
 
 
+def summary_histogram(values):
+    """Add a summary histogram to TensorBoard.
+
+    This will add a summary histogram with name ``variable.name + "_hist"``.
+
+    Parameters
+    ----------
+    values : tf.Variable, tf.Tensor
+        the Tensor to add to the summaries.
+
+    """
+    name = values.name.replace(':', '_') + "_hist"
+    tf.summary.histogram(name=name, values=values)
+
+
 def __data_len(feed_dict):
     N = feed_dict[list(feed_dict.keys())[0]].shape[0]
     return N

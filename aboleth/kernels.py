@@ -160,7 +160,8 @@ class RBFVariational(ShiftInvariant):
         # Initialise the posterior
         if self.lenscale_post is None:
             self.lenscale_post = np.sqrt(1 / input_dim)
-        qP = norm_posterior(dim=dim, std0=self.__len2std(self.lenscale_post))
+        qP = norm_posterior(dim=dim, std0=self.__len2std(self.lenscale_post),
+                            suffix="kernel")
 
         KL = kl_sum(qP, pP)
 

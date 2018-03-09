@@ -31,7 +31,7 @@ batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 n_samples_ = tf.placeholder_with_default(n_samples, [])
 
-model = "svr"
+model = "gaussian_process"
 
 
 # Models for regression
@@ -61,7 +61,7 @@ def bayesian_linear(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseVariational(output_dim=1, std=std, full=True)
+        ab.DenseVariational(output_dim=1, prior_std=std, full=True)
     )
 
     f, kl = net(X=X)
@@ -119,22 +119,21 @@ def nnet_dropout(X, Y):
 
 def nnet_bayesian(X, Y):
     """Bayesian neural net."""
-    lambda_ = 1e-1  # Weight prior
-    noise = tf.Variable(0.01)  # Likelihood st. dev. initialisation
+    noise = 0.05
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseVariational(output_dim=20, std=lambda_) >>
+        ab.DenseVariational(output_dim=5) >>
         ab.Activation(tf.nn.relu) >>
-        ab.DenseVariational(output_dim=7, std=lambda_) >>
+        ab.DenseVariational(output_dim=4) >>
         ab.Activation(tf.nn.relu) >>
-        ab.DenseVariational(output_dim=5, std=lambda_) >>
+        ab.DenseVariational(output_dim=3) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseVariational(output_dim=1, std=lambda_)
+        ab.DenseVariational(output_dim=1)
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
+    lkhood = tf.distributions.Normal(loc=f, scale=noise)
     loss = ab.elbo(lkhood, Y, N, kl)
     return f, loss
 
@@ -163,7 +162,7 @@ def svr(X, Y):
 
 def gaussian_process(X, Y):
     """Gaussian Process Regression."""
-    lambda_ = 0.1  # Initial weight prior std. dev, this is optimised later
+    lambda_ = 1.
     noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
     lenscale = tf.Variable(1.)  # learn the length scale
     kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
@@ -172,7 +171,7 @@ def gaussian_process(X, Y):
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
-        ab.DenseVariational(output_dim=1, std=lambda_, full=True)
+        ab.DenseVariational(output_dim=1, prior_std=lambda_, full=True)
     )
 
     f, kl = net(X=X)
@@ -192,9 +191,9 @@ def deep_gaussian_process(X, Y):
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale))) >>
-        ab.DenseVariational(output_dim=5, std=lambda_, full=False) >>
+        ab.DenseVariational(output_dim=5, prior_std=lambda_, full=False) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, std=lambda_, full=False)
+        ab.DenseVariational(output_dim=1, prior_std=lambda_, full=False)
     )
 
     f, kl = net(X=X)
