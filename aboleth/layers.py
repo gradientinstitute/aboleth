@@ -429,7 +429,7 @@ class Conv2DVariational(SampleLayer):
 
         # Layer weights
         self.pW = _make_prior(self.pstd, self.pW, W_shp)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shp, False)
+        self.qW = _make_posterior(self.qstd, self.qW, W_shp, False, "conv")
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -446,7 +446,8 @@ class Conv2DVariational(SampleLayer):
         if self.use_bias or not (self.prior_b is None and self.post_b is None):
             # Layer intercepts
             self.pb = _make_prior(self.pstd, self.pb, b_shp)
-            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False, "bias")
+            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False,
+                                      "conv_bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -572,7 +573,8 @@ class DenseVariational(SampleLayer3):
 
         # Layer weights
         self.pW = _make_prior(self.pstd, self.pW, W_shp)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shp, self.full)
+        self.qW = _make_posterior(self.qstd, self.qW, W_shp, self.full,
+                                  "dense")
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -585,7 +587,8 @@ class DenseVariational(SampleLayer3):
         if self.use_bias or not (self.prior_b is None and self.post_b is None):
             # Layer intercepts
             self.pb = _make_prior(self.pstd, self.pb, b_shp)
-            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False, "bias")
+            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False,
+                                      "dense_bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -700,7 +703,8 @@ class EmbedVariational(DenseVariational):
 
         # Layer weights
         self.pW = _make_prior(self.pstd, self.pW, W_shape)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shape, self.full)
+        self.qW = _make_posterior(self.qstd, self.qW, W_shape, self.full,
+                                  "embed")
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = _sample_W(self.qW, n_samples)
