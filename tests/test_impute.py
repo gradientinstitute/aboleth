@@ -119,3 +119,30 @@ def test_learned_normal_impute(make_missing_data):
         X_imputed = F.eval()
         assert KL.eval() == 0.0  # Might want to change this in the future
         assert(X_imputed.shape == X.shape)
+
+
+def test_extra_category_impute(make_missing_categories):
+    """Test the impute that learns a scalar value to impute for each col."""
+    ab.set_hyperseed(100)
+    X, m, ncats = make_missing_categories
+    X_true = np.copy(X)
+    X_true[:, m[:, 0], 0] = ncats[0]
+    X_true[:, m[:, 1], 1] = ncats[1]
+
+    # This replicates the input layer behaviour
+    def data_layer(**kwargs):
+        return kwargs['X'], 0.0
+
+    def mask_layer(**kwargs):
+        return kwargs['M'], 0.0
+
+    n, N, D = X.shape
+    impute = ab.ExtraCategoryImpute(data_layer, mask_layer, ncats)
+
+    F, KL = impute(X=X, M=m)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        X_imputed = F.eval()
+        assert np.all(X_imputed == X_true)

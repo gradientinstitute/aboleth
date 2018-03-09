@@ -70,6 +70,21 @@ def make_categories():
 
 
 @pytest.fixture
+def make_missing_categories():
+    """Make some simple categorical data."""
+    S = 3
+    N = 100
+    K1 = 20
+    K2 = 3
+    x1 = RAND.randint(0, K1, size=(S, N))[:, :, np.newaxis]
+    x2 = RAND.randint(0, K2, size=(S, N))[:, :, np.newaxis]
+    x = np.concatenate((x1, x2), axis=2)
+    mask = np.random.choice([True, False], size=x.shape[1:])
+    x = x.astype(np.int32)
+    return x, mask, (K1, K2)
+
+
+@pytest.fixture
 def make_graph():
     """Make the requirements for making a simple tf graph."""
     x, Y, X = make_data()
