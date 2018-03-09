@@ -333,3 +333,42 @@ class LearnedNormalImpute(ImputeOp):
         X_with_impute = data_zeroed_missing + missing_imputed
 
         return X_with_impute
+
+
+class ExtraCategoryImpute(ImputeOp):
+    r"""Impute missing values from categorical data with an extra category.
+
+    Given categorical data, a missing mask and a number of categories for
+    each feature (last dimension), this will assign missing values as
+    an extra category equal to the number of categories. e.g. for 2
+    categories (0 and 1) missing data will be assigned 2.
+
+    Parameters
+    ----------
+    datalayer : callable
+        A layer that returns a data tensor. Must be an InputLayer.
+    masklayer : callable
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be an InputLayer.
+    ncategory_list : list
+        A list that provides the total number of categories for each
+        feature (last dimension) of the input. Length of the list must be
+        equal to the size of the last dimension of X.
+
+    """
+
+    def __init__(self, datalayer, masklayer, ncategory_list):
+        """Initialise the object."""
+        self._ncats = tf.constant(ncategory_list)
+        super().__init__(datalayer, masklayer)
+
+    def _impute2D(self, X_2D):
+        # first, zero out the missing indices
+        X_missingzero = X_2D * self.real_val_mask
+        newvals = tf.gather(self._ncats, self.missing_ind[:, 1])
+        # newvals is a 1D tensor of lengh self.missing_ind, with self.ncats[i]
+        # if the second dimension is i for each missing index
+        X_new = tf.scatter_nd(self.missing_ind, newvals,
+                              shape=tf.shape(X_2D, out_type=tf.int64))
+        X_imp = X_missingzero + X_new
+        return X_imp
