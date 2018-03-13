@@ -13,7 +13,7 @@ ab.set_hyperseed(rseed)
 # Optimization
 n_epochs = 50
 batch_size = 100
-config = tf.ConfigProto(device_count={'GPU': 2})  # Use GPU ?
+config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 reg = 0.1
 
@@ -77,7 +77,7 @@ def main():
     with tf.name_scope("model"):
         logits, reg = net(X=X)
         llh = tf.distributions.Categorical(logits=logits)
-        loss = ab.elbo(llh, Y, N, reg)
+        loss = ab.max_posterior(llh.log_prob(Y), reg)
         probs = ab.sample_mean(llh.probs)
         accuracy = tf.reduce_mean(
             tf.cast(tf.equal(tf.argmax(probs, axis=1), Y), dtype=tf.float32))

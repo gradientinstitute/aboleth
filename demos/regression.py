@@ -93,8 +93,8 @@ def main():
     # This is where we build the actual GP model
     with tf.name_scope("Deepnet"):
         phi, kl = net(X=X_)
-        lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
-        loss = ab.elbo(lkhood, Y_, N, kl)
+        ll = tf.distributions.Normal(loc=phi, scale=ab.pos(noise)).log_prob(Y_)
+        loss = ab.elbo(ll, kl, N)
 
     # Set up the training graph
     with tf.name_scope("Train"):
@@ -104,7 +104,7 @@ def main():
 
     # This is used for building the predictive density image
     with tf.name_scope("Predict"):
-        logprob = ab.sample_mean(lkhood.log_prob(Y_))
+        logprob = ab.sample_mean(ll)
 
     # Logging learning progress
     log = tf.train.LoggingTensorHook(

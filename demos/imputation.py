@@ -95,7 +95,7 @@ def main():
         # Conditionally assign a placeholder for masks if USE_ABOLETH
         nn, kl = net(X=X_, M=M_) if USE_ABOLETH else net(X=X_)
         lkhood = tf.distributions.Categorical(logits=nn)
-        loss = ab.elbo(lkhood, Y_, N_tr, kl)
+        loss = ab.elbo(lkhood.log_prob(Y_), kl, N_tr)
         prob = ab.sample_mean(lkhood.probs)
 
     with tf.name_scope("Train"):
