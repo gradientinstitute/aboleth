@@ -31,7 +31,7 @@ batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 n_samples_ = tf.placeholder_with_default(n_samples, [])
 
-model = "gaussian_process"
+model = "deep_gaussian_process"
 
 
 # Models for regression
@@ -46,8 +46,8 @@ def linear(X, Y):
     )
 
     Xw, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=Xw, scale=noise)
-    loss = ab.max_posterior(lkhood, Y, reg)
+    lkhood = tf.distributions.Normal(loc=Xw, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
     # loss = 0.5 * tf.reduce_mean((Y - Xw)**2) + reg
 
     return Xw, loss
@@ -65,8 +65,8 @@ def bayesian_linear(X, Y):
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
 
     return f, loss
 
@@ -88,8 +88,8 @@ def nnet(X, Y):
     )
 
     f, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=noise)
-    loss = ab.max_posterior(lkhood, Y, reg)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
     return f, loss
 
 
@@ -112,8 +112,8 @@ def nnet_dropout(X, Y):
     )
 
     f, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=noise)
-    loss = ab.max_posterior(lkhood, Y, reg)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
     return f, loss
 
 
@@ -133,8 +133,8 @@ def nnet_bayesian(X, Y):
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=noise)
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
     return f, loss
 
 
@@ -175,30 +175,28 @@ def gaussian_process(X, Y):
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
-    # lkhood = tf.distributions.StudentT(df=1., loc=f, scale=ab.pos(noise))
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
 
     return f, loss
 
 
 def deep_gaussian_process(X, Y):
     """Deep Gaussian Process Regression."""
-    lambda_ = 0.1  # Initial weight prior std. dev, this is optimised later
     noise = tf.Variable(.01)  # Likelihood st. dev. initialisation
     lenscale = tf.Variable(1.)  # learn the length scale
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale))) >>
-        ab.DenseVariational(output_dim=5, prior_std=lambda_, full=False) >>
+        ab.DenseVariational(output_dim=5, prior_std=.1, full=True) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, prior_std=lambda_, full=False)
+        ab.DenseVariational(output_dim=1, prior_std=1., full=True)
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
 
     return f, loss
 

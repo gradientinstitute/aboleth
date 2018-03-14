@@ -1,6 +1,10 @@
-#!/usr/bin/env python
-
+#! /usr/bin/env python
 from setuptools import setup, find_packages
+
+# Detect minimum version of python
+import sys
+if sys.version_info < (3, 5):
+    sys.exit('Aboleth requires Python 3.5+')
 
 exec(open('aboleth/version.py').read())
 readme = open('README.rst').read()

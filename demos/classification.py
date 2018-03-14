@@ -63,7 +63,7 @@ def main():
     with tf.name_scope("Deepnet"):
         nn, reg = net(X=X_)
         lkhood = tf.distributions.Bernoulli(logits=nn)
-        loss = ab.max_posterior(lkhood, Y_, reg)
+        loss = ab.max_posterior(lkhood.log_prob(Y_), reg)
         prob = ab.sample_mean(lkhood.probs)
 
     with tf.name_scope("Train"):

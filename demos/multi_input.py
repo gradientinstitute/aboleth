@@ -88,7 +88,7 @@ def main():
     likelihood = tf.distributions.Bernoulli(logits=nn)
     prob = ab.sample_mean(likelihood.probs)
 
-    loss = ab.elbo(likelihood, Y_, N, kl)
+    loss = ab.elbo(likelihood.log_prob(Y_), kl, N)
     optimizer = tf.train.AdamOptimizer()
     train = optimizer.minimize(loss)
     init = tf.global_variables_initializer()
