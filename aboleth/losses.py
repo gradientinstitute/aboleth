@@ -10,7 +10,7 @@ def elbo(log_likelihood, KL, N):
     log_likelihood : Tensor
         the log-likelihood Tensor that takes neural network(s) and targets as
         an input. We recommend using a ``tf.distributions`` object's
-        ``log_prob()`` method to obtain this tensor.  The shape of this Tensor
+        ``log_prob()`` method to obtain this tensor. The shape of this Tensor
         should be ``(n_samples, N, ...)``, where ``n_samples`` is the number of
         log-likelihood samples (defined by ab.InputLayer) and ``N`` is the
         number of observations (can be ``?`` if you are using a placeholder and
@@ -39,6 +39,14 @@ def elbo(log_likelihood, KL, N):
 
     where ``NN`` is our neural network, and ``Y`` are our targets.
 
+    Note
+    ----
+    The way ``tf.distributions.Bernoulli`` and ``tf.distributions.Categorical``
+    are implemented are a little confusing... it is worth noting that you
+    should use a target array, ``Y``, of shape ``(N, 1)`` of ints with the
+    Bernoulli likelihood, and a target array of shape ``(N,)`` of ints with
+    the Categorical likelihood.
+
     """
     # Batch amplification factor
     B = N / tf.to_float(tf.shape(log_likelihood)[1])
@@ -47,7 +55,7 @@ def elbo(log_likelihood, KL, N):
     n_samples = tf.to_float(tf.shape(log_likelihood)[0])
 
     # Just mean over samps for expected log-likelihood
-    ELL = tf.reduce_sum(log_likelihood) / n_samples
+    ELL = tf.squeeze(tf.reduce_sum(log_likelihood, axis=[0, 1])) / n_samples
 
     # negative ELBO is batch weighted ELL and KL
     nELBO = - B * ELL + KL
@@ -90,9 +98,17 @@ def max_posterior(log_likelihood, regulariser):
 
     where ``NN`` is our neural network, and ``Y`` are our targets.
 
+    Note
+    ----
+    The way ``tf.distributions.Bernoulli`` and ``tf.distributions.Categorical``
+    are implemented are a little confusing... it is worth noting that you
+    should use a target array, ``Y``, of shape ``(N, 1)`` of ints with the
+    Bernoulli likelihood, and a target array of shape ``(N,)`` of ints with
+    the Categorical likelihood.
+
     """
     # Average likelihood for batch
-    AVLL = tf.reduce_mean(log_likelihood)
+    AVLL = tf.squeeze(tf.reduce_mean(log_likelihood, axis=[0, 1]))
 
     # MAP objective
     MAP = - AVLL + regulariser

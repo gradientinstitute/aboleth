@@ -34,7 +34,7 @@ true_noise = 0.1  # Add noise to the GP draws, to make things a little harder
 # Model settings
 n_samples = 5  # Number of random samples to get from an Aboleth net
 p_samples = 50  # Number of samples for prediction
-n_epochs = 200  # how many times to see the data for training
+n_epochs = 500  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
@@ -58,15 +58,15 @@ class WrapperLayer(SampleLayer):
 
 n_samples_ = tf.placeholder(tf.int32)
 
-l1_l2_reg = tf.keras.regularizers.l1_l2(l1=0., l2=0.01)
+l1_l2_reg = tf.keras.regularizers.l1_l2(l1=0., l2=0.)
 net = (
    ab.InputLayer(name="X", n_samples=n_samples_) >>
    WrapperLayer(tf.keras.layers.Dense, units=64, activation='tanh',
                 kernel_regularizer=l1_l2_reg, bias_regularizer=l1_l2_reg) >>
-   ab.DropOut(keep_prob=.5) >>
-   WrapperLayer(tf.keras.layers.Dense, units=64, activation='tanh',
+   ab.DropOut(keep_prob=.9) >>
+   WrapperLayer(tf.keras.layers.Dense, units=32, activation='tanh',
                 kernel_regularizer=l1_l2_reg, bias_regularizer=l1_l2_reg) >>
-   ab.DropOut(keep_prob=.5) >>
+   ab.DropOut(keep_prob=.9) >>
    WrapperLayer(tf.keras.layers.Dense, units=1, kernel_regularizer=l1_l2_reg,
                 bias_regularizer=l1_l2_reg)
 )
@@ -102,9 +102,9 @@ def main():
 
     # This is where we build the actual GP model
     with tf.name_scope("Deepnet"):
-        phi, kl = net(X=X_)
-        lkhood = tf.distributions.Normal(loc=phi, scale=ab.pos(noise))
-        loss = ab.elbo(lkhood, Y_, N, kl)
+        phi, reg = net(X=X_)
+        ll = tf.distributions.Normal(loc=phi, scale=ab.pos(noise)).log_prob(Y_)
+        loss = ab.max_posterior(ll, reg)
 
     # Set up the trainig graph
     with tf.name_scope("Train"):
@@ -114,7 +114,7 @@ def main():
 
     # This is used for building the predictive density image
     with tf.name_scope("Predict"):
-        logprob = tf.reduce_mean(lkhood.log_prob(Y_), axis=0)
+        logprob = tf.reduce_mean(ll, axis=0)
 
     # Logging learning progress
     log = tf.train.LoggingTensorHook(

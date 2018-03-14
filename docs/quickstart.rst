@@ -68,15 +68,16 @@ for our binary classifier (which corresponds to a log-loss):
 .. code::
         
     likelihood = tf.distributions.Bernoulli(probs=net)
+    log_like = likelihood.log_prob(Y_)
 
-If we were to call ``likelihood.log_prob(Y)``, it would return a tensor that
-implements the log of a Bernoulli probability mass function,
+which returns a tensor that implements the log of a Bernoulli probability mass
+function,
 
 .. math::
 
     \mathcal{L}(y_n, p_n) = y_n \log p_n + (1 - y_n) \log(1 - p_n).
 
-which is an integral part of our loss function. Here we have used :math:`p_n`
+This is an integral part of our loss function. Here we have used :math:`p_n`
 as shorthand for :math:`p(y_n = 1)`. 
 
 .. note::
@@ -100,7 +101,7 @@ weights:
 
 .. code::
         
-    loss = ab.max_posterior(likelihood, Y_, reg)
+    loss = ab.max_posterior(log_like, reg)
 
 This is a *maximum a-posteriori* loss function, which can be thought of as a 
 maximum likelihood objective with a penalty on the magnitude of the weights
@@ -129,12 +130,11 @@ model:
 This will run 1000 iterations of stochastic gradient optimization (using the
 Adam learning rate algorithm) where the model sees all of the data every
 iteration. We can also run this on mini-batches, see ``ab.batch`` for a simple
-batch generator, or TensorFlow's `train` and `data` modules for a more comprehensive set of
-utilities (we recommend looking at 
+batch generator, or TensorFlow's `train` and `data` modules for a more
+comprehensive set of utilities (we recommend looking at
 `tf.train.MonitoredTrainingSession
 <https://www.tensorflow.org/api_docs/python/tf/train/MonitoredTrainingSession>`_,
-and 
-`tf.data.Dataset
+and `tf.data.Dataset
 <https://www.tensorflow.org/api_docs/python/tf/data/Dataset>`_)
 
 Now that we have learned our classifier's weights, :math:`\hat{\mathbf{w}}`, we
@@ -280,7 +280,8 @@ Then like before to complete the model specification:
 
     net, kl = layers(X=X_)
     likelihood = tf.distributions.Bernoulli(probs=net)
-    loss = ab.elbo(likelihood, Y_, N=10000, KL=kl)
+    log_like = likelihood.log_prob(Y_)
+    loss = ab.elbo(log_like, KL=kl, N=10000)
 
 The main differences here are that ``reg`` is now ``kl``, and we use the
 ``elbo`` loss function. For all intents and purposes ``kl`` is still a
@@ -369,7 +370,8 @@ Then to complete the formulation of the Gaussian process (likelihood and loss),
 
     net, kl = layers(X=X_)
     likelihood = tf.distributions.Normal(net, scale=ab.pos(std))
-    loss = ab.elbo(likelihood, Y_, kl, N=10000)
+    log_like = likelihood.log_prob(Y_)
+    loss = ab.elbo(log_like, kl, N=10000)
 
 
 Here we just have a Normal likelihood since we are creating a model for

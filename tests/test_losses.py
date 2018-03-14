@@ -25,10 +25,9 @@ def test_elbo_likelihood(make_graph):
 
 def test_map_likelihood(make_graph):
     """Test for expected output dimensions from deepnet."""
-    x, y, _, _, _, _, layers = make_graph
-    Y = y.astype(np.float32)
-    nn, reg = layers(X=x.astype(np.float32))
-    log_like = tf.distributions.Normal(nn, scale=1.).log_prob(Y)
+    x, y, N, X_, Y_, N_, layers = make_graph
+    nn, reg = layers(X=X_)
+    log_like = tf.distributions.Normal(nn, scale=1.).log_prob(Y_)
 
     loss = ab.max_posterior(log_like, reg)
 
@@ -36,43 +35,54 @@ def test_map_likelihood(make_graph):
     with tc.test_session():
         tf.global_variables_initializer().run()
 
-        L = loss.eval()
+        L = loss.eval(feed_dict={X_: x, Y_: y})
         assert np.isscalar(L)
 
 
-def test_categorical_likelihood(make_data):
-    """Test aboleth with a tf.distributions.Categorical likelihood.
+@pytest.mark.parametrize('likelihood', [(tf.distributions.Categorical, 2),
+                                        (tf.distributions.Bernoulli, 1)])
+def test_categorical_likelihood(make_data, likelihood):
+    """Test aboleth with discrete likelihoods.
 
-    Since it is a bit of an odd half-multivariate case.
+    Since these are kind of corner cases...
     """
     x, y, _, = make_data
-    N, K = x.shape
+    like, K = likelihood
+    N, _ = x.shape
 
     # Make two classes (K = 2)
     Y = np.zeros(len(y), dtype=np.int32)
     Y[y[:, 0] > 0] = 1
 
+    if K == 1:
+        Y = Y[:, np.newaxis]
+
+    X_ = tf.placeholder(tf.float32, x.shape)
+    Y_ = tf.placeholder(tf.int32, Y.shape)
+    n_samples_ = tf.placeholder(tf.int32)
+
     layers = ab.stack(
-        ab.InputLayer(name='X', n_samples=10),
-        lambda X: (X, 0.0)   # Mock a sampling layer, with 2-class output
+        ab.InputLayer(name='X', n_samples=n_samples_),
+        ab.DenseMAP(output_dim=K)
     )
 
-    nn, reg = layers(X=x.astype(np.float32))
-    like = tf.distributions.Categorical(logits=nn)
-    log_like = like.log_prob(Y)
+    nn, reg = layers(X=X_)
+    like = like(logits=nn)
+    log_like = like.log_prob(Y_)
+    prob = like.prob(Y_)
 
     ELBO = ab.elbo(log_like, reg, N)
     MAP = ab.max_posterior(log_like, reg)
 
+    fd = {X_: x, Y_: Y, n_samples_: 10}
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
 
-        assert like.probs.eval().shape == (10, N, K)
-        assert like.prob(Y).eval().shape == (10, N)
+        assert like.probs.eval(feed_dict=fd).shape == (10, N, K)
+        assert prob.eval(feed_dict=fd).shape == (10,) + Y.shape
 
-        L = ELBO.eval()
-        assert np.isscalar(L)
+        L = ELBO.eval(feed_dict=fd)
 
-        L = MAP.eval()
+        L = MAP.eval(feed_dict=fd)
         assert np.isscalar(L)

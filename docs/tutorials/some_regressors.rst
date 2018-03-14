@@ -83,8 +83,8 @@ following code,
     )
 
     f, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=noise)
-    loss = ab.max_posterior(lkhood, Y, reg) 
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
 
 Here ``reg`` is the second regularizing term in the objective function, and
 putting a ``Normal`` likelihood distribution with a standard deviation of 1.0,
@@ -163,8 +163,8 @@ with Aboleth using the following code,
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
 
 Note here that we have set ``n_samples_`` to some value (e.g. 5, or use a place
 holder) because the ``DenseVariational`` layer uses samples from its posterior
@@ -242,8 +242,8 @@ Aboleth is here:
     )
 
     f, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=noise)
-    loss = ab.max_posterior(lkhood, Y, reg)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
 
 Where we have used hyperbolic tan activation functions. Now we get much better
 performance on our regression task!
@@ -279,8 +279,8 @@ layers.
     )
 
     f, reg = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=noise)
-    loss = ab.max_posterior(lkhood, Y, reg)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
 
 Now we get uncertainty on our latent functions:
 
@@ -315,8 +315,8 @@ building the Bayesian neural net regressor is,
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=noise)
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
 
 Unfortunately, this prediction is even smoother than the previous one. This
 behaviour with Gaussian weight distributions is also something observed in
@@ -435,8 +435,8 @@ before,
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
 
 Which makes these approximate GPs scale linearly with :math:`N` and allows us
 to trivially use mini-batch stochastic gradient optimisation! The tradeoff is,
@@ -481,8 +481,8 @@ Deep-GP algorithms with Aboleth, such as those presented in [5]_:
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise))
-    loss = ab.elbo(lkhood, Y, N, kl)
+    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
 
 On such a simple problem we obtain similar performance to the regular GP,
 though we see that extrapolation is worse, and is quite reminiscent of the

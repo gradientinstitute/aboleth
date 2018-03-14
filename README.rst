@@ -70,10 +70,10 @@ hidden layer and Normal prior/posterior distributions on the network weights:
     nn, kl = net(X=X_)
 
     # Define the likelihood model
-    likelihood = tf.distributions.Bernoulli(logits=nn)
+    likelihood = tf.distributions.Bernoulli(logits=nn).log_prob(Y_)
 
     # Build the final loss function to use with TensorFlow train
-    loss = ab.elbo(likelihood, Y_, N, kl)
+    loss = ab.elbo(likelihood, kl, N)
 
     # Now your TensorFlow training code here!
     ...
