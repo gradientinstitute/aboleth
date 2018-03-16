@@ -16,6 +16,7 @@ class MaskInputLayer(MultiLayer):
     ----------
     name : string
         The name of the input. Used as the agument for input into the net.
+
     """
 
     def __init__(self, name):
@@ -88,7 +89,7 @@ class ImputeOp(MultiLayer):
 
         """
         raise NotImplementedError("Abstract base class for imputation ops!")
-        X_imputed = None  # You imputation implementation
+        X_imputed = None  # Your imputation implementation
         return X_imputed
 
     def _check_rank_type(self, X, M):
@@ -106,11 +107,65 @@ class ImputeOp(MultiLayer):
         self.real_val_mask = tf.cast(tf.logical_not(M), dtype)
 
     def _initialise_variables(self, X):
-        """Optional extra build stage."""
+        """Extra build stage."""
         pass
 
 
-class MeanImpute(ImputeOp):
+class ImputeColumnWise(ImputeOp):
+    r"""Abstract class for imputing column-wise from a vector or scalar.
+
+    This implements ``_impute2D`` and this calls the ``_impute_columns`` method
+    that returns a vector or scalar to impute X column-wise (as opposed to
+    element-wise). You need to supply the ``_impute_columns`` method.
+    """
+
+    def _impute2D(self, X_2D):
+        r"""Randomly impute a rank 2 tensor.
+
+        Parameters
+        ----------
+        X_2D : Tensor
+            a rank 2 Tensor with missing data
+
+        Returns
+        -------
+        X_imputed : Tensor
+            a rank 2 Tensor with imputed data
+
+        """
+        # Fill zeros in for missing data initially
+        X_2D_zero = X_2D * self.real_val_mask
+
+        # Make a vector of the impute values for each missing point
+        column_vals = self._impute_columns(X_2D_zero)
+        imputed_vals = tf.gather(column_vals, self.missing_ind[:, 1])
+
+        # Fill the imputed values into the data tensor of zeros
+        X_new = tf.scatter_nd(self.missing_ind, imputed_vals,
+                              shape=tf.shape(X_2D, out_type=tf.int64))
+        X_imp = X_2D_zero + X_new
+        return X_imp
+
+    def _impute_columns(self, X_2D_zero):
+        """Generate a vector to subtitute missing data in X from.
+
+        Parameters
+        ----------
+        X_2D_zero : Tensor
+            a rank 2 Tensor with missing data zero-ed
+
+        Returns
+        -------
+        column_vals : float, array, Tensor
+            a scalar or rank 1 Tensor to impute X column-wise with
+
+        """
+        raise NotImplementedError("Abstract base class for imputation ops!")
+        column_vals = None  # Your imputation implementation
+        return column_vals
+
+
+class MeanImpute(ImputeColumnWise):
     r"""Impute the missing values using the stochastic mean of their column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -128,80 +183,20 @@ class MeanImpute(ImputeOp):
 
     """
 
-    def _impute2D(self, X_2D):
-        r"""Mean impute a rank 2 tensor."""
-        # Fill zeros in for missing data initially
-        data_zeroed_missing_tf = X_2D * self.real_val_mask
-
+    def _impute_columns(self, X_2D_zero):
+        """Generate a vector of means from X batches."""
         # Sum the real values in each column
-        col_tot = tf.reduce_sum(data_zeroed_missing_tf, 0)
+        col_tot = tf.reduce_sum(X_2D_zero, 0)
 
         # Divide column totals by the number of non-nan values
         num_values_col = tf.reduce_sum(self.real_val_mask, 0)
         num_values_col = tf.maximum(num_values_col,
                                     tf.ones(tf.shape(num_values_col)))
         col_nan_means = tf.div(col_tot, num_values_col)
-
-        # Make an vector of the impute values for each missing point
-        imputed_vals = tf.gather(col_nan_means, self.missing_ind[:, 1])
-
-        # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
-        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
-
-        X_with_impute = data_zeroed_missing_tf + missing_imputed
-
-        return X_with_impute
+        return col_nan_means
 
 
-class FixedNormalImpute(ImputeOp):
-    r"""Impute the missing values using marginal Gaussians over each column.
-
-    Takes two layers, one the returns a data tensor and the other returns a
-    mask layer. Creates a layer that returns a tensor in which the masked
-    values have been imputed as random draws from the marginal Gaussians.
-
-    Parameters
-    ----------
-    datalayer : callable
-        A layer that returns a data tensor. Must be of form ``f(**kwargs)``.
-    masklayer : callable
-        A layer that returns a boolean mask tensor where True values are
-        masked. Must be of form ``f(**kwargs)``.
-    mu_array : array-like
-        A list of the global mean values of each dat column
-    std_array : array-like
-        A list of the global standard deviation of each data column
-
-    """
-
-    def __init__(self, datalayer, masklayer, mu_array, std_array):
-        """Construct and instance of a RandomGaussImpute operation."""
-        super().__init__(datalayer, masklayer)
-        self.normal_array = [
-            tf.distributions.Normal(m, s) for m, s in zip(mu_array, std_array)
-        ]
-
-    def _impute2D(self, X_2D):
-        r"""Randomly impute a rank 2 tensor."""
-        # Fill zeros in for missing data initially
-        data_zeroed_missing_tf = X_2D * self.real_val_mask
-
-        # Divide column totals by the number of non-nan values
-        col_draws = [n.sample(seed=next(seedgen)) for n in self.normal_array]
-        # Make an vector of the impute values for each missing point
-        imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])
-
-        # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing_tf), dtype=tf.int64)
-        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
-
-        X_with_impute = data_zeroed_missing_tf + missing_imputed
-
-        return X_with_impute
-
-
-class LearnedScalarImpute(ImputeOp):
+class LearnedScalarImpute(ImputeColumnWise):
     r"""Impute the missing values using learnt scalar for each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -218,52 +213,21 @@ class LearnedScalarImpute(ImputeOp):
 
     """
 
-    def __init__(self, datalayer, masklayer):
-        r"""Construct and instance of a VarScalarImpute operation."""
-        super().__init__(datalayer, masklayer)
-
     def _initialise_variables(self, X):
         """Initialise the impute variables."""
         datadim = int(X.shape[2])
         self.impute_scalars = tf.Variable(
-            tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
+            tf.random_normal(shape=(datadim,), seed=next(seedgen)),
             name="impute_scalars"
         )
         summary_histogram(self.impute_scalars)
 
-    def _impute2D(self, X_2D):
-        r"""Randomly impute a rank 2 tensor.
-
-        Parameters
-        ----------
-        X_2D : Tensor
-            a rank 2 Tensor with missing data
-        scalars : Tensor 1 x D
-            these values are filled into the missing elements (per column)
-
-        Returns
-        -------
-        X_imputed : Tensor
-            a rank 2 Tensor with imputed data
-
-        """
-        # Fill zeros in for missing data initially
-        data_zeroed_missing = X_2D * self.real_val_mask
-
-        # Make an vector of the impute values for each missing point
-        imputed_vals = tf.gather(self.impute_scalars[0, :],
-                                 self.missing_ind[:, 1])
-
-        # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
-        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
-
-        X_with_impute = data_zeroed_missing + missing_imputed
-
-        return X_with_impute
+    def _impute_columns(self, X_2D_zero):
+        """Return the learned scalars for imputation."""
+        return self.impute_scalars
 
 
-class LearnedNormalImpute(ImputeOp):
+class LearnedNormalImpute(ImputeColumnWise):
     r"""Impute the missing values with draws from learned normal distributions.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -278,64 +242,67 @@ class LearnedNormalImpute(ImputeOp):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be an InputLayer.
-    """
 
-    def __init__(self, datalayer, masklayer):
-        r"""Construct and instance of a VarScalarImpute operation."""
-        super().__init__(datalayer, masklayer)
+    """
 
     def _initialise_variables(self, X):
         """Initialise the impute variables."""
         datadim = int(X.shape[2])
         impute_means = tf.Variable(
-            tf.random_normal(shape=(1, datadim), seed=next(seedgen)),
-            name="impute_scalars"
+            tf.random_normal(shape=(datadim,), seed=next(seedgen)),
+            name="impute_means"
         )
-        impute_stddev = tf.Variable(
-            tf.random_gamma(alpha=1., shape=(1, datadim), seed=next(seedgen)),
-            name="impute_scalars"
+        impute_var = tf.Variable(
+            tf.random_gamma(alpha=1., shape=(datadim,), seed=next(seedgen)),
+            name="impute_vars"
         )
 
         summary_histogram(impute_means)
-        summary_histogram(impute_stddev)
+        summary_histogram(impute_var)
 
         self.normal = tf.distributions.Normal(
             impute_means,
-            tf.sqrt(pos(impute_stddev))
+            tf.sqrt(pos(impute_var))
         )
 
-    def _impute2D(self, X_2D):
-        r"""Impute a rank 2 tensor with draws from normal distributions.
-
-        Parameters
-        ----------
-        X_2D : Tensor
-            a rank 2 Tensor with missing data
-
-        Returns
-        -------
-        X_imputed : Tensor
-            a rank 2 Tensor with imputed data
-
-        """
-        # Fill zeros in for missing data initially
-        data_zeroed_missing = X_2D * self.real_val_mask
-
-        # Divide column totals by the number of non-nan values
-        col_draws = tf.transpose(self.normal.sample(seed=next(seedgen)))
-        # Make an vector of the impute values for each missing point
-        imputed_vals = tf.gather(col_draws, self.missing_ind[:, 1])[:, 0]
-
-        # Fill the imputed values into the data tensor of zeros
-        shape = tf.cast(tf.shape(data_zeroed_missing), dtype=tf.int64)
-        missing_imputed = tf.scatter_nd(self.missing_ind, imputed_vals, shape)
-
-        X_with_impute = data_zeroed_missing + missing_imputed
-
-        return X_with_impute
+    def _impute_columns(self, X_2D_zero):
+        """Return random draws from an iid Normal for imputation."""
+        col_draws = self.normal.sample(seed=next(seedgen))
+        return col_draws
 
 
-class ExtraCategoryImpute(ImputeOp):
+class FixedNormalImpute(LearnedNormalImpute):
+    r"""Impute the missing values using marginal Gaussians over each column.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer. Creates a layer that returns a tensor in which the masked
+    values have been imputed as random draws from the marginal Gaussians.
+
+    Parameters
+    ----------
+    datalayer : callable
+        A layer that returns a data tensor. Must be of form ``f(**kwargs)``.
+    masklayer : callable
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be of form ``f(**kwargs)``.
+    loc : array-like
+        A list of the global mean values of each data column
+    scale : array-like
+        A list of the global standard deviation of each data column
+
+    """
+
+    def __init__(self, datalayer, masklayer, loc, scale):
+        """Construct and instance of a RandomGaussImpute operation."""
+        super().__init__(datalayer, masklayer)
+        self.loc = loc
+        self.scale = scale
+
+    def _initialise_variables(self, X):
+        self.normal = tf.distributions.Normal(self.loc, self.scale)
+
+
+class ExtraCategoryImpute(ImputeColumnWise):
     r"""Impute missing values from categorical data with an extra category.
 
     Given categorical data, a missing mask and a number of categories for
@@ -362,13 +329,6 @@ class ExtraCategoryImpute(ImputeOp):
         self._ncats = tf.constant(ncategory_list)
         super().__init__(datalayer, masklayer)
 
-    def _impute2D(self, X_2D):
-        # first, zero out the missing indices
-        X_missingzero = X_2D * self.real_val_mask
-        newvals = tf.gather(self._ncats, self.missing_ind[:, 1])
-        # newvals is a 1D tensor of lengh self.missing_ind, with self.ncats[i]
-        # if the second dimension is i for each missing index
-        X_new = tf.scatter_nd(self.missing_ind, newvals,
-                              shape=tf.shape(X_2D, out_type=tf.int64))
-        X_imp = X_missingzero + X_new
-        return X_imp
+    def _impute_columns(self, X_2D_zero):
+        """Return random draws from an iid Normal for imputation."""
+        return self._ncats
