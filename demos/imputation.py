@@ -24,9 +24,12 @@ FRAC_MISSING = 0.2  # Fraction of data that is missing
 MISSING_VAL = -666  # Value to indicate missingness
 NCLASSES = 7  # Number of target classes
 
-# Imputation method
+# Imputation method CHANGE THESE
 # METHOD = None
 METHOD = "LearnedNormalImpute"
+# METHOD = "FixedNormalImpute"
+# METHOD = "LearnedScalarImpute"
+# METHOD = "MeanImpute"
 
 # Optimization
 NEPOCHS = 5  # Number of times to see the data in training
@@ -51,6 +54,7 @@ def main():
     # Run this with imputation
     if METHOD is not None:
         print("Imputation method {}.".format(METHOD))
+
         # Fake some missing data
         rnd = np.random.RandomState(RSEED)
         mask = rnd.rand(*Xo.shape) < FRAC_MISSING
