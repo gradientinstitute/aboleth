@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.datasets import fetch_covtype
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, log_loss, confusion_matrix
-from sklearn.preprocessing import StandardScaler, Imputer
+from sklearn.preprocessing import StandardScaler
 
 import aboleth as ab
 
@@ -15,85 +15,120 @@ import aboleth as ab
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Make missing data?
-USE_ABOLETH = True  # Use Aboleth to learn an imputation?
-
 RSEED = 666
 ab.set_hyperseed(RSEED)
+CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
 
 FRAC_TEST = 0.1  # Fraction of data to use for hold-out testing
 FRAC_MISSING = 0.2  # Fraction of data that is missing
 MISSING_VAL = -666  # Value to indicate missingness
+NCLASSES = 7  # Number of target classes
+
+# Imputation method CHANGE THESE
+# METHOD = None
+METHOD = "LearnedNormalImpute"
+# METHOD = "FixedNormalImpute"
+# METHOD = "LearnedScalarImpute"
+# METHOD = "MeanImpute"
 
 # Optimization
 NEPOCHS = 5  # Number of times to see the data in training
 BSIZE = 100  # Mini batch size
-CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
-LSAMPLES = 5  # Number of samples the mode returns
+LSAMPLES = 5  # Number of samples for training
 PSAMPLES = 50  # Number of predictions samples
-
-NCLASSES = 7  # Number of target classes
-NFEATURES = 100  # Number of random features to use
-
-# Network construction
-n_samples_ = tf.placeholder_with_default(LSAMPLES, [])
-data_input = ab.InputLayer(name='X', n_samples=n_samples_)  # Data input
-mask_input = ab.MaskInputLayer(name='M')  # Missing data mask input
-
-lenscale = ab.pos(tf.Variable(np.ones((54, 1), dtype=np.float32)))
-sigma = ab.pos(tf.Variable(1.))
-
-layers = (
-    ab.RandomArcCosine(n_features=NFEATURES, lenscale=lenscale) >>
-    ab.DenseVariational(output_dim=NCLASSES, prior_std=sigma)
-)
 
 
 def main():
     """Run the imputation demo."""
     # Fetch data, one-hot targets and standardise data
     data = fetch_covtype()
-    X = data.data
+    Xo = data.data[:, :10]
+    Xc = data.data[:, 10:]
     Y = (data.target - 1)
-    X = StandardScaler().fit_transform(X)
+    Xo[:, :10] = StandardScaler().fit_transform(Xo[:, :10])
 
-    # Now fake some missing data with a mask
-    rnd = np.random.RandomState(RSEED)
-    mask = rnd.rand(*X.shape) < FRAC_MISSING
-    X[mask] = MISSING_VAL
+    # Network construction
+    n_samples_ = tf.placeholder_with_default(LSAMPLES, [])
+    data_input = ab.InputLayer(name='Xo', n_samples=n_samples_)  # Data input
 
-    # Use Aboleth to learn imputation statistics
-    if USE_ABOLETH:
-        net = ab.LearnedNormalImpute(data_input, mask_input) >> layers
+    # Run this with imputation
+    if METHOD is not None:
+        print("Imputation method {}.".format(METHOD))
 
-    # Or just mean impute
+        # Fake some missing data
+        rnd = np.random.RandomState(RSEED)
+        mask = rnd.rand(*Xo.shape) < FRAC_MISSING
+        Xo[mask] = MISSING_VAL
+
+        # Use Aboleth to imputate
+        mask_input = ab.MaskInputLayer(name='M')  # Missing data mask input
+        if METHOD == "LearnedNormalImpute":
+            input_layer = ab.LearnedNormalImpute(data_input, mask_input)
+        elif METHOD == "LearnedScalarImpute":
+            input_layer = ab.LearnedScalarImpute(data_input, mask_input)
+        elif METHOD == "FixedNormalImpute":
+            xm = np.ma.array(Xo, mask=mask)
+            mean = np.ma.mean(xm, axis=0).data.astype(np.float32)
+            std = np.ma.std(xm, axis=0).data.astype(np.float32)
+            input_layer = ab.FixedNormalImpute(data_input, mask_input, mean,
+                                               std)
+        elif METHOD == "MeanImpute":
+            input_layer = ab.MeanImpute(data_input, mask_input)
+
+        else:
+            raise ValueError("Invalid method!")
+
+    # Run this without imputation
     else:
-        net = data_input >> layers
-        imp = Imputer(missing_values=MISSING_VAL, strategy='mean')
-        X = imp.fit_transform(X)
+        print("No missing data")
+        input_layer = data_input
+        mask = np.zeros_like(Xo)
+
+    cat_layers = (
+        ab.InputLayer(name='Xc', n_samples=n_samples_) >>
+        ab.DenseVariational(output_dim=8)
+    )
+
+    con_layers = (
+        input_layer >>
+        ab.DenseVariational(output_dim=8)
+    )
+
+    net = (
+        ab.Concat(cat_layers, con_layers) >>
+        ab.Activation(tf.nn.elu) >>
+        ab.DenseVariational(output_dim=NCLASSES)
+    )
 
     # Split the training and testing data
-    X_tr, X_ts, Y_tr, Y_ts, M_tr, M_ts = train_test_split(
-        X.astype(np.float32),
+    Xo_tr, Xo_ts, Xc_tr, Xc_ts, Y_tr, Y_ts, M_tr, M_ts = train_test_split(
+        Xo.astype(np.float32),
+        Xc.astype(np.float32),
         Y.astype(np.int32),
         mask,
         test_size=FRAC_TEST,
         random_state=RSEED
     )
-    N_tr, D = X_tr.shape
+    N_tr, Do = Xo_tr.shape
+    _, Dc = Xc_tr.shape
 
     # Data
     with tf.name_scope("Input"):
-        Xb, Yb, Mb = batch_training(X_tr, Y_tr, M_tr, n_epochs=NEPOCHS,
-                                    batch_size=BSIZE)
-        X_ = tf.placeholder_with_default(Xb, shape=(None, D))
+        Xob, Xcb, Yb, Mb = batch_training(Xo_tr, Xc_tr, Y_tr, M_tr,
+                                          n_epochs=NEPOCHS, batch_size=BSIZE)
+        Xo_ = tf.placeholder_with_default(Xob, shape=(None, Do))
+        Xc_ = tf.placeholder_with_default(Xcb, shape=(None, Dc))
         # Y_ has to be this dimension for compatability with Categorical
         Y_ = tf.placeholder_with_default(Yb, shape=(None,))
-        M_ = tf.placeholder_with_default(Mb, shape=(None, D))
+        if METHOD is not None:
+            M_ = tf.placeholder_with_default(Mb, shape=(None, Do))
 
     with tf.name_scope("Deepnet"):
-        # Conditionally assign a placeholder for masks if USE_ABOLETH
-        nn, kl = net(X=X_, M=M_) if USE_ABOLETH else net(X=X_)
+        if METHOD is not None:
+            nn, kl = net(Xo=Xo_, Xc=Xc_, M=M_)
+        else:
+            nn, kl = net(Xo=Xo_, Xc=Xc_)
+
         lkhood = tf.distributions.Categorical(logits=nn)
         loss = ab.elbo(lkhood.log_prob(Y_), kl, N_tr)
         prob = ab.sample_mean(lkhood.probs)
@@ -124,8 +159,8 @@ def main():
             pass
 
         # Prediction
-        feed_dict = {X_: X_ts, Y_: [0], n_samples_: PSAMPLES}
-        if USE_ABOLETH:
+        feed_dict = {Xo_: Xo_ts, Xc_: Xc_ts, Y_: [0], n_samples_: PSAMPLES}
+        if METHOD is not None:
             feed_dict[M_] = M_ts
 
         p = sess.run(prob, feed_dict=feed_dict)
@@ -137,19 +172,20 @@ def main():
     acc = accuracy_score(Y_ts, Ey)
     ll = log_loss(Y_ts, p)
     conf = confusion_matrix(Y_ts, Ey)
-    print("Final scores:")
+    print("Final scores: {}".format(METHOD))
     print("\tAccuracy = {}\n\tLog loss = {}\n\tConfusion =\n{}".
           format(acc, ll, conf))
 
 
-def batch_training(X, Y, M, batch_size, n_epochs):
+def batch_training(Xo, Xc, Y, M, batch_size, n_epochs):
     """Batch training queue convenience function."""
-    data_tr = tf.data.Dataset.from_tensor_slices({'X': X, 'Y': Y, 'M': M}) \
+    fd = {'Xo': Xo, 'Xc': Xc, 'Y': Y, 'M': M}
+    data_tr = tf.data.Dataset.from_tensor_slices(fd) \
         .shuffle(buffer_size=1000, seed=RSEED) \
         .repeat(n_epochs) \
         .batch(batch_size)
     data = data_tr.make_one_shot_iterator().get_next()
-    return data['X'], data['Y'], data['M']
+    return data['Xo'], data['Xc'], data['Y'], data['M']
 
 
 if __name__ == "__main__":

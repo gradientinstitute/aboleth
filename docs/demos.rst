@@ -139,23 +139,18 @@ pipeline for dealing with messy data, and means our imputation methods can
 benefit from information contained in the labels (as opposed to imputing as a
 separate stage from supervised learning).
 
-This script demonstrates an imputation layer that learns a "mean" and a
-"standard deviation" of a Normal distribution (per column) to *randomly* impute
-the data from! We compare it to just imputing the missing values with the
-column means.
+This script demonstrates various imputation layers, some of which can learn
+scalar values per column to impute missing values with, and some can *randomly*
+impute data (based on mini-batch means or learned statistics)!
 
 The task is a multi-task classification problem in which we have to predict
 forest coverage types from 54 features or various types, described `here
 <http://archive.ics.uci.edu/ml/datasets/Covertype>`_. We have randomly removed
-elements from the features, which we impute using the two aforementioned
-techniques.
-
-Naive mean imputation gives 68.7% accuracy (0.717 log loss), and the per-column
-Normal imputation gives 69.1% accuracy (0.713 log loss). 
+elements from the continuous features, which we impute using the two
+aforementioned techniques.
 
 You can find the script here: `imputation.py
 <https://github.com/data61/aboleth/blob/master/demos/imputation.py>`_
-
 
 
 .. _compatibility:

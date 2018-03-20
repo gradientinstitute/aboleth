@@ -1,3 +1,16 @@
+Release 0.8.0
+=============
+
+Refactor the user interface for more clarity and flexibility. Also a lot of
+code maintenance and TensorBoard integration, specifically:
+
+- Compatibility checked with TensorFlow up to r1.6.
+- Convert the likelihoods to tensors away from distributions.
+- Clarify what is being optimised in the layers (do not optimise priors by
+  default)
+- Clean up the imputation module
+- Make all Variables constructed within the layers view-able trough TensorBoard
+
 Release 0.7.0
 =============
 
@@ -15,7 +28,7 @@ Release 0.7.0
   placeholders.
 - Generalise the feature embedding layers to work on matrix inputs (instead of
   just column vectors).
-- Numerous numerical and useability fixes.
+- Numerous numerical and usability fixes.
 
 Release 0.6.5
 =============
