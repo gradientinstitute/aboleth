@@ -464,7 +464,7 @@ class Conv2DVariational(SampleLayer):
         return weight_shape, bias_shape
 
 
-class DenseVariational(SampleLayer3):
+clas) DenseVariational(SampleLayer3):
     r"""A dense (fully connected) linear layer, with variational inference.
 
     This implements a dense linear layer,
@@ -743,7 +743,7 @@ class Conv2DMAP(SampleLayer):
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
-                 l1_reg=1., l2_reg=1., use_bias=True):
+                 l1_reg=0., l2_reg=0., use_bias=True):
         """Create and instance of a variational Conv2D layer."""
         self.filters = filters
         self.kernel_size = kernel_size
@@ -820,7 +820,7 @@ class DenseMAP(SampleLayer):
 
     """
 
-    def __init__(self, output_dim, l1_reg=1., l2_reg=1., use_bias=True):
+    def __init__(self, output_dim, l1_reg=0., l2_reg=0., use_bias=True):
         """Create and instance of a dense layer with MAP regularizers."""
         self.output_dim = output_dim
         self.l1 = l1_reg
@@ -883,7 +883,7 @@ class EmbedMAP(SampleLayer3):
 
     """
 
-    def __init__(self, output_dim, n_categories, l1_reg=1., l2_reg=1.):
+    def __init__(self, output_dim, n_categories, l1_reg=0., l2_reg=0.):
         """Create and instance of a MAP embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
