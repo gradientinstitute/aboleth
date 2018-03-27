@@ -464,7 +464,7 @@ class Conv2DVariational(SampleLayer):
         return weight_shape, bias_shape
 
 
-clas) DenseVariational(SampleLayer3):
+class DenseVariational(SampleLayer3):
     r"""A dense (fully connected) linear layer, with variational inference.
 
     This implements a dense linear layer,
