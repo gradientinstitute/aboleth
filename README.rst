@@ -60,7 +60,7 @@ hidden layer and Normal prior/posterior distributions on the network weights:
         ab.InputLayer(name="X", n_samples=5) >>
         ab.DenseVariational(output_dim=100) >>
         ab.Activation(tf.nn.relu) >>
-        ab.DenseVariational(output_dim=1) >>
+        ab.DenseVariational(output_dim=1)
     )
 
     X_ = tf.placeholder(tf.float, shape=(None, D))
