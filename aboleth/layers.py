@@ -7,7 +7,7 @@ from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_sum)
 from aboleth.baselayers import Layer, MultiLayer
-from aboleth.util import summary_histogram
+from aboleth.util import summary_histogram, pos
 
 
 #
@@ -298,10 +298,13 @@ class RandomArcCosine(RandomFourier):
     n_features : int
         the number of unique random features, the actual output dimension of
         this layer will be ``2 * n_features``.
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the ar-cosine kernel, this can be a scalar for
-        an isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
+    lenscale : float, ndarray, optional
+        The length scales of the arc-cosine kernel. This can be a scalar
+        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        automatic relevance detection (ARD) kernel. If not provided, it will
+        be set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto'
+        setting for a scikit learn SVM with a RBF kernel).
+        If learn_lenscale is True, lenscale will be its initial value.
     p : int
         The order of the arc-cosine kernel, this must be an integer greater
         than, or eual to zero. 0 will lead to sigmoid-like kernels, 1 will lead
@@ -309,12 +312,9 @@ class RandomArcCosine(RandomFourier):
     variational : bool
         use variational features instead of random features, (i.e. VAR-FIXED in
         [2]).
-    lenscale_posterior : float, ndarray, optional
-        the *initial* value for the posterior length scale. This is only used
-        if ``variational==True``. This can be a scalar or vector (different
-        initial value per input dimension). If this is left as None, it will be
-        set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto' setting
-        for a scikit learn SVM with a RBF kernel).
+    learn_lenscale : bool
+        Whether to learn the length scale. If True, the lenscale value provided
+        is used for initialisation.
 
     Note
     ----
@@ -331,15 +331,15 @@ class RandomArcCosine(RandomFourier):
 
     """
 
-    def __init__(self, n_features, lenscale=1.0, p=1, variational=False,
-                 lenscale_posterior=None):
+    def __init__(self, n_features, lenscale=None, p=1, variational=False,
+                 learn_lenscale=False):
         """Create an instance of an arc cosine kernel layer."""
         # Setup random weights
         if variational:
             kern = RBFVariational(lenscale=lenscale,
-                                  lenscale_posterior=lenscale_posterior)
+                                  learn_lenscale=learn_lenscale)
         else:
-            kern = RBF(lenscale=lenscale)
+            kern = RBF(lenscale=lenscale, learn_lenscale=learn_lenscale)
         super().__init__(n_features=n_features, kernel=kern)
 
         # Kernel order
@@ -380,47 +380,24 @@ class Conv2DVariational(SampleLayer):
     padding : str
         One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
         algorithm to use.
-    prior_std : float, np.array, tf.Tensor
+    prior_std : float, np.array
         the value of the weight prior standard deviation (:math:`\sigma` above)
-    post_std : float
-        the initial value of the posterior standard deviation.
+    learn_prior: bool, optional
+        Whether to learn the prior standard deviation.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
-    prior_W : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``prior_std`` parameter.
-    prior_b : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer intercept. It
-        must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``prior_std`` and ``use_bias`` parameters.
-    post_W : tf.distributions.Distribution, optional
-        It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.norm_posterior``.
-    post_b : tf.distributions.Distributions, optional
-        This is the posterior distribution object to use on the layer
-        intercept. It must have parameters compatible with (output_dim,) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.norm_posterior``.
-
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
-                 prior_std=1., post_std=1., use_bias=True, prior_W=None,
-                 prior_b=None, post_W=None, post_b=None):
+                 prior_std=1., learn_prior=False, use_bias=True):
         """Create and instance of a variational Conv2D layer."""
+        self.pstd = tf.Variable(pos(prior_std)) if learn_prior else prior_std
+        self.qstd = prior_std
         self.filters = filters
         self.kernel_size = kernel_size
         self.strides = [1] + list(strides) + [1]
         self.padding = padding
-        self.pstd = prior_std
-        self.qstd = post_std
         self.use_bias = use_bias
-        self.pW = prior_W
-        self.pb = prior_b
-        self.qW = post_W
-        self.qb = post_b
 
     def _build(self, X):
         """Build the graph of this layer."""
@@ -428,8 +405,8 @@ class Conv2DVariational(SampleLayer):
         W_shp, b_shp = self._weight_shapes(channels)
 
         # Layer weights
-        self.pW = _make_prior(self.pstd, self.pW, W_shp)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shp, False, "conv")
+        self.pW = _make_prior(self.pstd, W_shp)
+        self.qW = _make_posterior(self.qstd, W_shp, False, "conv")
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -443,11 +420,10 @@ class Conv2DVariational(SampleLayer):
             elems=(X, Wsamples), dtype=tf.float32)
 
         # Optional bias
-        if self.use_bias or not (self.prior_b is None and self.post_b is None):
+        if self.use_bias:
             # Layer intercepts
-            self.pb = _make_prior(self.pstd, self.pb, b_shp)
-            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False,
-                                      "conv_bias")
+            self.pb = _make_prior(self.pstd, b_shp)
+            self.qb = _make_posterior(self.qstd, b_shp, False, "conv_bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -522,49 +498,27 @@ class DenseVariational(SampleLayer3):
     ----------
     output_dim : int
         the dimension of the output of this layer
-    prior_std : float, np.array, tf.Tensor
+    prior_std : float, np.array
         the value of the weight prior standard deviation (:math:`\sigma` above)
-    post_std : float
-        the initial value of the posterior standard deviation.
+    learn_prior : bool, optional
+        Whether to learn the prior
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
-    prior_W : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``prior_std`` parameter.
-    prior_b : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer intercept. It
-        must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``prior_std`` and ``use_bias`` parameters.
-    post_W : tf.distributions.Distribution, optional
-        It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.gaus_posterior``.
-    post_b : tf.distributions.Distributions, optional
-        This is the posterior distribution object to use on the layer
-        intercept. It must have parameters compatible with (output_dim,) shaped
-        weights. This ignores the ``use_bias`` and ``post_std`` parameters.
-        See also ``distributions.norm_posterior``.
 
     """
 
-    def __init__(self, output_dim, prior_std=1., post_std=1., full=False,
-                 use_bias=True, prior_W=None, prior_b=None, post_W=None,
-                 post_b=None):
+    def __init__(self, output_dim, prior_std=1., learn_prior=False, full=False,
+                 use_bias=True):
         """Create and instance of a variational dense layer."""
         self.output_dim = output_dim
-        self.pstd = prior_std
-        self.qstd = post_std
+        self.pstd = tf.Variable(pos(prior_std)) if learn_prior else prior_std
+        self.qstd = prior_std
         self.full = full
         self.use_bias = use_bias
-        self.pW = prior_W
-        self.pb = prior_b
-        self.qW = post_W
-        self.qb = post_b
 
     def _build(self, X):
         """Build the graph of this layer."""
@@ -572,9 +526,8 @@ class DenseVariational(SampleLayer3):
         W_shp, b_shp = self._weight_shapes(input_dim)
 
         # Layer weights
-        self.pW = _make_prior(self.pstd, self.pW, W_shp)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shp, self.full,
-                                  "dense")
+        self.pW = _make_prior(self.pstd, W_shp)
+        self.qW = _make_posterior(self.qstd, W_shp, self.full, "dense")
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -584,11 +537,10 @@ class DenseVariational(SampleLayer3):
         Net = tf.matmul(X, Wsamples)
 
         # Optional bias
-        if self.use_bias or not (self.prior_b is None and self.post_b is None):
+        if self.use_bias:
             # Layer intercepts
-            self.pb = _make_prior(self.pstd, self.pb, b_shp)
-            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False,
-                                      "dense_bias")
+            self.pb = _make_prior(self.pstd, b_shp)
+            self.qb = _make_posterior(self.qstd, b_shp, False, "dense_bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -665,35 +617,24 @@ class EmbedVariational(DenseVariational):
         the number of categories in the input variable
     prior_std : float, np.array, tf.Tensor
         the value of the weight prior standard deviation (:math:`\sigma` above)
-    post_std : float
-        the initial value of the posterior standard deviation.
+    learn_prior : bool, optional
+        Whether to learn the prior
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
-    prior_W : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``prior_std`` parameter.
-    post_W : tf.distributions.Distribution, optional
-        This is the posterior distribution object to use on the layer weights.
-        It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.gaus_posterior``.
 
     """
 
-    def __init__(self, output_dim, n_categories, prior_std=1., post_std=1.,
-                 full=False, prior_W=None, post_W=None):
+    def __init__(self, output_dim, n_categories, prior_std=1.,
+                 learn_prior=False, full=False):
         """Create and instance of a variational dense embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
+        self.pstd = tf.Variable(pos(prior_std)) if learn_prior else prior_std
+        self.qstd = prior_std
         self.n_categories = n_categories
-        self.pstd = prior_std
-        self.qstd = post_std
         self.full = full
-        self.pW = prior_W
-        self.qW = post_W
 
     def _build(self, X):
         """Build the graph of this layer."""
@@ -702,9 +643,8 @@ class EmbedVariational(DenseVariational):
         n_batch = tf.shape(X)[1]
 
         # Layer weights
-        self.pW = _make_prior(self.pstd, self.pW, W_shape)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shape, self.full,
-                                  "embed")
+        self.pW = _make_prior(self.pstd, W_shape)
+        self.qW = _make_posterior(self.qstd, W_shape, self.full, "embed")
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = _sample_W(self.qW, n_samples)
@@ -754,7 +694,7 @@ class Conv2DMAP(SampleLayer):
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
-                 l1_reg=1., l2_reg=1., use_bias=True):
+                 l1_reg=0., l2_reg=0., use_bias=True):
         """Create and instance of a variational Conv2D layer."""
         self.filters = filters
         self.kernel_size = kernel_size
@@ -834,7 +774,7 @@ class DenseMAP(SampleLayer):
 
     """
 
-    def __init__(self, output_dim, l1_reg=1., l2_reg=1., use_bias=True):
+    def __init__(self, output_dim, l1_reg=0., l2_reg=0., use_bias=True):
         """Create and instance of a dense layer with MAP regularizers."""
         self.output_dim = output_dim
         self.l1 = l1_reg
@@ -900,7 +840,7 @@ class EmbedMAP(SampleLayer3):
 
     """
 
-    def __init__(self, output_dim, n_categories, l1_reg=1., l2_reg=1.):
+    def __init__(self, output_dim, n_categories, l1_reg=0., l2_reg=0.):
         """Create and instance of a MAP embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
@@ -957,27 +897,21 @@ def _sample_W(dist, n_samples, transpose=True):
     return Wsamples
 
 
-def _make_prior(std, prior_W, weight_shape):
+def _make_prior(std, weight_shape):
     """Check/make prior weight distributions."""
-    if prior_W is None:
-        prior_W = norm_prior(weight_shape, std=std)
-
+    prior_W = norm_prior(weight_shape, std=std)
     assert _is_dim(prior_W, weight_shape), \
         "Prior inconsistent dimension!"
-
     return prior_W
 
 
-def _make_posterior(std, post_W, weight_shape, full, suffix=None):
+def _make_posterior(std, weight_shape, full, suffix=None):
     """Check/make posterior."""
-    if post_W is None:
-        # We don't want a full-covariance on an intercept, check input_dim
-        if full and len(weight_shape) > 1:
-            post_W = gaus_posterior(weight_shape, std0=std, suffix=suffix)
-        else:
-            post_W = norm_posterior(weight_shape, std0=std, suffix=suffix)
-
+    # We don't want a full-covariance on an intercept, check input_dim
+    if full and len(weight_shape) > 1:
+        post_W = gaus_posterior(weight_shape, std0=std, suffix=suffix)
+    else:
+        post_W = norm_posterior(weight_shape, std0=std, suffix=suffix)
     assert _is_dim(post_W, weight_shape), \
         "Posterior inconsistent dimension!"
-
     return post_W
