@@ -124,9 +124,10 @@ class RBFVariational(ShiftInvariant):
         automatic relevance detection (ARD) kernel. If not provided, it will
         be set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto'
         setting for a scikit learn SVM with a RBF kernel).
-        If learn_lenscale is True, lenscale will be its initial value.
+        If learn_lenscale is True, lenscale will be the initial value of the
+        prior precision of the Fourier weight distribution.
     learn_lenscale : bool, optional
-        Whether to learn the length scale. If True, the lenscale
+        Whether to learn the (prior) length scale. If True, the lenscale
         value provided (or its default) is used for initialisation.
 
     """
