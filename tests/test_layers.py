@@ -292,13 +292,7 @@ def test_fourier_features(kernels, make_data):
         assert kl >= 0
 
 
-@pytest.mark.parametrize('dists', [
-    {'prior_W': norm_prior((4, 4, 3, D), 1.), 'prior_b': norm_prior((D,), 1.)},
-    {'post_W': norm_prior((4, 4, 3, D), 1.), 'post_b': norm_prior((D,), 1.)},
-    {'prior_W': norm_prior((4, 4, 3, D), 1.),
-     'post_W': norm_prior((4, 4, 3, D), 1.)}
-])
-def test_conv2d_distribution(dists, make_image_data):
+def test_conv2d_distribution(make_image_data):
     """Test initialising dense variational layers with distributions."""
     x, _, X = make_image_data
     S = 3
@@ -306,7 +300,7 @@ def test_conv2d_distribution(dists, make_image_data):
     x_, X_ = _make_placeholders(x, S)
     N, height, width, channels = x.shape
 
-    Phi, KL = ab.Conv2DVariational(filters=D, kernel_size=(4, 4), **dists)(X_)
+    Phi, KL = ab.Conv2DVariational(filters=D, kernel_size=(4, 4))(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -316,14 +310,7 @@ def test_conv2d_distribution(dists, make_image_data):
         assert KL.eval() >= 0.
 
 
-@pytest.mark.parametrize('dists', [
-    {'prior_W': norm_prior(DIM, 1.), 'prior_b': norm_prior((D,), 1.)},
-    {'post_W': norm_prior(DIM, 1.), 'post_b': norm_prior((D,), 1.)},
-    {'prior_W': norm_prior(DIM, 1.), 'post_W': norm_prior(DIM, 1.)},
-    {'prior_W': norm_prior(DIM, 1.), 'post_W': gaus_posterior(DIM, 1.)},
-    {'prior_W': gaus_posterior(DIM, 1.), 'post_W': gaus_posterior(DIM, 1.)},
-])
-def test_dense_distribution(dists, make_data):
+def test_dense_distribution(make_data):
     """Test initialising dense variational layers with distributions."""
     x, _, _ = make_data
     S = 3
@@ -331,7 +318,7 @@ def test_dense_distribution(dists, make_data):
     x_, X_ = _make_placeholders(x, S)
     N = x.shape[0]
 
-    Phi, KL = ab.DenseVariational(output_dim=D, **dists)(X_)
+    Phi, KL = ab.DenseVariational(output_dim=D)(X_)
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
@@ -340,18 +327,13 @@ def test_dense_distribution(dists, make_data):
         assert KL.eval() >= 0.
 
 
-@pytest.mark.parametrize('dists', [
-    {'prior_W': norm_prior(EDIM, 1.), 'post_W': norm_prior(EDIM, 1.)},
-    {'prior_W': norm_prior(EDIM, 1.), 'post_W': gaus_posterior(EDIM, 1.)},
-    {'prior_W': gaus_posterior(EDIM, 1.), 'post_W': gaus_posterior(EDIM, 1.)},
-])
-def test_embeddings_distribution(dists, make_categories):
+def test_embeddings_distribution(make_categories):
     """Test initialising embedding variational layers with distributions."""
     x, K = make_categories
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K, **dists)(X_)
+    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():

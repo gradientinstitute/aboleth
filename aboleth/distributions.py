@@ -40,8 +40,9 @@ def norm_posterior(dim, std0, suffix=None):
     ----------
     dim : tuple or list
         the dimension of this distribution.
-    std0 : float
+    std0 : float, np.array
         the initial (unoptimized) standard deviation of this distribution.
+        Must be a scalar or have the same shape as dim.
     suffix : str
         suffix to add to the names of the variables of the parameters of this
         distribution.
@@ -60,11 +61,10 @@ def norm_posterior(dim, std0, suffix=None):
     ``std0`` and a beta of 1.
 
     """
-    mu_0 = tf.random_normal(dim, stddev=std0, seed=next(seedgen))
+    # we have different values for each dimension on the first axis
+    mu_0 = np.zeros(dim, dtype=np.float32)
     mu = tf.Variable(mu_0, name=_add_suffix("W_mu_q", suffix))
-
-    std_0 = tf.random_gamma(alpha=std0, shape=dim, seed=next(seedgen))
-    std = tf.Variable(std_0, name=_add_suffix("W_std_q", suffix))
+    std = tf.Variable(std0, name=_add_suffix("W_std_q", suffix))
 
     summary_histogram(mu)
     summary_histogram(std)

@@ -78,13 +78,13 @@ def nnet(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
-        ab.DenseMAP(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=40, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=20, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=10, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
     )
 
     f, reg = net(X=X)
@@ -100,15 +100,15 @@ def nnet_dropout(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseMAP(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=40, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
         ab.DropOut(keep_prob=0.9) >>
-        ab.DenseMAP(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=20, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
         ab.DropOut(keep_prob=0.95) >>
-        ab.DenseMAP(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DenseMAP(output_dim=10, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
     )
 
     f, reg = net(X=X)
@@ -152,7 +152,7 @@ def svr(X, Y):
         ab.InputLayer(name="X", n_samples=1) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
         # ab.DropOut(keep_prob=0.9) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
     )
 
     f, reg = net(X=X)
@@ -164,9 +164,7 @@ def gaussian_process(X, Y):
     """Gaussian Process Regression."""
     lambda_ = 1.
     noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
-    lenscale = tf.Variable(1.)  # learn the length scale
-    kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
-    # kern = ab.RBFVariational(lenscale=ab.pos(lenscale))
+    kern = ab.RBF(learn_lenscale=True)  # learn lengthscale
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
@@ -184,11 +182,10 @@ def gaussian_process(X, Y):
 def deep_gaussian_process(X, Y):
     """Deep Gaussian Process Regression."""
     noise = tf.Variable(.01)  # Likelihood st. dev. initialisation
-    lenscale = tf.Variable(1.)  # learn the length scale
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.RandomFourier(n_features=20, kernel=ab.RBF(ab.pos(lenscale))) >>
+        ab.RandomFourier(n_features=20, kernel=ab.RBF(learn_lenscale=True)) >>
         ab.DenseVariational(output_dim=5, prior_std=.1, full=True) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
         ab.DenseVariational(output_dim=1, prior_std=1., full=True)
