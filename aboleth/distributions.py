@@ -62,11 +62,9 @@ def norm_posterior(dim, std0, suffix=None):
 
     """
     # we have different values for each dimension on the first axis
-    rand = np.random.RandomState(next(seedgen))
-    mu_0 = rand.normal(loc=0., scale=std0, size=dim).astype(np.float32)
+    mu_0 = np.zeros(dim, dtype=np.float32)
     mu = tf.Variable(mu_0, name=_add_suffix("W_mu_q", suffix))
-    std_0 = rand.gamma(std0, size=dim).astype(np.float32)
-    std = tf.Variable(std_0, name=_add_suffix("W_std_q", suffix))
+    std = tf.Variable(std0, name=_add_suffix("W_std_q", suffix))
 
     summary_histogram(mu)
     summary_histogram(std)
