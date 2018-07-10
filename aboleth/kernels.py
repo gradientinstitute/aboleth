@@ -18,7 +18,7 @@ class ShiftInvariant:
     ----------
     lenscale : float, ndarray, optional
         The length scales of the shift invariant kernel. This can be a scalar
-        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        for an isotropic kernel, or a vector of shape (input_dim,) for an
         automatic relevance detection (ARD) kernel. If learn_lenscale is
         True, lenscale will be its initial value.
     learn_lenscale : bool, optional
@@ -27,7 +27,7 @@ class ShiftInvariant:
 
     """
 
-    def __init__(self, lenscale, learn_lenscale=False):
+    def __init__(self, lenscale=None, learn_lenscale=False):
         """Constuct a shift invariant kernel object."""
         self.given_lenscale = lenscale
         self.learn_lenscale = learn_lenscale
@@ -67,7 +67,7 @@ class RBF(ShiftInvariant):
     ----------
     lenscale : float, ndarray, optional
         The length scales of the RBF kernel. This can be a scalar
-        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        for an isotropic kernel, or a vector of shape (input_dim,) for an
         automatic relevance detection (ARD) kernel. If not provided, it will
         be set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto'
         setting for a scikit learn SVM with a RBF kernel).
@@ -106,7 +106,7 @@ class RBF(ShiftInvariant):
                                           input_dim)
         rand = np.random.RandomState(next(seedgen))
         e = rand.randn(input_dim, n_features).astype(dtype)
-        P = e / self.lenscale
+        P = e / tf.expand_dims(self.lenscale, axis=-1)
         return P, 0.
 
 
@@ -120,7 +120,7 @@ class RBFVariational(ShiftInvariant):
     ----------
     lenscale : float, ndarray, optional
         The length scales of the RBF kernel. This can be a scalar
-        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        for an isotropic kernel, or a vector of shape (input_dim,) for an
         automatic relevance detection (ARD) kernel. If not provided, it will
         be set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto'
         setting for a scikit learn SVM with a RBF kernel).
@@ -165,14 +165,14 @@ class RBFVariational(ShiftInvariant):
         dim = (input_dim, n_features)
 
         # Setup the prior, lenscale may be a variable, so dont use prior_normal
+        pP_scale = self.__len2std(self.lenscale, n_features)
         pP = tf.distributions.Normal(
             loc=tf.zeros(dim),
-            scale=self.__len2std(self.lenscale)
-        )
-
+            scale=pP_scale)
         # Initialise the posterior
-        qP = norm_posterior(dim=dim, std0=self.__len2std(self.lenscale_post),
-                            suffix="kernel")
+        qP_scale = 1.0 / self.lenscale_post
+        import IPython; IPython.embed(); import sys; sys.exit()
+        qP = norm_posterior(dim=dim, std0=qP_scale, suffix="kernel")
 
         KL = kl_sum(qP, pP)
 
@@ -185,8 +185,8 @@ class RBFVariational(ShiftInvariant):
         return P, KL
 
     @staticmethod
-    def __len2std(lenscale):
-        std = tf.to_float(1. / lenscale)
+    def __len2std(lenscale, n_features):
+        std = tf.tile(1.0 / tf.expand_dims(lenscale, axis=-1), (1, n_features))
         return std
 
 
@@ -197,7 +197,7 @@ class Matern(ShiftInvariant):
     ----------
     lenscale : float, ndarray, optional
         The length scales of the Matern kernel. This can be a scalar
-        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        for an isotropic kernel, or a vector of shape (input_dim,) for an
         automatic relevance detection (ARD) kernel. If not provided, it will
         be set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto'
         setting for a scikit learn SVM with a RBF kernel).
@@ -256,15 +256,20 @@ class Matern(ShiftInvariant):
         rand = np.random.RandomState(next(seedgen))
         y = rand.randn(input_dim, n_features)
         u = rand.chisquare(df, size=(n_features,))
-        P = (y * np.sqrt(df / u)).astype(dtype) / self.lenscale
+        P = (y * np.sqrt(df / u)).astype(dtype) / \
+            tf.expand_dims(self.lenscale, axis=-1)
         return P, 0.
 
 
 def _init_lenscale(given_lenscale, learn_lenscale, input_dim):
     """Provide the lenscale variable and its initial value."""
-    if given_lenscale is None:
-        given_lenscale = np.sqrt(1.0 / input_dim)
+    given_lenscale = tf.cast(
+        np.sqrt(1.0 / input_dim) if given_lenscale is None
+        else tf.squeeze(given_lenscale), dtype=tf.float32)
+
     lenscale = tf.Variable(pos(given_lenscale)) if learn_lenscale \
         else given_lenscale
-    init_lenscale = given_lenscale
-    return lenscale, init_lenscale
+
+    lenscale_vec = tf.ones(input_dim, dtype=tf.float32) * lenscale
+    init_lenscale = given_lenscale * np.ones(input_dim, dtype=np.float32)
+    return lenscale_vec, init_lenscale
