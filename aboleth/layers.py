@@ -391,7 +391,7 @@ class Conv2DVariational(SampleLayer):
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
                  prior_std=1., learn_prior=False, use_bias=True):
         """Create and instance of a variational Conv2D layer."""
-        self.pstd = tf.Variable(pos(prior_std)) if learn_prior else prior_std
+        self.pstd = _make_prior_std(prior_std, learn_prior, "conv2d")
         self.qstd = prior_std
         self.filters = filters
         self.kernel_size = kernel_size
@@ -516,7 +516,7 @@ class DenseVariational(SampleLayer3):
                  use_bias=True):
         """Create and instance of a variational dense layer."""
         self.output_dim = output_dim
-        self.pstd = tf.Variable(pos(prior_std)) if learn_prior else prior_std
+        self.pstd = _make_prior_std(prior_std, learn_prior, "dense")
         self.qstd = prior_std
         self.full = full
         self.use_bias = use_bias
@@ -633,7 +633,7 @@ class EmbedVariational(DenseVariational):
         """Create and instance of a variational dense embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
-        self.pstd = tf.Variable(pos(prior_std)) if learn_prior else prior_std
+        self.pstd = _make_prior_std(prior_std, learn_prior, "embed")
         self.qstd = prior_std
         self.n_categories = n_categories
         self.full = full
@@ -917,3 +917,12 @@ def _make_posterior(std, weight_shape, full, suffix=None):
     assert _is_dim(post_W, weight_shape), \
         "Posterior inconsistent dimension!"
     return post_W
+
+
+def _make_prior_std(std, learn_prior, suffix=None):
+    if learn_prior:
+        x = tf.Variable(pos(std), name="prior_std_{}".format(suffix))
+        summary_histogram(x)
+    else:
+        x = std
+    return x
