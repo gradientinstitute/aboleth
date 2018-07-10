@@ -171,7 +171,8 @@ class RBFVariational(ShiftInvariant):
             scale=pP_scale)
         # Initialise the posterior
         qP_scale = 1.0 / self.lenscale_post
-        import IPython; IPython.embed(); import sys; sys.exit()
+        if qP_scale.ndim > 0:
+            qP_scale = np.repeat(qP_scale[:, np.newaxis], n_features, axis=1)
         qP = norm_posterior(dim=dim, std0=qP_scale, suffix="kernel")
 
         KL = kl_sum(qP, pP)
@@ -263,9 +264,9 @@ class Matern(ShiftInvariant):
 
 def _init_lenscale(given_lenscale, learn_lenscale, input_dim):
     """Provide the lenscale variable and its initial value."""
-    given_lenscale = tf.cast(
-        np.sqrt(1.0 / input_dim) if given_lenscale is None
-        else tf.squeeze(given_lenscale), dtype=tf.float32)
+    given_lenscale = (np.sqrt(1.0 / input_dim) if given_lenscale is None
+                      else np.array(given_lenscale).squeeze()).astype(
+                          np.float32)
 
     lenscale = tf.Variable(pos(given_lenscale)) if learn_lenscale \
         else given_lenscale

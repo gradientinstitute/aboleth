@@ -300,7 +300,7 @@ class RandomArcCosine(RandomFourier):
         this layer will be ``2 * n_features``.
     lenscale : float, ndarray, optional
         The length scales of the arc-cosine kernel. This can be a scalar
-        for an isotropic kernel, or a vector of shape (input_dim, 1) for an
+        for an isotropic kernel, or a vector of shape (input_dim,) for an
         automatic relevance detection (ARD) kernel. If not provided, it will
         be set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto'
         setting for a scikit learn SVM with a RBF kernel).
@@ -380,7 +380,7 @@ class Conv2DVariational(SampleLayer):
     padding : str
         One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
         algorithm to use.
-    prior_std : float, np.array
+    prior_std : float
         the value of the weight prior standard deviation (:math:`\sigma` above)
     learn_prior: bool, optional
         Whether to learn the prior standard deviation.
@@ -479,8 +479,9 @@ class DenseVariational(SampleLayer3):
     :math:`\mathbf{C}_j \in \mathbb{R}^{D_{in} \times D_{in}}`.
 
     This layer will use variational inference to learn the posterior
-    parameters, and optionally the ``prior_std`` parameter can be passed in as
-    a ``tf.Variable``, in which case it will also be learned.
+    parameters, and optionally the ``prior_std`` parameter can be  learned
+    if ``learn_prior`` is set to True. The given value is then used to
+    initialize.
 
     Whenever this layer is called, it will return the result,
 
@@ -498,7 +499,7 @@ class DenseVariational(SampleLayer3):
     ----------
     output_dim : int
         the dimension of the output of this layer
-    prior_std : float, np.array
+    prior_std : float
         the value of the weight prior standard deviation (:math:`\sigma` above)
     learn_prior : bool, optional
         Whether to learn the prior
@@ -595,8 +596,9 @@ class EmbedVariational(DenseVariational):
     :math:`\mathbf{C}_j \in \mathbb{R}^{K \times K}`.
 
     This layer will use variational inference to learn the posterior
-    parameters, and optionally the ``prior_std`` parameter can be passed in as
-    a ``tf.Variable``, in which case it will also be learned.
+    parameters, and optionally the ``prior_std`` parameter can be learned
+    if ``learn_prior`` is set to True. The ``prior_std`` value given will
+    be used for initialization.
 
     Whenever this layer is called, it will return the result,
 
@@ -615,7 +617,7 @@ class EmbedVariational(DenseVariational):
         the dimension of the output (embedding) of this layer
     n_categories : int
         the number of categories in the input variable
-    prior_std : float, np.array, tf.Tensor
+    prior_std : float
         the value of the weight prior standard deviation (:math:`\sigma` above)
     learn_prior : bool, optional
         Whether to learn the prior
