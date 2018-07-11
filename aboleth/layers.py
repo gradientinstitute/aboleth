@@ -8,7 +8,7 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_sum)
 from aboleth.baselayers import Layer, MultiLayer
 from aboleth.util import summary_histogram, pos
-from aboleth.initialisers import initialise_weights
+from aboleth.initialisers import initialise_weights, initialise_stds
 
 
 #
@@ -381,8 +381,11 @@ class Conv2DVariational(SampleLayer):
     padding : str
         One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
         algorithm to use.
-    prior_std : float
-        the value of the weight prior standard deviation (:math:`\sigma` above)
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
     learn_prior: bool, optional
         Whether to learn the prior standard deviation.
     use_bias : bool
@@ -390,21 +393,22 @@ class Conv2DVariational(SampleLayer):
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
-                 prior_std=1., learn_prior=False, use_bias=True):
+                 prior_std='glorot', learn_prior=False, use_bias=True):
         """Create and instance of a variational Conv2D layer."""
-        self.pstd = _make_prior_std(prior_std, learn_prior, "conv2d")
-        self.qstd = prior_std
         self.filters = filters
         self.kernel_size = kernel_size
         self.strides = [1] + list(strides) + [1]
         self.padding = padding
         self.use_bias = use_bias
+        self.prior_std0 = prior_std
+        self.learn_prior = learn_prior
 
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, (height, width, channels) = self._get_X_dims(X)
         W_shp, b_shp = self._weight_shapes(channels)
-
+        self.pstd, self.qstd = initialise_stds(W_shp, self.prior_std0,
+                                               self.learn_prior, "conv2d")
         # Layer weights
         self.pW = _make_prior(self.pstd, W_shp)
         self.qW = _make_posterior(self.qstd, W_shp, False, "conv")
@@ -500,8 +504,11 @@ class DenseVariational(SampleLayer3):
     ----------
     output_dim : int
         the dimension of the output of this layer
-    prior_std : float
-        the value of the weight prior standard deviation (:math:`\sigma` above)
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
     learn_prior : bool, optional
         Whether to learn the prior
     full : bool
@@ -517,15 +524,18 @@ class DenseVariational(SampleLayer3):
                  use_bias=True):
         """Create and instance of a variational dense layer."""
         self.output_dim = output_dim
-        self.pstd = _make_prior_std(prior_std, learn_prior, "dense")
-        self.qstd = prior_std
         self.full = full
         self.use_bias = use_bias
+        self.prior_std0 = prior_std
+        self.learn_prior = learn_prior
 
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self._get_X_dims(X)
         W_shp, b_shp = self._weight_shapes(input_dim)
+
+        self.pstd, self.qstd = initialise_stds(W_shp, self.prior_std0,
+                                               self.learn_prior, "dense")
 
         # Layer weights
         self.pW = _make_prior(self.pstd, W_shp)
@@ -618,8 +628,11 @@ class EmbedVariational(DenseVariational):
         the dimension of the output (embedding) of this layer
     n_categories : int
         the number of categories in the input variable
-    prior_std : float
-        the value of the weight prior standard deviation (:math:`\sigma` above)
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
     learn_prior : bool, optional
         Whether to learn the prior
     full : bool
@@ -634,16 +647,19 @@ class EmbedVariational(DenseVariational):
         """Create and instance of a variational dense embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
-        self.pstd = _make_prior_std(prior_std, learn_prior, "embed")
-        self.qstd = prior_std
         self.n_categories = n_categories
         self.full = full
+        self.prior_std0 = prior_std
+        self.learn_prior = learn_prior
 
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_dim = self._get_X_dims(X)
         W_shape, _ = self._weight_shapes(self.n_categories)
         n_batch = tf.shape(X)[1]
+
+        self.pstd, self.qstd = initialise_stds(W_shape, self.prior_std0,
+                                               self.learn_prior, "embed")
 
         # Layer weights
         self.pW = _make_prior(self.pstd, W_shape)
@@ -936,10 +952,3 @@ def _make_posterior(std, weight_shape, full, suffix=None):
     return post_W
 
 
-def _make_prior_std(std, learn_prior, suffix=None):
-    if learn_prior:
-        x = tf.Variable(pos(std), name="prior_std_{}".format(suffix))
-        summary_histogram(x)
-    else:
-        x = std
-    return x

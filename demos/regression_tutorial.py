@@ -42,7 +42,7 @@ def linear(X, Y):
 
     net = (
         ab.InputLayer(name="X") >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
     )
 
     Xw, reg = net(X=X)
@@ -55,13 +55,11 @@ def linear(X, Y):
 
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
-    lambda_ = 100.
-    std = (1 / lambda_) ** .5  # Weight st. dev. prior
     noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseVariational(output_dim=1, prior_std=std, full=True)
+        ab.DenseVariational(output_dim=1, full=True)
     )
 
     f, kl = net(X=X)
@@ -162,14 +160,13 @@ def svr(X, Y):
 
 def gaussian_process(X, Y):
     """Gaussian Process Regression."""
-    lambda_ = 1.
     noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
     kern = ab.RBF(learn_lenscale=True)  # learn lengthscale
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
-        ab.DenseVariational(output_dim=1, prior_std=lambda_, full=True)
+        ab.DenseVariational(output_dim=1, full=True)
     )
 
     f, kl = net(X=X)
@@ -186,9 +183,9 @@ def deep_gaussian_process(X, Y):
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=20, kernel=ab.RBF(learn_lenscale=True)) >>
-        ab.DenseVariational(output_dim=5, prior_std=.1, full=True) >>
+        ab.DenseVariational(output_dim=5, full=True) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, prior_std=1., full=True)
+        ab.DenseVariational(output_dim=1, full=True)
     )
 
     f, kl = net(X=X)
