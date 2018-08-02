@@ -10,32 +10,34 @@ _INIT_DICT = {"glorot": tf.glorot_uniform_initializer(seed=next(seedgen)),
               "glorot_trunc": tf.glorot_normal_initializer(seed=next(seedgen))}
 
 
-
 def _glorot_std(n_in, n_out):
     """
-    The standard deviation for initialising normally distributed weights.
+    Compute the standard deviation for initialising weights.
+
     See Glorot and Bengio, AISTATS2010.
     """
     std = 1. / np.sqrt(3 * (n_in + n_out))
     return std
 
+
 def _autonorm_std(n_in, n_out):
     """
-    The auto-normalizing NN initialisation, to be used with SELU
-    nonlinearities.
-    See Klambaur et. al. 2017 (https://arxiv.org/pdf/1706.02515.pdf)
+    Compute the auto-normalizing NN initialisation.
+
+    To be used with SELU nonlinearities.  See Klambaur et. al. 2017
+    (https://arxiv.org/pdf/1706.02515.pdf)
     """
     std = 1. / np.sqrt(n_in + n_out)
     return std
 
 
-_PRIOR_DICT = {"glorot":  _glorot_std,
+_PRIOR_DICT = {"glorot": _glorot_std,
                "autonorm": _autonorm_std}
 
 
 def initialise_weights(shape, init_fn):
     """
-    Draw random initial weights using the specified function or method
+    Draw random initial weights using the specified function or method.
 
     Parameters
     ----------
@@ -59,8 +61,29 @@ def initialise_weights(shape, init_fn):
 
 def initialise_stds(shape, init_val, learn_prior, suffix):
     """
-    Initialise the prior standard devation and initial poststerior
-    value.
+    Initialise the prior standard devation and initial poststerior.
+
+    Parameters
+    ----------
+    shape : tuple, list
+        The shape of the matrix to initialise.
+    init_val : str, float
+        If a string, must be one of "glorot" or "autonorm", which will use
+        these methods to initialise a value. Otherwise, will use the provided
+        float to initialise.
+    learn_prior : bool
+        Whether to learn the prior or not. If true, will make the prior
+        a variable.
+    suffix : str
+        A string used to name the variable so Tensorboard can track it.
+
+    Returns
+    -------
+    std : tf.Variable, np.array
+        The standard deviation value/variable
+    std0 :
+        The initial value of the standard deviation
+
     """
     if isinstance(init_val, str):
         fn = _PRIOR_DICT[init_val]

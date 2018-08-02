@@ -7,7 +7,7 @@ from aboleth.random import seedgen
 from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_sum)
 from aboleth.baselayers import Layer, MultiLayer
-from aboleth.util import summary_histogram, pos
+from aboleth.util import summary_histogram
 from aboleth.initialisers import initialise_weights, initialise_stds
 
 
@@ -950,5 +950,3 @@ def _make_posterior(std, weight_shape, full, suffix=None):
     assert _is_dim(post_W, weight_shape), \
         "Posterior inconsistent dimension!"
     return post_W
-
-
