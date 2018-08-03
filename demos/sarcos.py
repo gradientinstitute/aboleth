@@ -21,9 +21,8 @@ NOISE = 3.0  # Initial estimate of the observation noise
 
 # Random Fourier Features, this is setting up an anisotropic length scale, or
 # one length scale per dimension
-LENSCALE = tf.Variable(5 * np.ones((21, 1), dtype=np.float32))
-tf.summary.histogram(name="lenscale", values=LENSCALE)
-KERNEL = ab.RBF(ab.pos(LENSCALE))
+LENSCALE = 5 * np.ones((21, 1), dtype=np.float32)
+KERNEL = ab.RBF(LENSCALE, learn_lenscale=True)
 
 # Variational Fourier Features -- length-scale setting here is the "prior"
 # LENSCALE = 10.
@@ -81,9 +80,10 @@ def main():
 
     with tf.name_scope("Deepnet"):
         phi, kl = net(X=data['X'])
-        std = tf.Variable(NOISE, name="noise")
-        lkhood = tf.distributions.Normal(phi, scale=ab.pos(std))
-        loss = ab.elbo(lkhood, data['Y'], N, kl)
+        std = ab.pos(tf.Variable(NOISE, name="noise"))
+        ll_f = tf.distributions.Normal(loc=phi, scale=std)
+        ll = ll_f.log_prob(data['Y'])
+        loss = ab.elbo(ll, kl, N)
         tf.summary.scalar('loss', loss)
 
     with tf.name_scope("Train"):
