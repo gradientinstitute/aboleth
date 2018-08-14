@@ -5,6 +5,7 @@ import tensorflow as tf
 from aboleth.random import seedgen
 from aboleth.util import pos, summary_histogram
 
+
 def _glorot_std(n_in, n_out):
     """
     Compute the standard deviation for initialising weights.
@@ -38,7 +39,8 @@ class _autonorm_initializer:
     seed : None, int
         A seed for the random initialization.
     dtype : tf.dtype
-        The numerical type for weight initialization. 
+        The numerical type for weight initialization.
+
     """
 
     def __init__(self, seed=None, dtype=tf.float32):
@@ -48,7 +50,7 @@ class _autonorm_initializer:
 
     def __call__(self, shape):
         """
-        Call the autonorm initalizer
+        Call the autonorm initalizer.
 
         Parameters
         ----------
