@@ -6,10 +6,6 @@ from aboleth.random import seedgen
 from aboleth.util import pos, summary_histogram
 
 
-_INIT_DICT = {"glorot": tf.glorot_uniform_initializer(seed=next(seedgen)),
-              "glorot_trunc": tf.glorot_normal_initializer(seed=next(seedgen))}
-
-
 def _glorot_std(n_in, n_out):
     """
     Compute the standard deviation for initialising weights.
@@ -29,6 +25,52 @@ def _autonorm_std(n_in, n_out):
     """
     std = 1. / np.sqrt(n_in + n_out)
     return std
+
+
+class _autonorm_initializer:
+    """
+    Implements the auto-normalizing NN initialisation for regular (MAP) layers.
+
+    To be used with SELU nonlinearities.  See Klambaur et. al. 2017
+    (https://arxiv.org/pdf/1706.02515.pdf)
+
+    Parameters
+    ----------
+    seed : None, int
+        A seed for the random initialization.
+    dtype : tf.dtype
+        The numerical type for weight initialization.
+
+    """
+
+    def __init__(self, seed=None, dtype=tf.float32):
+        """Create an instance of the autonorm initializer."""
+        self.seed = seed
+        self.dtype = dtype
+
+    def __call__(self, shape):
+        """
+        Call the autonorm initalizer.
+
+        Parameters
+        ----------
+        shape : tuple, tf.TensorShape
+            The shape of the weight matrix to initialize.
+
+        Returns
+        -------
+        W : Tensor
+            The initial values of the weight matrix.
+        """
+        std = 1. / np.sqrt(np.product(shape))
+        W = tf.random_normal(shape, mean=0., stddev=std, dtype=self.dtype,
+                             seed=self.seed)
+        return W
+
+
+_INIT_DICT = {"glorot": tf.glorot_uniform_initializer(seed=next(seedgen)),
+              "glorot_trunc": tf.glorot_normal_initializer(seed=next(seedgen)),
+              "autonorm": _autonorm_initializer(seed=next(seedgen))}
 
 
 _PRIOR_DICT = {"glorot": _glorot_std,
