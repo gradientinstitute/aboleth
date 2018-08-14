@@ -796,7 +796,6 @@ class DenseMAP(SampleLayer):
         the callable takes a shape (input_dim, output_dim) as an argument
         and returns the weight matrix.
 
-
     """
 
     def __init__(self, output_dim, l1_reg=0., l2_reg=0., use_bias=True,

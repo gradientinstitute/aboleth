@@ -34,13 +34,13 @@ n_samples_ = tf.placeholder_with_default(LSAMPLES, [])
 net = ab.stack(
     ab.InputLayer(name='X', n_samples=n_samples_),
     ab.DropOut(0.95),
-    ab.DenseMAP(output_dim=64, l2_reg=REG),
-    ab.Activation(h=tf.nn.relu),
-    ab.DropOut(0.5),
-    ab.DenseMAP(output_dim=64, l2_reg=REG),
-    ab.Activation(h=tf.nn.relu),
-    ab.DropOut(0.5),
-    ab.DenseMAP(output_dim=1, l2_reg=REG),
+    ab.DenseMAP(output_dim=64, l2_reg=REG, init_fn="autonorm"),
+    ab.Activation(h=tf.nn.selu),
+    ab.DropOut(0.9),
+    ab.DenseMAP(output_dim=64, l2_reg=REG, init_fn="autonorm"),
+    ab.Activation(h=tf.nn.selu),
+    ab.DropOut(0.9),
+    ab.DenseMAP(output_dim=1, l2_reg=REG, init_fn="autonorm"),
 )
 
 

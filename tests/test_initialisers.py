@@ -16,6 +16,20 @@ def test_autonorm_std():
     assert np.allclose(result, 1. / np.sqrt(31))
 
 
+def test_autonorm_initializer():
+    init_fn = ab.initialisers._autonorm_initializer()
+    shape = (1000, 20, 3)
+    std = 1. / np.sqrt(np.product(shape))
+    W_init = init_fn(shape)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        W = W_init.eval()
+
+    assert np.allclose(0., np.mean(W), atol=1e-4)
+    assert np.allclose(std, np.std(W), atol=1e-4)
+
+
 def test_initialise_weights(mocker):
     mocker.patch.dict("aboleth.initialisers._INIT_DICT",
                       {"foo": lambda x: "bar"})
@@ -44,6 +58,8 @@ def test_initialise_stds(mocker):
     std, std0 = ab.initialisers.initialise_stds(shape, init_val, learn_prior,
                                                 suffix)
     assert std.name == 'prior_std_bar:0'
-    with tf.Session():
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
         assert std.initial_value.eval() == 10.0
 
