@@ -23,7 +23,7 @@ def _autonorm_std(n_in, n_out):
     To be used with SELU nonlinearities.  See Klambaur et. al. 2017
     (https://arxiv.org/pdf/1706.02515.pdf)
     """
-    std = 1. / np.sqrt(n_in + n_out)
+    std = 1. / np.sqrt(n_in)
     return std
 
 
@@ -62,7 +62,7 @@ class _autonorm_initializer:
         W : Tensor
             The initial values of the weight matrix.
         """
-        std = 1. / np.sqrt(np.product(shape))
+        std = 1. / np.sqrt(shape[-2])
         W = tf.random_normal(shape, mean=0., stddev=std, dtype=self.dtype,
                              seed=self.seed)
         return W
@@ -93,6 +93,8 @@ def initialise_weights(shape, init_fn):
         and returns the weight matrix.
 
     """
+    # assert len(shape) == 2
+
     if isinstance(init_fn, str):
         fn = _INIT_DICT[init_fn]
     else:
@@ -127,6 +129,8 @@ def initialise_stds(shape, init_val, learn_prior, suffix):
         The initial value of the standard deviation
 
     """
+    # assert len(shape) == 2
+
     if isinstance(init_val, str):
         fn = _PRIOR_DICT[init_val]
         std0 = fn(shape[-2], shape[-1])

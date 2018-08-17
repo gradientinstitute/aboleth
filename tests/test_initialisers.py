@@ -13,21 +13,21 @@ def test_glorot_std():
 
 def test_autonorm_std():
     result = ab.initialisers._autonorm_std(10, 21)
-    assert np.allclose(result, 1. / np.sqrt(31))
+    assert np.allclose(result, 1. / np.sqrt(10))
 
 
 def test_autonorm_initializer():
     init_fn = ab.initialisers._autonorm_initializer()
-    shape = (1000, 20, 3)
-    std = 1. / np.sqrt(np.product(shape))
+    shape = (1000, 20, 5)
+    std = 1. / np.sqrt(20)
     W_init = init_fn(shape)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         W = W_init.eval()
 
-    assert np.allclose(0., np.mean(W), atol=1e-4)
-    assert np.allclose(std, np.std(W), atol=1e-4)
+    assert np.allclose(0., np.mean(W), atol=1e-3)
+    assert np.allclose(std, np.std(W), atol=1e-3)
 
 
 def test_initialise_weights(mocker):
