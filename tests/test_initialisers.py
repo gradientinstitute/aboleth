@@ -17,6 +17,7 @@ def test_autonorm_std():
 
 
 def test_autonorm_initializer():
+    ab.set_hyperseed(666)
     init_fn = ab.initialisers._autonorm_initializer()
     shape = (1000, 20, 5)
     std = 1. / np.sqrt(20)
@@ -26,8 +27,8 @@ def test_autonorm_initializer():
     with tc.test_session():
         W = W_init.eval()
 
-    assert np.allclose(0., np.mean(W), atol=1e-3)
-    assert np.allclose(std, np.std(W), atol=1e-3)
+    assert np.allclose(0., np.mean(W), atol=1e-2)
+    assert np.allclose(std, np.std(W), atol=1e-2)
 
 
 def test_initialise_weights(mocker):
@@ -43,7 +44,7 @@ def test_initialise_weights(mocker):
 
 def test_initialise_stds(mocker):
     mocker.patch.dict("aboleth.initialisers._PRIOR_DICT",
-                      {"foo": lambda x, y: x + 10 * y})
+                      {"foo": lambda x, y: y + 10 * x})
     shape = (1, 2, 3)
     init_val = "foo"
     learn_prior = False

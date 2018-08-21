@@ -133,7 +133,7 @@ def initialise_stds(shape, init_val, learn_prior, suffix):
 
     if isinstance(init_val, str):
         fn = _PRIOR_DICT[init_val]
-        std0 = fn(shape[-2], shape[-1])
+        std0 = fn(shape[-1], shape[-2])  # NOTE Var weights are Transp. of MAP
     else:
         std0 = init_val
     std0 = np.array(std0).astype(np.float32)

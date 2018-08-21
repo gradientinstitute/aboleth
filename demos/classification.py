@@ -33,13 +33,16 @@ REG = 0.001  # weight regularizer
 n_samples_ = tf.placeholder_with_default(LSAMPLES, [])
 net = ab.stack(
     ab.InputLayer(name='X', n_samples=n_samples_),
-    ab.DropOut(0.95),
+    ab.DropOut(0.95, alpha=True),
+    ab.DenseMAP(output_dim=128, l2_reg=REG, init_fn="autonorm"),
+    ab.Activation(h=tf.nn.selu),
+    ab.DropOut(0.9, alpha=True),
     ab.DenseMAP(output_dim=64, l2_reg=REG, init_fn="autonorm"),
     ab.Activation(h=tf.nn.selu),
-    ab.DropOut(0.9),
-    ab.DenseMAP(output_dim=64, l2_reg=REG, init_fn="autonorm"),
+    ab.DropOut(0.9, alpha=True),
+    ab.DenseMAP(output_dim=32, l2_reg=REG, init_fn="autonorm"),
     ab.Activation(h=tf.nn.selu),
-    ab.DropOut(0.9),
+    ab.DropOut(0.9, alpha=True),
     ab.DenseMAP(output_dim=1, l2_reg=REG, init_fn="autonorm"),
 )
 
