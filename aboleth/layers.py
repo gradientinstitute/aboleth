@@ -165,13 +165,17 @@ class DropOut(Layer):
         This is so we can repeat the dropout pattern over observations, which
         has the effect of dropping out weights consistently, thereby sampling
         the "latent function" of the layer.
+    alpha : bool
+        Use alpha dropout (tf.contrib.nn.alpha_dropout) that maintains the self
+        normalising property of SNNs.
 
     """
 
-    def __init__(self, keep_prob, observation_axis=1):
+    def __init__(self, keep_prob, observation_axis=1, alpha=False):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
         self.obsax = observation_axis
+        self.dropout = tf.contrib.nn.alpha_dropout if alpha else tf.nn.dropout
 
     def _build(self, X):
         """Build the graph of this layer."""
@@ -179,7 +183,7 @@ class DropOut(Layer):
         # i.e. share the samples along the data-observations axis
         noise_shape = tf.concat([tf.shape(X)[:self.obsax], [1],
                                  tf.shape(X)[(self.obsax + 1):]], axis=0)
-        Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
+        Net = self.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
 
@@ -390,6 +394,7 @@ class Conv2DVariational(SampleLayer):
         Whether to learn the prior standard deviation.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
+
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',

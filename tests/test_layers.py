@@ -70,21 +70,30 @@ def test_activation(make_data):
         assert KL == 0
 
 
-def test_dropout(random):
+def test_dropout(random, alpha=False):
     """Test dropout layer."""
-    X = np.repeat(random.randn(1, 30, 20), 3, axis=0)
+    samples, rows, cols = 3, 5, 1000
+    keep_prob = 0.9
+    X = (random.randn(samples, rows, cols) + 1).astype(np.float32)
     ab.set_hyperseed(666)
-    drop = ab.DropOut(0.5)
+    drop = ab.DropOut(keep_prob, alpha=alpha)
 
     F, KL = drop(X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         f = F.eval()
-        prop_zero = np.sum(f == 0) / np.prod(f.shape)
+        dropped = np.where(f == 0)
+
+        # Check we dropout whole columns
+        for s, _, c in zip(*dropped):
+            assert np.allclose(f[s, :, c], 0.)
+
+        # Check the dropout proportions are approximately correct
+        active = 1 - np.sum(f[:, 0, :] == 0) / (samples * cols)
 
         assert f.shape == X.shape
-        assert (prop_zero >= 0.4) and (prop_zero <= 0.6)
+        assert (active >= keep_prob - 0.05) and (active <= keep_prob + 0.05)
         assert KL == 0
 
 
