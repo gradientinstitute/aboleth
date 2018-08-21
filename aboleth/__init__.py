@@ -3,7 +3,7 @@ from . import distributions
 from .version import __version__
 from .losses import elbo, max_posterior
 from .baselayers import stack
-from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
+from .layers import (Activation, DropOut, MaxPool2D, Flatten, DenseVariational,
                      EmbedVariational, Conv2DVariational, DenseMAP, EmbedMAP,
                      Conv2DMAP, InputLayer, RandomFourier, RandomArcCosine)
 from .hlayers import Concat, Sum, PerFeature
@@ -24,7 +24,7 @@ __all__ = (
     'Activation',
     'DropOut',
     'MaxPool2D',
-    'Reshape',
+    'Flatten',
     'Conv2DVariational',
     'DenseVariational',
     'EmbedVariational',

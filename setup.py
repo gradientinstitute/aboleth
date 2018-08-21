@@ -34,6 +34,7 @@ setup(
             'pytest-cov>=2.5.1',
             'pytest-flake8>=0.8.1',
             'flake8-docstrings>=1.1.0',
+            'scikit-learn>=0.18.1',
         ],
         'demos': [
             'bokeh>=0.12.4',

@@ -127,12 +127,12 @@ def test_max_pooling2d(make_image_data):
         assert KL == 0
 
 
-def test_reshape(make_image_data):
-    """Test dropout layer."""
+def test_flatten(make_image_data):
+    """Test flatten layer."""
     x, _, X = make_image_data
 
     # reshape. useful for feeding output of conv layer into dense layer
-    reshape = ab.Reshape(target_shape=(28*28*3,))
+    reshape = ab.Flatten()
 
     F, KL = reshape(X)
 
