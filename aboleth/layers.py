@@ -15,6 +15,7 @@ from aboleth.initialisers import initialise_weights, initialise_stds
 # Layer type base classes
 #
 
+
 class InputLayer(MultiLayer):
     r"""Create an input layer.
 
@@ -46,8 +47,10 @@ class InputLayer(MultiLayer):
     def _build(self, **kwargs):
         """Build the tiling input layer."""
         X = kwargs[self.name]
-        # (n_samples, N, D)
-        Xs = tf.tile(tf.expand_dims(X, 0), [self.n_samples, 1, 1])
+        ndims = len(X.shape)
+        # tile like (n_samples, ...)
+        new_shape = [self.n_samples] + ([1] * ndims)
+        Xs = tf.tile(tf.expand_dims(X, 0), new_shape)
         return Xs, 0.0
 
 
@@ -116,16 +119,10 @@ class SampleLayer3(SampleLayer):
         Net, KL = super(SampleLayer3, self).__call__(X)
         return Net, KL
 
-    @staticmethod
-    def _get_X_dims(X):
-        """Get the dimensions of the rank 3 input tensor, X."""
-        n_samples, (input_dim,) = SampleLayer._get_X_dims(X)
-        return n_samples, input_dim
-
-
 #
 # Activation and Transformation Layers
 #
+
 
 class Activation(Layer):
     """Activation function layer.
@@ -165,13 +162,17 @@ class DropOut(Layer):
         This is so we can repeat the dropout pattern over observations, which
         has the effect of dropping out weights consistently, thereby sampling
         the "latent function" of the layer.
+    alpha : bool
+        Use alpha dropout (tf.contrib.nn.alpha_dropout) that maintains the self
+        normalising property of SNNs.
 
     """
 
-    def __init__(self, keep_prob, observation_axis=1):
+    def __init__(self, keep_prob, observation_axis=1, alpha=False):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
         self.obsax = observation_axis
+        self.dropout = tf.contrib.nn.alpha_dropout if alpha else tf.nn.dropout
 
     def _build(self, X):
         """Build the graph of this layer."""
@@ -179,7 +180,7 @@ class DropOut(Layer):
         # i.e. share the samples along the data-observations axis
         noise_shape = tf.concat([tf.shape(X)[:self.obsax], [1],
                                  tf.shape(X)[(self.obsax + 1):]], axis=0)
-        Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
+        Net = self.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
 
@@ -217,25 +218,21 @@ class MaxPool2D(Layer):
         return Net, KL
 
 
-class Reshape(Layer):
-    """Reshape layer.
+class Flatten(Layer):
+    """Flattening layer.
 
-    Reshape and output an tensor to a specified shape.
+    Reshape and output a tensor to be always rank 3 (keeps first dimension
+    which is samples, and second dimension which is observations).
 
-    Parameters
-    ----------
-    target_shape : tuple of ints
-        Does not include the samples or batch axes.
+    I.e. if ``X.shape`` is ``(3, 100, 5, 5, 3)`` this flatten the last
+    dimensions to ``(3, 100, 75)``.
 
     """
 
-    def __init__(self, target_shape):
-        """Initialize instance of a Reshape layer."""
-        self.target_shape = target_shape
-
     def _build(self, X):
         """Build the graph of this layer."""
-        new_shape = (int(X.shape[0]), tf.shape(X)[1]) + self.target_shape
+        flat_dim = np.product(X.shape[2:])
+        new_shape = tf.concat([tf.shape(X)[0:2], [flat_dim]], 0)
         Net = tf.reshape(X, new_shape)
         KL = 0.
         return Net, KL
@@ -273,7 +270,7 @@ class RandomFourier(SampleLayer3):
     def _build(self, X):
         """Build the graph of this layer."""
         # Random weights
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         dtype = X.dtype.as_numpy_dtype
         P, KL = self.kernel.weights(input_dim, self.n_features, dtype)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
@@ -390,6 +387,7 @@ class Conv2DVariational(SampleLayer):
         Whether to learn the prior standard deviation.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
+
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
@@ -407,7 +405,14 @@ class Conv2DVariational(SampleLayer):
         """Build the graph of this layer."""
         n_samples, (height, width, channels) = self._get_X_dims(X)
         W_shp, b_shp = self._weight_shapes(channels)
-        self.pstd, self.qstd = initialise_stds(W_shp, self.prior_std0,
+
+        # get effective IO shapes, DAN's fault if this is wrong
+        receptive_field = np.product(W_shp[:-2])
+        n_inputs = receptive_field * channels
+        n_outputs = receptive_field * self.filters
+
+        self.pstd, self.qstd = initialise_stds(n_inputs, n_outputs,
+                                               self.prior_std0,
                                                self.learn_prior, "conv2d")
         # Layer weights
         self.pW = _make_prior(self.pstd, W_shp)
@@ -531,10 +536,11 @@ class DenseVariational(SampleLayer3):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         W_shp, b_shp = self._weight_shapes(input_dim)
 
-        self.pstd, self.qstd = initialise_stds(W_shp, self.prior_std0,
+        self.pstd, self.qstd = initialise_stds(input_dim, self.output_dim,
+                                               self.prior_std0,
                                                self.learn_prior, "dense")
 
         # Layer weights
@@ -654,11 +660,12 @@ class EmbedVariational(DenseVariational):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         W_shape, _ = self._weight_shapes(self.n_categories)
         n_batch = tf.shape(X)[1]
 
-        self.pstd, self.qstd = initialise_stds(W_shape, self.prior_std0,
+        self.pstd, self.qstd = initialise_stds(input_dim, self.output_dim,
+                                               self.prior_std0,
                                                self.learn_prior, "embed")
 
         # Layer weights
@@ -810,7 +817,7 @@ class DenseMAP(SampleLayer):
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_shape = self._get_X_dims(X)
-        Wdim = tuple(input_shape) + (self.output_dim,)
+        Wdim = input_shape + [self.output_dim]
 
         W_init = initialise_weights(Wdim, self.init_fn)
         W = tf.Variable(W_init, name="W_map")
@@ -884,7 +891,7 @@ class EmbedMAP(SampleLayer3):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         Wdim = (self.n_categories, self.output_dim)
         n_batch = tf.shape(X)[1]
 

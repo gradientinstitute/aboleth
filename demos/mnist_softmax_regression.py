@@ -23,8 +23,6 @@ p_samples = 5
 # Network architecture
 net = ab.stack(
     ab.InputLayer(name='X', n_samples=l_samples),  # LSAMPLES,BATCH_SIZE,28*28
-    ab.Reshape(target_shape=(28, 28, 1)),  # LSAMPLES, BATCH_SIZE, 28, 28, 1
-
     ab.Conv2DMAP(filters=32,
                  kernel_size=(5, 5),
                  l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 28, 28, 32
@@ -39,7 +37,7 @@ net = ab.stack(
     ab.MaxPool2D(pool_size=(2, 2),
                  strides=(2, 2)),  # LSAMPLES, BATCH_SIZE, 7, 7, 64
 
-    ab.Reshape(target_shape=(7*7*64,)),  # LSAMPLES, BATCH_SIZE, 7*7*64
+    ab.Flatten(),  # LSAMPLES, BATCH_SIZE, 7*7*64
 
     ab.DenseMAP(output_dim=1024,
                 l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 1024
@@ -55,9 +53,9 @@ def main():
 
     # Dataset
     mnist_data = tf.contrib.learn.datasets.mnist.read_data_sets(
-        './mnist_demo', reshape=True)
+        './mnist_demo', reshape=False)
 
-    N, D = mnist_data.train.images.shape
+    N = mnist_data.train.images.shape[0]
 
     X, Y = tf.data.Dataset.from_tensor_slices(
         (np.asarray(mnist_data.train.images, dtype=np.float32),
