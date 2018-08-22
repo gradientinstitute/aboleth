@@ -37,8 +37,7 @@ net = ab.stack(
     ab.MaxPool2D(pool_size=(2, 2),
                  strides=(2, 2)),  # LSAMPLES, BATCH_SIZE, 7, 7, 64
 
-    # ab.Reshape(target_shape=(7*7*64,)),  # LSAMPLES, BATCH_SIZE, 7*7*64
-    ab.Flatten(),
+    ab.Flatten(),  # LSAMPLES, BATCH_SIZE, 7*7*64
 
     ab.DenseMAP(output_dim=1024,
                 l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 1024

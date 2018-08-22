@@ -48,6 +48,7 @@ class InputLayer(MultiLayer):
         """Build the tiling input layer."""
         X = kwargs[self.name]
         ndims = len(X.shape)
+        # tile like (n_samples, ...)
         new_shape = [self.n_samples] + ([1] * ndims)
         Xs = tf.tile(tf.expand_dims(X, 0), new_shape)
         return Xs, 0.0
@@ -220,8 +221,11 @@ class MaxPool2D(Layer):
 class Flatten(Layer):
     """Flattening layer.
 
-    Reshape and output an tensor to be always rank 3 (keeps first dimension
+    Reshape and output a tensor to be always rank 3 (keeps first dimension
     which is samples, and second dimension which is observations).
+
+    I.e. if ``X.shape`` is ``(3, 100, 5, 5, 3)`` this flatten the last
+    dimensions to ``(3, 100, 75)``.
 
     """
 
@@ -399,15 +403,14 @@ class Conv2DVariational(SampleLayer):
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_shape = self._get_X_dims(X)
-        (height, width, channels) = input_shape
+        n_samples, (height, width, channels) = self._get_X_dims(X)
         W_shp, b_shp = self._weight_shapes(channels)
 
-        # get effective IO shapes
+        # get effective IO shapes, DAN's fault if this is wrong
         receptive_field = np.product(W_shp[:-2])
-        # DAN's fault if this is wrong
         n_inputs = receptive_field * channels
         n_outputs = receptive_field * self.filters
+
         self.pstd, self.qstd = initialise_stds(n_inputs, n_outputs,
                                                self.prior_std0,
                                                self.learn_prior, "conv2d")

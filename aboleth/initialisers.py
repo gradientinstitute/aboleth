@@ -45,8 +45,9 @@ def initialise_weights(shape, init_fn):
     Parameters
     ----------
     shape : tuple, list
-        The shape of the weight matrix W. Typically this is
-        2D ie of size (input_size, output_size).
+        The shape of the weight matrix ``W``. This uses the same convention as
+        tnesorflow for weight shapes (see their initializers in
+        tensorflow.python.ops.init_ops).
     init_fn : str, callable
         The function to use to initialise the weights. The default is
         'glorot_trunc', the truncated normal glorot function. If supplied,
@@ -54,8 +55,6 @@ def initialise_weights(shape, init_fn):
         and returns the weight matrix.
 
     """
-    # assert len(shape) == 2
-
     if isinstance(init_fn, str):
         fn = _INIT_DICT[init_fn]
     else:
@@ -71,9 +70,9 @@ def initialise_stds(n_in, n_out, init_val, learn_prior, suffix):
     Parameters
     ----------
     n_in : int
-        The number of input units in the layer
+        The total number of input units in the layer.
     n_out : int
-        The number of output units in The layer
+        The total number of output units in the layer.
     init_val : str, float
         If a string, must be one of "glorot" or "autonorm", which will use
         these methods to initialise a value. Otherwise, will use the provided
