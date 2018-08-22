@@ -4,8 +4,11 @@ import tensorflow as tf
 
 from tensorflow.contrib.distributions import MultivariateNormalTriL
 
-from aboleth.util import pos, summary_histogram
+from aboleth.util import inverse_softplus, summary_histogram
 from aboleth.random import seedgen
+
+
+JIT = 1e-15  # cholesky jitter
 
 
 #
@@ -64,12 +67,13 @@ def norm_posterior(dim, std0, suffix=None):
     # we have different values for each dimension on the first axis
     mu_0 = np.zeros(dim, dtype=np.float32)
     mu = tf.Variable(mu_0, name=_add_suffix("W_mu_q", suffix))
-    std = tf.Variable(std0, name=_add_suffix("W_std_q", suffix))
+    std = tf.nn.softplus(tf.Variable(inverse_softplus(std0)),
+                         name=_add_suffix("W_std_q", suffix))
 
     summary_histogram(mu)
     summary_histogram(std)
 
-    Q = tf.distributions.Normal(loc=mu, scale=pos(std))
+    Q = tf.distributions.Normal(loc=mu, scale=std)
     return Q
 
 
@@ -196,7 +200,7 @@ def _kl_gaussian_normal(q, p, name=None):
 
 def _chollogdet(L):
     """Log det of a cholesky, where L is (..., D, D)."""
-    ldiag = pos(tf.matrix_diag_part(L))  # keep > 0, and no vanashing gradient
+    ldiag = tf.maximum(tf.abs(tf.matrix_diag_part(L), JIT))  # keep > 0
     logdet = 2. * tf.reduce_sum(tf.log(ldiag))
     return logdet
 

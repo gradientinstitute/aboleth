@@ -4,7 +4,7 @@ import tensorflow as tf
 from tensorflow.python.ops.init_ops import VarianceScaling
 
 from aboleth.random import seedgen
-from aboleth.util import pos, summary_histogram
+from aboleth.util import inverse_softplus, summary_histogram
 
 
 def _glorot_std(n_in, n_out):
@@ -101,7 +101,8 @@ def initialise_stds(n_in, n_out, init_val, learn_prior, suffix):
     std0 = np.array(std0).astype(np.float32)
 
     if learn_prior:
-        std = tf.Variable(pos(std0), name="prior_std_{}".format(suffix))
+        std = tf.nn.softplus(tf.Variable(inverse_softplus(std0)),
+                             name="prior_std_{}".format(suffix))
         summary_histogram(std)
     else:
         std = std0

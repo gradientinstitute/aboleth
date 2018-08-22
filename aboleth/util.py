@@ -5,44 +5,32 @@ import numpy as np
 from aboleth.random import endless_permutations
 
 
-def pos(X, minval=1e-15):
-    r"""Constrain a ``tf.Variable`` to be positive only.
+def inverse_softplus(x):
+    r"""Inverse softplus function for initialising values.
 
-    At the moment this is implemented as:
-
-        :math:`\max(|\mathbf{X}|, \text{minval})`
-
-    This is fast and does not result in vanishing gradients, but will lead to
-    non-smooth gradients and more local minima. In practice we haven't noticed
-    this being a problem.
-
-    Parameters
-    ----------
-    X : Tensor
-        any Tensor in which all elements will be made positive.
-    minval : float
-        the minimum "positive" value the resulting tensor will have.
-
-    Returns
-    -------
-    X : Tensor
-        a tensor the same shape as the input ``X`` but positively constrained.
+    This is useful for when we want to constrain a value to be positive using a
+    softplus function, but we wish to specify an exact value for
+    initialisation.
 
     Examples
     --------
-    >>> X = tf.constant(np.array([1.0, -1.0, 0.0]))
-    >>> Xp = pos(X)
-    >>> with tf.Session():
-    ...     xp = Xp.eval()
-    >>> all(xp == np.array([1., 1., 1.e-15]))
-    True
+    Say we wish a variable to be positive, and have an initial value of 1.,
+    >>> var = tf.nn.softplus(tf.Variable(1.0))
+    >>> with tf.Session() as sess:
+    ...     sess.run(tf.global_variables_initializer())
+    ...     print(var.eval())
+    1.3132616
+
+    If we use this function,
+    >>> var = tf.nn.softplus(tf.Variable(inverse_softplus(1.0)))
+    >>> with tf.Session() as sess:
+    ...     sess.run(tf.global_variables_initializer())
+    ...     print(var.eval())
+    1.0
 
     """
-    # Other alternatives could be:
-    # Xp = tf.exp(X)  # Medium speed, but gradients tend to explode
-    # Xp = tf.nn.softplus(X)  # Slow but well behaved!
-    Xp = tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
-    return Xp
+    x_prime = tf.log(tf.exp(x) - 1.)
+    return x_prime
 
 
 def batch(feed_dict, batch_size, n_iter=10000, N_=None):
