@@ -4,7 +4,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 from aboleth.util import inverse_softplus, summary_histogram
-from aboleth.random import seedgen
 
 
 JIT = 1e-15  # cholesky jitter
@@ -56,16 +55,18 @@ def norm_posterior(dim, std0, suffix=None):
 
     Note
     ----
-    This will make tf.Variables on the randomly initialised mean and standard
-    deviation of the posterior. The initialisation of the mean is from a Normal
-    with zero mean, and ``std0`` standard deviation, and the initialisation of
-    the standard deviation is from a gamma distribution with an alpha of
-    ``std0`` and a beta of 1.
+    This will make tf.Variables on the mean standard deviation of the
+    posterior. The initialisation of the mean is zero and the initialisation of
+    the standard deviation is simply ``std0`` for each element.
 
     """
-    # we have different values for each dimension on the first axis
-    mu_0 = np.zeros(dim, dtype=np.float32)
+    assert (np.ndim(std0) == 0) or (np.shape(std0) == dim)
+    mu_0 = tf.zeros(dim)
     mu = tf.Variable(mu_0, name=_add_suffix("W_mu_q", suffix))
+
+    if np.ndim(std0) == 0:
+        std0 = tf.ones(dim) * std0
+
     std = tf.nn.softplus(tf.Variable(inverse_softplus(std0)),
                          name=_add_suffix("W_std_q", suffix))
 
@@ -101,11 +102,10 @@ def gaus_posterior(dim, std0, suffix=None):
 
     Note
     ----
-    This will make tf.Variables on the randomly initialised mean and covariance
-    of the posterior. The initialisation of the mean is from a Normal with zero
-    mean, and ``std0`` standard deviation, and the initialisation of the (lower
-    triangular of the) covariance is from a gamma distribution with an alpha of
-    ``std0`` and a beta of 1.
+    This will make tf.Variables on the mean and covariance of the posterior.
+    The initialisation of the mean is zero, and the initialisation of the
+    (lower triangular of the) covariance is from diagonal matrices with
+    diagonal elements taking the value of `std0`.
 
     """
     o, i = dim
@@ -113,13 +113,12 @@ def gaus_posterior(dim, std0, suffix=None):
     # Optimize only values in lower triangular
     u, v = np.tril_indices(i)
     indices = (u * i + v)[:, np.newaxis]
-    l0 = np.tile(np.eye(i), [o, 1, 1])[:, u, v].T
-    l0 = l0 * tf.random_gamma(alpha=std0, shape=l0.shape, seed=next(seedgen))
+    l0 = (np.tile(np.eye(i) * std0, [o, 1, 1])[:, u, v].T).astype(np.float32)
     lflat = tf.Variable(l0, name=_add_suffix("W_cov_q", suffix))
     Lt = tf.transpose(tf.scatter_nd(indices, lflat, shape=(i * i, o)))
     L = tf.reshape(Lt, (o, i, i))
 
-    mu_0 = tf.random_normal((o, i), stddev=std0, seed=next(seedgen))
+    mu_0 = tf.zeros((o, i))
     mu = tf.Variable(mu_0, name=_add_suffix("W_mu_q", suffix))
 
     summary_histogram(mu)
