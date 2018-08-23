@@ -1,9 +1,9 @@
 """Test distributions.py functionality."""
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 from scipy.linalg import cho_solve
 from scipy.stats import wishart
-from tensorflow.contrib.distributions import MultivariateNormalTriL
 
 from aboleth.distributions import kl_sum, _chollogdet
 from .conftest import SEED
@@ -49,7 +49,7 @@ def test_kl_gaussian_normal(random):
 
     mu0 = random.randn(*dim).astype(np.float32)
     L0 = random_chol(Dim)
-    q = MultivariateNormalTriL(mu0, L0)
+    q = tfp.distributions.MultivariateNormalTriL(mu0, L0)
 
     mu1 = random.randn(*dim).astype(np.float32)
     std1 = 1.0
@@ -73,11 +73,11 @@ def test_kl_gaussian_gaussian(random):
 
     mu0 = random.randn(*dim).astype(np.float32)
     L0 = random_chol(Dim)
-    q = MultivariateNormalTriL(mu0, L0)
+    q = tfp.distributions.MultivariateNormalTriL(mu0, L0)
 
     mu1 = random.randn(*dim).astype(np.float32)
     L1 = random_chol(Dim)
-    p = MultivariateNormalTriL(mu1, L1)
+    p = tfp.distributions.MultivariateNormalTriL(mu1, L1)
 
     KL = kl_sum(q, p)
     KLr = KLdiv(mu0, L0, mu1, L1)

@@ -1,7 +1,6 @@
 """Functions for initialising weights or distributions."""
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.ops.init_ops import VarianceScaling
 
 from aboleth.random import seedgen
 from aboleth.util import inverse_softplus, summary_histogram
@@ -30,9 +29,11 @@ def _autonorm_std(n_in, n_out):
 
 _INIT_DICT = {"glorot": tf.glorot_uniform_initializer(seed=next(seedgen)),
               "glorot_trunc": tf.glorot_normal_initializer(seed=next(seedgen)),
-              "autonorm": VarianceScaling(scale=1.0, mode="fan_in",
-                                          distribution="normal",
-                                          seed=next(seedgen))}
+              "autonorm": tf.variance_scaling_initializer(
+                  scale=1.0,
+                  mode="fan_in",
+                  distribution="untruncated_normal",
+                  seed=next(seedgen))}
 
 _PRIOR_DICT = {"glorot": _glorot_std,
                "autonorm": _autonorm_std}
@@ -91,8 +92,6 @@ def initialise_stds(n_in, n_out, init_val, learn_prior, suffix):
         The initial value of the standard deviation
 
     """
-    # assert len(shape) == 2
-
     if isinstance(init_val, str):
         fn = _PRIOR_DICT[init_val]
         std0 = fn(n_in, n_out)

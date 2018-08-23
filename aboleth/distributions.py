@@ -1,8 +1,7 @@
 """Helper functions for model parameter distributions."""
 import numpy as np
 import tensorflow as tf
-
-from tensorflow.contrib.distributions import MultivariateNormalTriL
+import tensorflow_probability as tfp
 
 from aboleth.util import inverse_softplus, summary_histogram
 from aboleth.random import seedgen
@@ -126,7 +125,7 @@ def gaus_posterior(dim, std0, suffix=None):
     summary_histogram(mu)
     summary_histogram(lflat)
 
-    Q = MultivariateNormalTriL(mu, L)
+    Q = tfp.distributions.MultivariateNormalTriL(mu, L)
     return Q
 
 
@@ -157,13 +156,14 @@ def kl_sum(q, p):
     return kl
 
 
-@tf.distributions.RegisterKL(MultivariateNormalTriL, tf.distributions.Normal)
+@tf.distributions.RegisterKL(tfp.distributions.MultivariateNormalTriL,
+                             tf.distributions.Normal)
 def _kl_gaussian_normal(q, p, name=None):
     """Gaussian-Normal Kullback Leibler divergence calculation.
 
     Parameters
     ----------
-    q : tf.contrib.distributions.MultivariateNormalTriL
+    q : tfp.distributions.MultivariateNormalTriL
         the approximating 'q' distribution(s).
     p : tf.distributions.Normal
         the prior 'p' distribution(s), ``p.scale`` should be a *scalar* value!
@@ -200,7 +200,7 @@ def _kl_gaussian_normal(q, p, name=None):
 
 def _chollogdet(L):
     """Log det of a cholesky, where L is (..., D, D)."""
-    ldiag = tf.maximum(tf.abs(tf.matrix_diag_part(L), JIT))  # keep > 0
+    ldiag = tf.maximum(tf.abs(tf.matrix_diag_part(L)), JIT)  # keep > 0
     logdet = 2. * tf.reduce_sum(tf.log(ldiag))
     return logdet
 

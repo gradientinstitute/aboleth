@@ -80,7 +80,8 @@ def main():
 
     with tf.name_scope("Deepnet"):
         phi, kl = net(X=data['X'])
-        std = ab.pos(tf.Variable(NOISE, name="noise"))
+        std = tf.nn.softplus(tf.Variable(ab.inverse_softplus(NOISE)),
+                             name="noise")
         ll_f = tf.distributions.Normal(loc=phi, scale=std)
         ll = ll_f.log_prob(data['Y'])
         loss = ab.elbo(ll, kl, N)

@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 
 RSEED = 666
 ab.set_hyperseed(RSEED)
-CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
+CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 FRAC_TEST = 0.1  # Fraction of data to use for hold-out testing
 FRAC_MISSING = 0.2  # Fraction of data that is missing
@@ -34,7 +34,7 @@ METHOD = "LearnedNormalImpute"
 # Optimization
 NEPOCHS = 5  # Number of times to see the data in training
 BSIZE = 100  # Mini batch size
-LSAMPLES = 5  # Number of samples for training
+LSAMPLES = 3  # Number of samples for training
 PSAMPLES = 50  # Number of predictions samples
 
 
@@ -96,7 +96,7 @@ def main():
 
     net = (
         ab.Concat(cat_layers, con_layers) >>
-        ab.Activation(tf.nn.elu) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DenseVariational(output_dim=NCLASSES)
     )
 

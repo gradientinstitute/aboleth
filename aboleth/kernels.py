@@ -270,10 +270,10 @@ def _init_lenscale(given_lenscale, learn_lenscale, input_dim):
                           np.float32)
 
     if learn_lenscale:
-        lenscale = tf.softplus(
+        lenscale = tf.nn.softplus(
             tf.Variable(inverse_softplus(given_lenscale)),
             name="kernel_lenscale"
-            )
+        )
         summary_histogram(lenscale)
     else:
         lenscale = given_lenscale

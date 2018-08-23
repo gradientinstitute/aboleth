@@ -23,7 +23,8 @@ setup(
     install_requires=[
         'numpy>=1.12.0',
         'scipy>=0.18.1',
-        'tensorflow>=1.4.0',
+        'tensorflow>=1.10.0',
+        'tensorflow-probability>=0.3',
         'six>=1.10.0'
     ],
     extras_require={
