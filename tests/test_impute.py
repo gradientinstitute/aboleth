@@ -67,6 +67,32 @@ def test_learned_scalar_impute(make_missing_data):
         assert(X_imputed.shape == X.shape)
 
 
+def test_fixed_scalar_impute(make_missing_data):
+    """Test the impute that uses a scalar value to impute for each col."""
+    ab.set_hyperseed(100)
+    _, m, X, _ = make_missing_data
+
+    # This replicates the input layer behaviour
+    def data_layer(**kwargs):
+        return kwargs['X'], 0.0
+
+    def mask_layer(**kwargs):
+        return kwargs['M'], 0.0
+
+    n, N, D = X.shape
+    impute = ab.FixedScalarImpute(data_layer, mask_layer, np.pi)
+
+    F, KL = impute(X=X, M=m)
+
+    tc = tf.test.TestCase()
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        X_imputed = F.eval()
+        assert KL.eval() == 0.0
+        assert(X_imputed.shape == X.shape)
+        assert np.allclose(X_imputed[:, m], np.pi)
+
+
 def test_fixed_normal_impute(make_missing_data):
     """Test the fixed normal random imputation."""
     ab.set_hyperseed(100)

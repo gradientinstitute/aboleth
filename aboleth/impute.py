@@ -31,11 +31,12 @@ class MaskInputLayer(MultiLayer):
         return M, 0.0
 
 
-class ImputeOp(MultiLayer):
-    r"""Abstract Base Impute operation. These specialise MultiLayers.
+class ImputeOp3(MultiLayer):
+    r"""Abstract Base Impute operation for rank 3 Tensors (samples, N, D).
 
-    They expect a data InputLayer and a mask InputLayer. They return layers in
-    which the masked values have been imputed.
+    These specialise MultiLayers and they expect a data InputLayer and a mask
+    InputLayer. They return layers in which the masked values have been
+    imputed.
 
     Parameters
     ----------
@@ -48,7 +49,7 @@ class ImputeOp(MultiLayer):
     """
 
     def __init__(self, datalayer, masklayer):
-        """Construct and instance of an ImputeOp operation."""
+        """Construct and instance of an ImputeOp3 operation."""
         self.datalayer = datalayer
         self.masklayer = masklayer
 
@@ -111,7 +112,7 @@ class ImputeOp(MultiLayer):
         pass
 
 
-class ImputeColumnWise(ImputeOp):
+class ImputeColumnWise(ImputeOp3):
     r"""Abstract class for imputing column-wise from a vector or scalar.
 
     This implements ``_impute2D`` and this calls the ``_impute_columns`` method
@@ -227,6 +228,37 @@ class LearnedScalarImpute(ImputeColumnWise):
         return self.impute_scalars
 
 
+class FixedScalarImpute(LearnedScalarImpute):
+    r"""Impute the missing values using a scalar for each column.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer. Creates a layer that returns a tensor in which the masked
+    values have been imputed with a provided scalar value per colum.
+
+    Parameters
+    ----------
+    datalayer : callable
+        A layer that returns a data tensor. Must be an InputLayer.
+    masklayer : callable
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be an InputLayer.
+    scalars : float, array-like
+        A scalar or an array of the values with which to impute each data
+        column.
+
+    """
+
+    def __init__(self, datalayer, masklayer, scalars):
+        """Construct and instance of a RandomGaussImpute operation."""
+        super().__init__(datalayer, masklayer)
+        self.impute_scalars = scalars
+
+    def _initialise_variables(self, X):
+        """Initialise the impute variables."""
+        datadim = int(X.shape[2])
+        self.impute_scalars *= tf.ones(shape=(datadim,))
+
+
 class LearnedNormalImpute(ImputeColumnWise):
     r"""Impute the missing values with draws from learned normal distributions.
 
@@ -280,9 +312,9 @@ class FixedNormalImpute(LearnedNormalImpute):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form ``f(**kwargs)``.
-    loc : array-like
+    loc : float, array-like
         A list of the global mean values of each data column
-    scale : array-like
+    scale : float, array-like
         A list of the global standard deviation of each data column
 
     """
@@ -294,7 +326,10 @@ class FixedNormalImpute(LearnedNormalImpute):
         self.scale = scale
 
     def _initialise_variables(self, X):
-        self.normal = tf.distributions.Normal(self.loc, self.scale)
+        D = X.shape[2]
+        mean = tf.ones((D,)) * self.loc
+        std = tf.ones((D,)) * self.scale
+        self.normal = tf.distributions.Normal(mean, std)
 
 
 class ExtraCategoryImpute(ImputeColumnWise):

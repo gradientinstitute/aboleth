@@ -15,7 +15,7 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-NSAMPLES = 10  # Number of random samples to get from an Aboleth net
+NSAMPLES = 3  # Number of random samples to get from an Aboleth net
 NFEATURES = 500  # Number of random features/bases to use in the approximation
 NOISE = 3.0  # Initial estimate of the observation noise
 
@@ -33,7 +33,8 @@ n_samples_ = tf.placeholder_with_default(NSAMPLES, [])
 net = ab.stack(
     ab.InputLayer(name='X', n_samples=n_samples_),
     ab.RandomFourier(n_features=NFEATURES, kernel=KERNEL),
-    ab.DenseVariational(output_dim=1, full=True)
+    ab.DenseVariational(output_dim=1, full=True, prior_std=1.0,
+                        learn_prior=True)
 )
 
 # Learning and prediction settings
