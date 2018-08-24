@@ -31,11 +31,12 @@ class MaskInputLayer(MultiLayer):
         return M, 0.0
 
 
-class ImputeOp(MultiLayer):
-    r"""Abstract Base Impute operation. These specialise MultiLayers.
+class ImputeOp3(MultiLayer):
+    r"""Abstract Base Impute operation for rank 3 Tensors (samples, N, D).
 
-    They expect a data InputLayer and a mask InputLayer. They return layers in
-    which the masked values have been imputed.
+    These specialise MultiLayers and they expect a data InputLayer and a mask
+    InputLayer. They return layers in which the masked values have been
+    imputed.
 
     Parameters
     ----------
@@ -48,7 +49,7 @@ class ImputeOp(MultiLayer):
     """
 
     def __init__(self, datalayer, masklayer):
-        """Construct and instance of an ImputeOp operation."""
+        """Construct and instance of an ImputeOp3 operation."""
         self.datalayer = datalayer
         self.masklayer = masklayer
 
@@ -111,7 +112,7 @@ class ImputeOp(MultiLayer):
         pass
 
 
-class ImputeColumnWise(ImputeOp):
+class ImputeColumnWise(ImputeOp3):
     r"""Abstract class for imputing column-wise from a vector or scalar.
 
     This implements ``_impute2D`` and this calls the ``_impute_columns`` method
@@ -225,6 +226,19 @@ class LearnedScalarImpute(ImputeColumnWise):
     def _impute_columns(self, X_2D_zero):
         """Return the learned scalars for imputation."""
         return self.impute_scalars
+
+
+class FixedScalarImpute(LearnedScalarImpute):
+
+    def __init__(self, datalayer, masklayer, scalars):
+        """Construct and instance of a RandomGaussImpute operation."""
+        super().__init__(datalayer, masklayer)
+        self.impute_scalars = scalars
+
+    def _initialise_variables(self, X):
+        """Initialise the impute variables."""
+        datadim = int(X.shape[2])
+        self.impute_scalars *= tf.ones(shape=(datadim,))
 
 
 class LearnedNormalImpute(ImputeColumnWise):

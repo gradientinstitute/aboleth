@@ -25,9 +25,10 @@ MISSING_VAL = -666  # Value to indicate missingness
 NCLASSES = 7  # Number of target classes
 
 # Imputation method CHANGE THESE
-# METHOD = None
-METHOD = "LearnedNormalImpute"
+METHOD = None
+# METHOD = "LearnedNormalImpute"
 # METHOD = "FixedNormalImpute"
+# METHOD = "FixedScalarImpute"
 # METHOD = "LearnedScalarImpute"
 # METHOD = "MeanImpute"
 
@@ -72,6 +73,10 @@ def main():
             std = np.ma.std(xm, axis=0).data.astype(np.float32)
             input_layer = ab.FixedNormalImpute(data_input, mask_input, mean,
                                                std)
+        elif METHOD == "FixedScalarImpute":
+            xm = np.ma.array(Xo, mask=mask)
+            mean = np.ma.mean(xm, axis=0).data.astype(np.float32)
+            input_layer = ab.FixedScalarImpute(data_input, mask_input, mean)
         elif METHOD == "MeanImpute":
             input_layer = ab.MeanImpute(data_input, mask_input)
 
