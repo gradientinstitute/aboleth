@@ -55,7 +55,7 @@ def linear(X, Y):
 
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
-    noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
+    noise = ab.pos_variable(1.0)
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
@@ -63,7 +63,7 @@ def bayesian_linear(X, Y):
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
     loss = ab.elbo(lkhood, kl, N)
 
     return f, loss
@@ -160,7 +160,7 @@ def svr(X, Y):
 
 def gaussian_process(X, Y):
     """Gaussian Process Regression."""
-    noise = tf.Variable(.5)  # Likelihood st. dev. initialisation, and learning
+    noise = ab.pos_variable(.5)
     kern = ab.RBF(learn_lenscale=True)  # learn lengthscale
 
     net = (
@@ -170,7 +170,7 @@ def gaussian_process(X, Y):
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
     loss = ab.elbo(lkhood, kl, N)
 
     return f, loss
@@ -178,18 +178,18 @@ def gaussian_process(X, Y):
 
 def deep_gaussian_process(X, Y):
     """Deep Gaussian Process Regression."""
-    noise = tf.Variable(.01)  # Likelihood st. dev. initialisation
+    noise = ab.pos_variable(.1)
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=20, kernel=ab.RBF(learn_lenscale=True)) >>
-        ab.DenseVariational(output_dim=5, full=True) >>
+        ab.DenseVariational(output_dim=5, full=False) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, full=True)
+        ab.DenseVariational(output_dim=1, full=False)
     )
 
     f, kl = net(X=X)
-    lkhood = tf.distributions.Normal(loc=f, scale=ab.pos(noise)).log_prob(Y)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
     loss = ab.elbo(lkhood, kl, N)
 
     return f, loss

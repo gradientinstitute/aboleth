@@ -35,7 +35,7 @@ batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
 # Model initialisation
-noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
+NOISE = 1.  # Likelihood st. dev. initialisation, and learning
 
 # Random Fourier Features
 kern = ab.RBF(learn_lenscale=True)  # keep the length scale positive
@@ -91,7 +91,8 @@ def main():
     # This is where we build the actual GP model
     with tf.name_scope("Deepnet"):
         phi, kl = net(X=X_)
-        ll = tf.distributions.Normal(loc=phi, scale=ab.pos(noise)).log_prob(Y_)
+        noise = ab.pos_variable(NOISE)
+        ll = tf.distributions.Normal(loc=phi, scale=noise).log_prob(Y_)
         loss = ab.elbo(ll, kl, N)
 
     # Set up the training graph

@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from aboleth.baselayers import MultiLayer
 from aboleth.random import seedgen
-from aboleth.util import pos, summary_histogram
+from aboleth.util import pos_variable, summary_histogram
 
 
 class MaskInputLayer(MultiLayer):
@@ -252,18 +252,13 @@ class LearnedNormalImpute(ImputeColumnWise):
             tf.random_normal(shape=(datadim,), seed=next(seedgen)),
             name="impute_means"
         )
-        impute_var = tf.Variable(
-            tf.random_gamma(alpha=1., shape=(datadim,), seed=next(seedgen)),
-            name="impute_vars"
-        )
+        std0 = tf.random_gamma(alpha=1., shape=(datadim,), seed=next(seedgen))
+        impute_std = pos_variable(std0, name="impute_std")
 
         summary_histogram(impute_means)
-        summary_histogram(impute_var)
+        summary_histogram(impute_std)
 
-        self.normal = tf.distributions.Normal(
-            impute_means,
-            tf.sqrt(pos(impute_var))
-        )
+        self.normal = tf.distributions.Normal(impute_means, impute_std)
 
     def _impute_columns(self, X_2D_zero):
         """Return random draws from an iid Normal for imputation."""

@@ -33,8 +33,8 @@ def elbo(log_likelihood, KL, N):
 
     .. code-block:: python
 
-        noise = tf.Variable(1.0)
-        likelihood = tf.distributions.Normal(loc=NN, scale=ab.pos(noise))
+        noise = ab.pos_variable(1.0)
+        likelihood = tf.distributions.Normal(loc=NN, scale=noise)
         log_likelihood = likelihood.log_prob(Y)
 
     where ``NN`` is our neural network, and ``Y`` are our targets.
@@ -92,8 +92,8 @@ def max_posterior(log_likelihood, regulariser):
 
     .. code-block:: python
 
-        noise = tf.Variable(1.0)
-        likelihood = tf.distributions.Normal(loc=NN, scale=ab.pos(noise))
+        noise = ab.pos_variable(1.0)
+        likelihood = tf.distributions.Normal(loc=NN, scale=noise)
         log_likelihood = likelihood.log_prob(Y)
 
     where ``NN`` is our neural network, and ``Y`` are our targets.

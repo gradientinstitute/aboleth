@@ -44,6 +44,6 @@ def test_initialise_stds(mocker):
     assert std.name == 'prior_std_bar:0'
 
     tc = tf.test.TestCase()
-    with tc.test_session():
-        assert std.initial_value.eval() == 10.0
-
+    with tc.test_session() as sess:
+        sess.run(tf.global_variables_initializer())
+        assert std.eval() == 10.0

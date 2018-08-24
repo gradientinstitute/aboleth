@@ -4,7 +4,7 @@ import tensorflow as tf
 
 from aboleth.random import seedgen
 from aboleth.distributions import norm_posterior, kl_sum
-from aboleth.util import pos, summary_histogram
+from aboleth.util import pos_variable, summary_histogram
 
 
 #
@@ -270,7 +270,7 @@ def _init_lenscale(given_lenscale, learn_lenscale, input_dim):
                           np.float32)
 
     if learn_lenscale:
-        lenscale = tf.Variable(pos(given_lenscale), name="kernel_lenscale")
+        lenscale = pos_variable(given_lenscale, name="kernel_lenscale")
         summary_histogram(lenscale)
     else:
         lenscale = given_lenscale

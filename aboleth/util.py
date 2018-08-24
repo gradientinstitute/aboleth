@@ -5,44 +5,28 @@ import numpy as np
 from aboleth.random import endless_permutations
 
 
-def pos(X, minval=1e-15):
-    r"""Constrain a ``tf.Variable`` to be positive only.
-
-    At the moment this is implemented as:
-
-        :math:`\max(|\mathbf{X}|, \text{minval})`
-
-    This is fast and does not result in vanishing gradients, but will lead to
-    non-smooth gradients and more local minima. In practice we haven't noticed
-    this being a problem.
+def pos_variable(initial_value, name=None, **kwargs):
+    """Make a tf.Variable that will remain positive.
 
     Parameters
     ----------
-    X : Tensor
-        any Tensor in which all elements will be made positive.
-    minval : float
-        the minimum "positive" value the resulting tensor will have.
+    initial_value : float, np.array, tf.Tensor
+        the initial value of the Variable.
+    name : string
+        the name to give the returned tensor.
+    kwargs : dict
+        optional arguments to give the created ``tf.Variable``.
 
     Returns
     -------
-    X : Tensor
-        a tensor the same shape as the input ``X`` but positively constrained.
-
-    Examples
-    --------
-    >>> X = tf.constant(np.array([1.0, -1.0, 0.0]))
-    >>> Xp = pos(X)
-    >>> with tf.Session():
-    ...     xp = Xp.eval()
-    >>> all(xp == np.array([1., 1., 1.e-15]))
-    True
+    var : tf.Tensor
+        a tf.Variable within a Tensor that will remain positive through
+        training.
 
     """
-    # Other alternatives could be:
-    # Xp = tf.exp(X)  # Medium speed, but gradients tend to explode
-    # Xp = tf.nn.softplus(X)  # Slow but well behaved!
-    Xp = tf.maximum(tf.abs(X), minval)  # Faster, but more local optima
-    return Xp
+    var0 = tf.Variable(_inverse_softplus(initial_value), **kwargs)
+    var = tf.nn.softplus(var0, name=name)
+    return var
 
 
 def batch(feed_dict, batch_size, n_iter=10000, N_=None):
@@ -141,3 +125,31 @@ def summary_histogram(values):
 def __data_len(feed_dict):
     N = feed_dict[list(feed_dict.keys())[0]].shape[0]
     return N
+
+
+def _inverse_softplus(x):
+    r"""Inverse softplus function for initialising values.
+
+    This is useful for when we want to constrain a value to be positive using a
+    softplus function, but we wish to specify an exact value for
+    initialisation.
+
+    Examples
+    --------
+    Say we wish a variable to be positive, and have an initial value of 1.,
+    >>> var = tf.nn.softplus(tf.Variable(1.0))
+    >>> with tf.Session() as sess:
+    ...     sess.run(tf.global_variables_initializer())
+    ...     print(var.eval())
+    1.3132616
+
+    If we use this function,
+    >>> var = tf.nn.softplus(tf.Variable(_inverse_softplus(1.0)))
+    >>> with tf.Session() as sess:
+    ...     sess.run(tf.global_variables_initializer())
+    ...     print(var.eval())
+    1.0
+
+    """
+    x_prime = tf.log(tf.exp(x) - 1.)
+    return x_prime
