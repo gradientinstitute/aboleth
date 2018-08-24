@@ -25,12 +25,12 @@ MISSING_VAL = -666  # Value to indicate missingness
 NCLASSES = 7  # Number of target classes
 
 # Imputation method CHANGE THESE
-METHOD = None
+# METHOD = None
 # METHOD = "LearnedNormalImpute"
 # METHOD = "FixedNormalImpute"
 # METHOD = "FixedScalarImpute"
 # METHOD = "LearnedScalarImpute"
-# METHOD = "MeanImpute"
+METHOD = "MeanImpute"
 
 # Optimization
 NEPOCHS = 5  # Number of times to see the data in training

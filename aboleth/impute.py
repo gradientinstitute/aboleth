@@ -229,6 +229,24 @@ class LearnedScalarImpute(ImputeColumnWise):
 
 
 class FixedScalarImpute(LearnedScalarImpute):
+    r"""Impute the missing values using a scalar for each column.
+
+    Takes two layers, one the returns a data tensor and the other returns a
+    mask layer. Creates a layer that returns a tensor in which the masked
+    values have been imputed with a provided scalar value per colum.
+
+    Parameters
+    ----------
+    datalayer : callable
+        A layer that returns a data tensor. Must be an InputLayer.
+    masklayer : callable
+        A layer that returns a boolean mask tensor where True values are
+        masked. Must be an InputLayer.
+    scalars : float, array-like
+        A scalar or an array of the values with which to impute each data
+        column.
+
+    """
 
     def __init__(self, datalayer, masklayer, scalars):
         """Construct and instance of a RandomGaussImpute operation."""
@@ -294,9 +312,9 @@ class FixedNormalImpute(LearnedNormalImpute):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form ``f(**kwargs)``.
-    loc : array-like
+    loc : float, array-like
         A list of the global mean values of each data column
-    scale : array-like
+    scale : float, array-like
         A list of the global standard deviation of each data column
 
     """
@@ -308,7 +326,10 @@ class FixedNormalImpute(LearnedNormalImpute):
         self.scale = scale
 
     def _initialise_variables(self, X):
-        self.normal = tf.distributions.Normal(self.loc, self.scale)
+        D = X.shape[2]
+        mean = tf.ones((D,)) * self.loc
+        std = tf.ones((D,)) * self.scale
+        self.normal = tf.distributions.Normal(mean, std)
 
 
 class ExtraCategoryImpute(ImputeColumnWise):

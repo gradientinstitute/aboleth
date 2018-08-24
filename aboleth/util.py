@@ -110,7 +110,7 @@ def batch_prediction(feed_dict, batch_size):
 def summary_histogram(values):
     """Add a summary histogram to TensorBoard.
 
-    This will add a summary histogram with name ``variable.name + "_hist"``.
+    This will add a summary histogram with name ``variable.name``.
 
     Parameters
     ----------
@@ -118,8 +118,23 @@ def summary_histogram(values):
         the Tensor to add to the summaries.
 
     """
-    name = values.name.replace(':', '_') + "_hist"
+    name = values.name.replace(':', '_')
     tf.summary.histogram(name=name, values=values)
+
+
+def summary_scalar(values):
+    """Add a summary scalar to TensorBoard.
+
+    This will add a summary scalar with name ``variable.name``.
+
+    Parameters
+    ----------
+    values : tf.Variable, tf.Tensor
+        the Tensor to add to the summaries.
+
+    """
+    name = values.name.replace(':', '_')
+    tf.summary.scalar(name=name, tensor=values)
 
 
 def __data_len(feed_dict):

@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from aboleth.random import seedgen
-from aboleth.util import pos_variable, summary_histogram
+from aboleth.util import pos_variable, summary_scalar
 
 
 def _glorot_std(n_in, n_out):
@@ -101,7 +101,7 @@ def initialise_stds(n_in, n_out, init_val, learn_prior, suffix):
 
     if learn_prior:
         std = pos_variable(std0, name="prior_std_{}".format(suffix))
-        summary_histogram(std)
+        summary_scalar(std)
     else:
         std = std0
     return std, std0
