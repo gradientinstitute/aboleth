@@ -55,7 +55,7 @@ def linear(X, Y):
 
 def bayesian_linear(X, Y):
     """Bayesian Linear Regression."""
-    noise = tf.nn.softplus(tf.Variable(ab.inverse_softplus(1.0)))
+    noise = ab.pos_variable(1.0)
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
@@ -160,7 +160,7 @@ def svr(X, Y):
 
 def gaussian_process(X, Y):
     """Gaussian Process Regression."""
-    noise = tf.nn.softplus(tf.Variable(ab.inverse_softplus(0.5)))
+    noise = ab.pos_variable(.5)
     kern = ab.RBF(learn_lenscale=True)  # learn lengthscale
 
     net = (
@@ -178,14 +178,14 @@ def gaussian_process(X, Y):
 
 def deep_gaussian_process(X, Y):
     """Deep Gaussian Process Regression."""
-    noise = tf.nn.softplus(tf.Variable(ab.inverse_softplus(0.01)))
+    noise = ab.pos_variable(.1)
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=20, kernel=ab.RBF(learn_lenscale=True)) >>
-        ab.DenseVariational(output_dim=5, full=True) >>
+        ab.DenseVariational(output_dim=5, full=False) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
-        ab.DenseVariational(output_dim=1, full=True)
+        ab.DenseVariational(output_dim=1, full=False)
     )
 
     f, kl = net(X=X)

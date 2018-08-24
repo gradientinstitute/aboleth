@@ -91,7 +91,7 @@ def main():
     # This is where we build the actual GP model
     with tf.name_scope("Deepnet"):
         phi, kl = net(X=X_)
-        noise = tf.nn.softplus(tf.Variable(ab.inverse_softplus(NOISE)))
+        noise = ab.pos_variable(NOISE)
         ll = tf.distributions.Normal(loc=phi, scale=noise).log_prob(Y_)
         loss = ab.elbo(ll, kl, N)
 

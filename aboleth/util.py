@@ -5,32 +5,28 @@ import numpy as np
 from aboleth.random import endless_permutations
 
 
-def inverse_softplus(x):
-    r"""Inverse softplus function for initialising values.
+def pos_variable(initial_value, name=None, **kwargs):
+    """Make a tf.Variable that will remain positive.
 
-    This is useful for when we want to constrain a value to be positive using a
-    softplus function, but we wish to specify an exact value for
-    initialisation.
+    Parameters
+    ----------
+    initial_value : float, np.array, tf.Tensor
+        the initial value of the Variable.
+    name : string
+        the name to give the returned tensor.
+    kwargs : dict
+        optional arguments to give the created ``tf.Variable``.
 
-    Examples
-    --------
-    Say we wish a variable to be positive, and have an initial value of 1.,
-    >>> var = tf.nn.softplus(tf.Variable(1.0))
-    >>> with tf.Session() as sess:
-    ...     sess.run(tf.global_variables_initializer())
-    ...     print(var.eval())
-    1.3132616
-
-    If we use this function,
-    >>> var = tf.nn.softplus(tf.Variable(inverse_softplus(1.0)))
-    >>> with tf.Session() as sess:
-    ...     sess.run(tf.global_variables_initializer())
-    ...     print(var.eval())
-    1.0
+    Returns
+    -------
+    var : tf.Tensor
+        a tf.Variable within a Tensor that will remain positive through
+        training.
 
     """
-    x_prime = tf.log(tf.exp(x) - 1.)
-    return x_prime
+    var0 = tf.Variable(_inverse_softplus(initial_value), **kwargs)
+    var = tf.nn.softplus(var0, name=name)
+    return var
 
 
 def batch(feed_dict, batch_size, n_iter=10000, N_=None):
@@ -129,3 +125,31 @@ def summary_histogram(values):
 def __data_len(feed_dict):
     N = feed_dict[list(feed_dict.keys())[0]].shape[0]
     return N
+
+
+def _inverse_softplus(x):
+    r"""Inverse softplus function for initialising values.
+
+    This is useful for when we want to constrain a value to be positive using a
+    softplus function, but we wish to specify an exact value for
+    initialisation.
+
+    Examples
+    --------
+    Say we wish a variable to be positive, and have an initial value of 1.,
+    >>> var = tf.nn.softplus(tf.Variable(1.0))
+    >>> with tf.Session() as sess:
+    ...     sess.run(tf.global_variables_initializer())
+    ...     print(var.eval())
+    1.3132616
+
+    If we use this function,
+    >>> var = tf.nn.softplus(tf.Variable(_inverse_softplus(1.0)))
+    >>> with tf.Session() as sess:
+    ...     sess.run(tf.global_variables_initializer())
+    ...     print(var.eval())
+    1.0
+
+    """
+    x_prime = tf.log(tf.exp(x) - 1.)
+    return x_prime

@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from aboleth.random import seedgen
-from aboleth.util import inverse_softplus, summary_histogram
+from aboleth.util import pos_variable, summary_histogram
 
 
 def _glorot_std(n_in, n_out):
@@ -100,8 +100,7 @@ def initialise_stds(n_in, n_out, init_val, learn_prior, suffix):
     std0 = np.array(std0).astype(np.float32)
 
     if learn_prior:
-        std = tf.nn.softplus(tf.Variable(inverse_softplus(std0)),
-                             name="prior_std_{}".format(suffix))
+        std = pos_variable(std0, name="prior_std_{}".format(suffix))
         summary_histogram(std)
     else:
         std = std0

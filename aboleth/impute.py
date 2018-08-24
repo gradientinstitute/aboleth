@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from aboleth.baselayers import MultiLayer
 from aboleth.random import seedgen
-from aboleth.util import inverse_softplus, summary_histogram
+from aboleth.util import pos_variable, summary_histogram
 
 
 class MaskInputLayer(MultiLayer):
@@ -253,10 +253,7 @@ class LearnedNormalImpute(ImputeColumnWise):
             name="impute_means"
         )
         std0 = tf.random_gamma(alpha=1., shape=(datadim,), seed=next(seedgen))
-        impute_std = tf.nn.softplus(
-            tf.Variable(inverse_softplus(std0)),
-            name="impute_vars"
-        )
+        impute_std = pos_variable(std0, name="impute_std")
 
         summary_histogram(impute_means)
         summary_histogram(impute_std)

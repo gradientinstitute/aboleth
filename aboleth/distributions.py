@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
-from aboleth.util import inverse_softplus, summary_histogram
+from aboleth.util import pos_variable, summary_histogram
 
 
 JIT = 1e-15  # cholesky jitter
@@ -67,9 +67,7 @@ def norm_posterior(dim, std0, suffix=None):
     if np.ndim(std0) == 0:
         std0 = tf.ones(dim) * std0
 
-    std = tf.nn.softplus(tf.Variable(inverse_softplus(std0)),
-                         name=_add_suffix("W_std_q", suffix))
-
+    std = pos_variable(std0, name=_add_suffix("W_std_q", suffix))
     summary_histogram(mu)
     summary_histogram(std)
 
