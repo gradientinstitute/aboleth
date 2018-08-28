@@ -24,7 +24,7 @@ regularisation on the model weights:
 
     layers = (
         ab.InputLayer(name="X") >>
-        ab.DenseMAP(output_dim=1, l1_reg=0, l2_reg=.05) >>
+        ab.Dense(output_dim=1, l1_reg=0, l2_reg=.05) >>
         ab.Activation(tf.nn.sigmoid)
     )
 
@@ -90,7 +90,7 @@ as shorthand for :math:`p(y_n = 1)`.
 
         layers = (
             ab.InputLayer(name="X") >>
-            ab.DenseMAP(output_dim=1, l1_reg=0, l2_reg=.05) >>
+            ab.Dense(output_dim=1, l1_reg=0, l2_reg=.05) >>
         )
         net, reg = layers(X=X_)
 
@@ -258,7 +258,7 @@ following,
         ab.Activation(tf.nn.sigmoid)
     )
 
-Note we are using ``DenseVariational`` instead of ``DenseMAP``. In the
+Note we are using ``DenseVariational`` instead of ``Dense``. In the
 ``DenseVariational`` layer the ``full`` parameter tells the layer to use a full
 covariance Gaussian, and ``prior_std`` is value of the weight prior standard
 deviation, :math:`\psi`. Also we've set ``n_samples=5`` (as a default value of
