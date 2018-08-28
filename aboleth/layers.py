@@ -119,10 +119,10 @@ class SampleLayer3(SampleLayer):
         Net, KL = super(SampleLayer3, self).__call__(X)
         return Net, KL
 
+
 #
 # Activation and Transformation Layers
 #
-
 
 class Activation(Layer):
     """Activation function layer.
@@ -156,30 +156,45 @@ class DropOut(Layer):
     keep_prob : float, Tensor
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
+    independent: bool
+        Use independently sampled droput for each observation if ``True``. This
+        may dramatically increase convergence, but will no longer only sample
+        the latent function.
     observation_axis : int
         The axis that indexes the observations (``N``). This will assume the
         obserations are on the *second* axis, i.e. ``(n_samples, N, ...)``.
         This is so we can repeat the dropout pattern over observations, which
         has the effect of dropping out weights consistently, thereby sampling
-        the "latent function" of the layer.
+        the "latent function" of the layer. This is only active if
+        ``independent`` is set to ``False``.
     alpha : bool
         Use alpha dropout (tf.contrib.nn.alpha_dropout) that maintains the self
         normalising property of SNNs.
 
+    Note
+    ----
+    If a more complex noise shape, or some other modification to dropout is
+    required, you can use an Activation layer. E.g.
+    ``ab.Activation(lambda x: tf.nn.dropout(x, **your_args))``.
+
     """
 
-    def __init__(self, keep_prob, observation_axis=1, alpha=False):
+    def __init__(self, keep_prob, independent=True, observation_axis=1,
+                 alpha=False):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
         self.obsax = observation_axis
+        self.independent = independent
         self.dropout = tf.contrib.nn.alpha_dropout if alpha else tf.nn.dropout
 
     def _build(self, X):
         """Build the graph of this layer."""
         # Set noise shape to equivalent to different samples from posterior
         # i.e. share the samples along the data-observations axis
-        noise_shape = tf.concat([tf.shape(X)[:self.obsax], [1],
-                                 tf.shape(X)[(self.obsax + 1):]], axis=0)
+        noise_shape = None
+        if not self.independent:
+            noise_shape = tf.concat([tf.shape(X)[:self.obsax], [1],
+                                     tf.shape(X)[(self.obsax + 1):]], axis=0)
         Net = self.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
@@ -687,11 +702,11 @@ class EmbedVariational(DenseVariational):
         return Net, KL
 
 
-class Conv2DMAP(SampleLayer):
-    r"""A 2D convolution layer, with maximum a posteriori (MAP) inference.
+class Conv2D(SampleLayer):
+    r"""A 2D convolution layer.
 
-    This layer uses maximum *a-posteriori* inference to learn the
-    convolutional kernels and biases, and so also returns complexity
+    This layer uses maximum likelihood or maximum *a-posteriori* inference to
+    learn the convolutional kernels and biases, and so also returns complexity
     penalities (l1 or l2) for the weights and biases.
 
     Parameters
@@ -771,8 +786,8 @@ class Conv2DMAP(SampleLayer):
         return weight_shape, bias_shape
 
 
-class DenseMAP(SampleLayer):
-    r"""Dense (fully connected) linear layer, with MAP inference.
+class Dense(SampleLayer):
+    r"""Dense (fully connected) linear layer.
 
     This implements a linear layer, and when called returns
 
@@ -782,8 +797,9 @@ class DenseMAP(SampleLayer):
     where :math:`\mathbf{X} \in \mathbb{R}^{N \times D_{in}}`,
     :math:`\mathbf{W} \in \mathbb{R}^{D_{in} \times D_{out}}` and
     :math:`\mathbf{b} \in \mathbb{R}^{D_{out}}`. This layer uses maximum
-    *a-posteriori* inference to learn the weights and biases, and so also
-    returns complexity penalities (l1 or l2) for the weights and biases.
+    likelihood or maximum *a-posteriori* inference to learn the weights and
+    biases, and so also returns complexity penalities (l1 or l2) for the
+    weights and biases.
 
     Parameters
     ----------
@@ -807,7 +823,7 @@ class DenseMAP(SampleLayer):
 
     def __init__(self, output_dim, l1_reg=0., l2_reg=0., use_bias=True,
                  init_fn='glorot'):
-        """Create and instance of a dense layer with MAP regularizers."""
+        """Create and instance of a dense layer with regularizers."""
         self.output_dim = output_dim
         self.l1 = l1_reg
         self.l2 = l2_reg
@@ -841,8 +857,8 @@ class DenseMAP(SampleLayer):
         return Net, penalty
 
 
-class EmbedMAP(SampleLayer3):
-    r"""Dense (fully connected) embedding layer, with MAP inference.
+class Embed(SampleLayer3):
+    r"""Dense (fully connected) embedding layer.
 
     This layer works directly inputs of *K* category *indices* rather than
     one-hot representations, for efficiency. Each column of the input is
@@ -855,8 +871,9 @@ class EmbedMAP(SampleLayer3):
     Here :math:`\mathbf{X} \in \mathbb{N}_2^{N \times K}` and :math:`\mathbf{W}
     \in \mathbb{R}^{K \times D_{out}}`. Though in code we represent
     :math:`\mathbf{X}` as a vector of indices in :math:`\mathbb{N}_K^{N \times
-    1}`. This layer uses maximum *a-posteriori* inference to learn the weights
-    and so also returns complexity penalities (l1 or l2) for the weights.
+    1}`. This layer uses maximum likelihood or maximum *a-posteriori* inference
+    to learn the weights and so also returns complexity penalities (l1 or l2)
+    for the weights.
 
     Parameters
     ----------
@@ -881,7 +898,7 @@ class EmbedMAP(SampleLayer3):
 
     def __init__(self, output_dim, n_categories, l1_reg=0., l2_reg=0.,
                  init_fn='glorot'):
-        """Create and instance of a MAP embedding layer."""
+        """Create and instance of an embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
         self.n_categories = n_categories

@@ -44,13 +44,13 @@ the layer weights / biases. The following are effectively equivalent:
 
    net = (
       ab.InputLayer(name="X", n_samples=n_samples_) >>
-      ab.DenseMAP(output_dim=64, l2_reg=0.01, l1_reg=0.) >>
+      ab.Dense(output_dim=64, l2_reg=0.01, l1_reg=0.) >>
       ab.Activation(tf.tanh) >>
       ab.DropOut(keep_prob=.5) >>
-      ab.DenseMAP(output_dim=64, l2_reg=0.01, l1_reg=0.) >>
+      ab.Dense(output_dim=64, l2_reg=0.01, l1_reg=0.) >>
       ab.Activation(tf.tanh) >>
       ab.DropOut(keep_prob=.5) >>
-      ab.DenseMAP(output_dim=1, l2_reg=0.01, l1_reg=0.)
+      ab.Dense(output_dim=1, l2_reg=0.01, l1_reg=0.)
    )
 
 .. code:: python

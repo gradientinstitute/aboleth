@@ -63,7 +63,7 @@ def test_categorical_likelihood(make_data, likelihood):
 
     layers = ab.stack(
         ab.InputLayer(name='X', n_samples=n_samples_),
-        ab.DenseMAP(output_dim=K)
+        ab.Dense(output_dim=K)
     )
 
     nn, reg = layers(X=X_)

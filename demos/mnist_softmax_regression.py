@@ -23,29 +23,27 @@ p_samples = 5
 # Network architecture
 net = ab.stack(
     ab.InputLayer(name='X', n_samples=l_samples),  # LSAMPLES,BATCH_SIZE,28*28
-    ab.Conv2DMAP(filters=32,
-                 kernel_size=(5, 5),
-                 l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 28, 28, 32
+    ab.Conv2D(filters=32,
+              kernel_size=(5, 5),
+              l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 28, 28, 32
     ab.Activation(h=tf.nn.relu),
     ab.MaxPool2D(pool_size=(2, 2),
                  strides=(2, 2)),  # LSAMPLES, BATCH_SIZE, 14, 14, 32
 
-    ab.Conv2DMAP(filters=64,
-                 kernel_size=(5, 5),
-                 l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 14, 14, 64
+    ab.Conv2D(filters=64,
+              kernel_size=(5, 5),
+              l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 14, 14, 64
     ab.Activation(h=tf.nn.relu),
     ab.MaxPool2D(pool_size=(2, 2),
                  strides=(2, 2)),  # LSAMPLES, BATCH_SIZE, 7, 7, 64
 
     ab.Flatten(),  # LSAMPLES, BATCH_SIZE, 7*7*64
 
-    ab.DenseMAP(output_dim=1024,
-                l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 1024
+    ab.Dense(output_dim=1024, l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 1024
     ab.Activation(h=tf.nn.relu),
     ab.DropOut(0.5),
 
-    ab.DenseMAP(output_dim=10,
-                l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 10
+    ab.Dense(output_dim=10, l2_reg=reg),  # LSAMPLES, BATCH_SIZE, 10
 )
 
 

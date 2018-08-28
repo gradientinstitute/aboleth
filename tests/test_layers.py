@@ -70,13 +70,14 @@ def test_activation(make_data):
         assert KL == 0
 
 
-def test_dropout(random, alpha=False):
+@pytest.mark.parametrize('indep', [True, False])
+def test_dropout(random, indep):
     """Test dropout layer."""
     samples, rows, cols = 3, 5, 1000
     keep_prob = 0.9
     X = (random.randn(samples, rows, cols) + 1).astype(np.float32)
     ab.set_hyperseed(666)
-    drop = ab.DropOut(keep_prob, alpha=alpha)
+    drop = ab.DropOut(keep_prob, independent=indep)
 
     F, KL = drop(X)
 
@@ -86,8 +87,9 @@ def test_dropout(random, alpha=False):
         dropped = np.where(f == 0)
 
         # Check we dropout whole columns
-        for s, _, c in zip(*dropped):
-            assert np.allclose(f[s, :, c], 0.)
+        if not indep:
+            for s, _, c in zip(*dropped):
+                assert np.allclose(f[s, :, c], 0.)
 
         # Check the dropout proportions are approximately correct
         active = 1 - np.sum(f[:, 0, :] == 0) / (samples * cols)
@@ -163,7 +165,7 @@ def test_arc_cosine(make_data):
 
 
 @pytest.mark.parametrize('reps', [1, 3, 10])
-@pytest.mark.parametrize('layer', [ab.EmbedVariational, ab.EmbedMAP])
+@pytest.mark.parametrize('layer', [ab.EmbedVariational, ab.Embed])
 def test_dense_embeddings(make_categories, reps, layer):
     """Test the embedding layer."""
     x, K = make_categories
@@ -186,7 +188,7 @@ def test_dense_embeddings(make_categories, reps, layer):
         assert Phi.shape == (S, N, D * reps)
 
 
-@pytest.mark.parametrize('dense', [ab.DenseMAP, ab.DenseVariational])
+@pytest.mark.parametrize('dense', [ab.Dense, ab.DenseVariational])
 def test_dense_outputs(dense, make_data):
     """Make sure the dense layers output expected dimensions."""
     x, _, _ = make_data
@@ -206,7 +208,7 @@ def test_dense_outputs(dense, make_data):
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
 
 
-@pytest.mark.parametrize('conv2d', [ab.Conv2DMAP, ab.Conv2DVariational])
+@pytest.mark.parametrize('conv2d', [ab.Conv2D, ab.Conv2DVariational])
 @pytest.mark.parametrize(
     'kwargs', [
         dict(filters=D, kernel_size=(4, 4)),
@@ -251,10 +253,10 @@ def test_conv2d_outputs(conv2d, kwargs, make_image_data):
 @pytest.mark.parametrize('layer_args', [
     (SampleLayer, ()),
     (SampleLayer3, ()),
-    (ab.DenseMAP, (D,)),
+    (ab.Dense, (D,)),
     (ab.DenseVariational, (D,)),
     (ab.EmbedVariational, (2, D)),
-    (ab.Conv2DMAP, (8, (4, 4))),
+    (ab.Conv2D, (8, (4, 4))),
     (ab.Conv2DVariational, (8, (4, 4))),
     (ab.RandomFourier, (2, ab.RBF())),
     (ab.RandomArcCosine, (2,)),

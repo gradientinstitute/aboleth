@@ -42,7 +42,7 @@ def linear(X, Y):
 
     net = (
         ab.InputLayer(name="X") >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
+        ab.Dense(output_dim=1, l2_reg=lambda_)
     )
 
     Xw, reg = net(X=X)
@@ -76,13 +76,13 @@ def nnet(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
-        ab.DenseMAP(output_dim=40, l2_reg=lambda_) >>
+        ab.Dense(output_dim=40, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=20, l2_reg=lambda_) >>
+        ab.Dense(output_dim=20, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=10, l2_reg=lambda_) >>
+        ab.Dense(output_dim=10, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
+        ab.Dense(output_dim=1, l2_reg=lambda_)
     )
 
     f, reg = net(X=X)
@@ -98,15 +98,15 @@ def nnet_dropout(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseMAP(output_dim=40, l2_reg=lambda_) >>
+        ab.Dense(output_dim=40, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.9) >>
-        ab.DenseMAP(output_dim=20, l2_reg=lambda_) >>
+        ab.DropOut(keep_prob=0.9, independent=True) >>
+        ab.Dense(output_dim=20, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.95) >>
-        ab.DenseMAP(output_dim=10, l2_reg=lambda_) >>
+        ab.DropOut(keep_prob=0.95, independent=True) >>
+        ab.Dense(output_dim=10, l2_reg=lambda_) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
+        ab.Dense(output_dim=1, l2_reg=lambda_)
     )
 
     f, reg = net(X=X)
@@ -149,8 +149,8 @@ def svr(X, Y):
         # ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.InputLayer(name="X", n_samples=1) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
-        # ab.DropOut(keep_prob=0.9) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_)
+        # ab.DropOut(keep_prob=0.9, independent=True) >>
+        ab.Dense(output_dim=1, l2_reg=lambda_)
     )
 
     f, reg = net(X=X)
