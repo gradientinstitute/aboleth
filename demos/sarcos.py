@@ -24,8 +24,9 @@ NOISE = 3.0  # Initial estimate of the observation noise
 LENSCALE = 5 * np.ones((21, 1), dtype=np.float32)
 
 # Learning and prediction settings
-BATCH_SIZE = 200 # number of observations per mini batch
+BATCH_SIZE = 200  # number of observations per mini batch
 NEPOCHS = 200  # Number of times to iterate though the dataset
+EPOCHS_PER_EVAL = 10  # Number of epochs between evals
 NPREDICTSAMPLES = 20  # Number of prediction samples
 
 
@@ -54,7 +55,7 @@ def get_data():
 def train_input_fn(Xr, Yr):
     def f():
         data_tr = tf.data.Dataset.from_tensor_slices((Xr, Yr)) \
-            .repeat(NEPOCHS) \
+            .repeat() \
             .shuffle(buffer_size=10000) \
             .batch(BATCH_SIZE)
         return data_tr
@@ -154,9 +155,11 @@ def main():
     eval_fn = test_input_fn(Xs, Ys)
     predict_fn = predict_input_fn(Xs)
 
-    for i in range(NEPOCHS):
-    # Train the Model.
-        estimator.train(input_fn=input_fn, steps=1000)
+    steps = EPOCHS_PER_EVAL * (N // BATCH_SIZE)
+
+    for i in range(NEPOCHS // EPOCHS_PER_EVAL):
+        # Train the Model.
+        estimator.train(input_fn=input_fn, steps=steps)
         # Evaluate the model.
         eval_result = estimator.evaluate(input_fn=eval_fn)
 
