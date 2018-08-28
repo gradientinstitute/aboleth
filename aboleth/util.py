@@ -162,8 +162,8 @@ def _inverse_softplus(x):
     >>> var = tf.nn.softplus(tf.Variable(_inverse_softplus(1.0)))
     >>> with tf.Session() as sess:
     ...     sess.run(tf.global_variables_initializer())
-    ...     print(var.eval())
-    1.0
+    ...     print(np.allclose(var.eval(), 1.0))
+    True
 
     """
     x_prime = tf.log(tf.exp(x) - 1.)
