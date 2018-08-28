@@ -2,7 +2,6 @@
 import numpy as np
 import tensorflow as tf
 
-from aboleth.random import seedgen
 from aboleth.distributions import norm_posterior, kl_sum
 from aboleth.util import pos_variable, summary_histogram, summary_scalar
 
@@ -24,14 +23,19 @@ class ShiftInvariant:
     learn_lenscale : bool, optional
         Whether to learn the length scale. If True, the lenscale
         value provided (or its default) is used for initialisation.
+    seed : int, optional
+        The seed for the internal random number generator. Setting a fixed
+        seed ensures that remaking the tensorflow graph results in the
+        same weights.
 
     """
 
-    def __init__(self, lenscale=None, learn_lenscale=False):
+    def __init__(self, lenscale=None, learn_lenscale=False, seed=0):
         """Constuct a shift invariant kernel object."""
         self.given_lenscale = lenscale
         self.learn_lenscale = learn_lenscale
         self.lenscale = None
+        self._random_state = np.random.RandomState(seed)
 
     def weights(self, input_dim, n_features, dtype=np.float32):
         """Generate the random fourier weights for this kernel.
@@ -75,6 +79,10 @@ class RBF(ShiftInvariant):
     learn_lenscale : bool, optional
         Whether to learn the length scale. If True, the lenscale
         value provided (or its default) is used for initialisation.
+    seed : int, optional
+        The seed for the internal random number generator. Setting a fixed
+        seed ensures that remaking the tensorflow graph results in the
+        same weights.
 
     """
 
@@ -104,8 +112,7 @@ class RBF(ShiftInvariant):
         self.lenscale, _ = _init_lenscale(self.given_lenscale,
                                           self.learn_lenscale,
                                           input_dim)
-        rand = np.random.RandomState(next(seedgen))
-        e = rand.randn(input_dim, n_features).astype(dtype)
+        e = self._random_state.randn(input_dim, n_features).astype(dtype)
         P = e / tf.expand_dims(self.lenscale, axis=-1)
         return P, 0.
 
@@ -129,13 +136,17 @@ class RBFVariational(ShiftInvariant):
     learn_lenscale : bool, optional
         Whether to learn the (prior) length scale. If True, the lenscale
         value provided (or its default) is used for initialisation.
+    seed : int, optional
+        The seed for the internal random number generator. Setting a fixed
+        seed ensures that remaking the tensorflow graph results in the
+        same weights.
 
     """
 
-    def __init__(self, lenscale=None, learn_lenscale=False):
+    def __init__(self, lenscale=None, learn_lenscale=False, seed=0):
         """Constuct an instance of the RBFVariational kernel."""
         self.lenscale_post = None
-        super().__init__(lenscale, learn_lenscale)
+        super().__init__(lenscale, learn_lenscale, seed)
 
     def weights(self, input_dim, n_features, dtype=np.float32):
         """Generate the random fourier weights for this kernel.
@@ -180,8 +191,7 @@ class RBFVariational(ShiftInvariant):
 
         # We implement the VAR-FIXED method here from Cutajar et. al 2017, so
         # we pre-generate and fix the standard normal samples
-        rand = np.random.RandomState(next(seedgen))
-        e = rand.randn(*dim).astype(dtype)
+        e = self._random_state.randn(*dim).astype(dtype)
         P = qP.mean() + qP.stddev() * e
 
         return P, KL
@@ -211,12 +221,16 @@ class Matern(ShiftInvariant):
         a zero or positive integer specifying the number of the Matern kernel,
         e.g. ``p == 0`` results int a Matern 1/2 kernel, ``p == 1``  results in
         the Matern 3/2 kernel etc.
+    seed : int, optional
+        The seed for the internal random number generator. Setting a fixed
+        seed ensures that remaking the tensorflow graph results in the
+        same weights.
 
     """
 
-    def __init__(self, lenscale=None, learn_lenscale=False, p=1):
+    def __init__(self, lenscale=None, learn_lenscale=False, p=1, seed=0):
         """Constuct a Matern kernel object."""
-        super().__init__(lenscale, learn_lenscale)
+        super().__init__(lenscale, learn_lenscale, seed)
         assert isinstance(p, int) and p >= 0
         self.p = p
 
@@ -255,9 +269,8 @@ class Matern(ShiftInvariant):
         self.lenscale, _ = _init_lenscale(self.given_lenscale,
                                           self.learn_lenscale, input_dim)
         df = 2 * (self.p + 0.5)
-        rand = np.random.RandomState(next(seedgen))
-        y = rand.randn(input_dim, n_features)
-        u = rand.chisquare(df, size=(n_features,))
+        y = self._random_state.randn(input_dim, n_features)
+        u = self._random_state.chisquare(df, size=(n_features,))
         P = (y * np.sqrt(df / u)).astype(dtype) / \
             tf.expand_dims(self.lenscale, axis=-1)
         return P, 0.
