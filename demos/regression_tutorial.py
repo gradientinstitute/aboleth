@@ -184,7 +184,7 @@ def deep_gaussian_process(X, Y):
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=20, kernel=ab.RBF(learn_lenscale=True)) >>
         ab.DenseVariational(output_dim=5, full=False) >>
-        ab.RandomFourier(n_features=10, kernel=ab.RBF(1.)) >>
+        ab.RandomFourier(n_features=10, kernel=ab.RBF(1., seed=1)) >>
         ab.DenseVariational(output_dim=1, full=False)
     )
 
