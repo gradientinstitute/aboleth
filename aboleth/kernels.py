@@ -2,7 +2,6 @@
 import numpy as np
 import tensorflow as tf
 
-from aboleth.random import seedgen
 from aboleth.distributions import norm_posterior, kl_sum
 from aboleth.util import pos_variable, summary_histogram, summary_scalar
 
