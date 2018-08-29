@@ -47,12 +47,14 @@ class InputLayer(MultiLayer):
     def _build(self, **kwargs):
         """Build the tiling input layer."""
         X = kwargs[self.name]
-        ndims = len(X.shape)
         # tile like (n_samples, ...)
-        new_shape = [self.n_samples] + ([1] * ndims)
-        Xs = tf.tile(tf.expand_dims(X, 0), new_shape)
+        Xs = _tile2samples(self.n_samples, X)
         return Xs, 0.0
 
+
+#
+#  Sample Layer Abstract base classes
+#
 
 class SampleLayer(Layer):
     r"""Sample Layer base class.
@@ -371,7 +373,7 @@ class RandomArcCosine(RandomFourier):
 
 
 #
-# Weight layers
+# Variational Weight layers
 #
 
 class Conv2DVariational(SampleLayer):
@@ -702,6 +704,126 @@ class EmbedVariational(DenseVariational):
         return Net, KL
 
 
+#
+# Noise Contrastive Layers
+#
+
+class NCPContinuousPerturb(SampleLayer):
+    """TODO."""
+
+    def __init__(self, input_noise=1.):
+        """Instantiate a NCPContinuousPerturb layer."""
+        self.input_noise = input_noise
+
+    def _build(self, X):
+        # calculate the perturbation
+        loc = tf.constant(0., X.dtype)
+        scale = tf.constant(self.input_noise, X.dtype)
+        noise = tf.distributions.Normal(loc, scale).sample(tf.shape(X))
+
+        # Concatenate the perturbation
+        X_pert = tf.concat([X, X + noise], axis=0)
+        return X_pert, 0.0
+
+
+class NCPCategoricalPerturb(SampleLayer):
+    """TODO."""
+
+    pass
+
+
+class DenseNCP(DenseVariational):
+    r"""A DenseVariational layer with Noise Constrastive Prior.
+
+    This is basically just a ``DenseVariational`` layer, but with an added
+    Kullback Leibler penalty on the latent function, as derived in Equation (6)
+    in "Reliable Uncertainty Estimates in Deep Neural Networks using Noise
+    Contrastive Priors" https://arxiv.org/abs/1807.09289.
+
+    This should be the *last* layer in a network, and needs to be used in
+    conjuction with ``NCPContinuousPerturb`` and/or ``NCPCategoricalPerturb``
+    layers (after an input layer). For example:
+
+    .. code::
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.NCPContinuousPerturb() >>
+            ab.Dense(output_dim=32) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+            ab.Dense(output_dim=8) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.DenseNCP(output_dim=1)
+        )
+
+    Parameters
+    ----------
+    output_dim : int
+        the dimension of the output of this layer
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
+    learn_prior : bool, optional
+        Whether to learn the prior on the weights.
+    use_bias : bool
+        If true, also learn a bias weight, e.g. a constant offset weight.
+    latent_mean : float
+        The prior mean over the latent function(s) on the output of this layer.
+        This specifies what value the latent function should take away from the
+        support of the training data.
+    latent_std : float
+        The prior standard deviation over the latent function(s) on the output
+        of this layer. This controls the strength of the regularisation away
+        from the latent mean.
+
+    Note
+    ----
+    This implementation is inspired by:
+    https://github.com/brain-research/ncp/blob/master/ncp/models/bbb_ncp.py
+
+    """
+
+    def __init__(self, output_dim, prior_std=1., learn_prior=False,
+                 use_bias=True, latent_mean=0., latent_std=1.):
+        """Instantiate a DenseNCP layer."""
+        super().__init__(
+            output_dim=output_dim,
+            prior_std=prior_std,
+            learn_prior=learn_prior,
+            full=False,
+            use_bias=use_bias
+        )
+        self.f_prior = tf.distributions.Normal(latent_mean, latent_std)
+
+    def _build(self, X):
+        # Extract perturbed predictions
+        n_samples = tf.shape(X)[0] // 2
+        X_orig, X_pert = X[:n_samples], X[n_samples:]
+
+        # Build Dense Layer
+        F, KL = super()._build(X_orig)
+
+        # Build a latent function density
+        qWmean = _tile2samples(n_samples, tf.transpose(self.qW.mean()))
+        qWvar = _tile2samples(n_samples, tf.transpose(self.qW.variance()))
+        f_loc = tf.matmul(X_pert, qWmean)
+        if self.use_bias:
+            f_loc += self.qb.mean()
+        f_scale = tf.sqrt(tf.matmul(X_pert ** 2, qWvar))
+        f_post = tf.distributions.Normal(f_loc, f_scale)
+
+        # Calculate NCP loss
+        KL += kl_sum(f_post, self.f_prior) / tf.to_float(n_samples)
+
+        return F, KL
+
+
+#
+# Maximum likelihood/MAP Weight layers
+#
+
 class Conv2D(SampleLayer):
     r"""A 2D convolution layer.
 
@@ -839,8 +961,8 @@ class Dense(SampleLayer):
         W = tf.Variable(W_init, name="W_map")
         summary_histogram(W)
 
-        # We don't want to copy tf.Variable W so map over X
-        Net = tf.map_fn(lambda x: tf.matmul(x, W), X)
+        # Tiling W is much faster than mapping (tf.map_fn) the matmul
+        Net = tf.matmul(X, _tile2samples(n_samples, W))
 
         # Regularizers
         penalty = self.l2 * tf.nn.l2_loss(W) + self.l1 * _l1_loss(W)
@@ -930,6 +1052,13 @@ class Embed(SampleLayer3):
 #
 # Private module stuff
 #
+
+def _tile2samples(n_samples, tensor):
+    """Tile a tensor along axis 0 to match the number of samples."""
+    new_shape = [n_samples] + ([1] * len(tensor.shape))
+    tiled = tf.tile(tf.expand_dims(tensor, 0), new_shape)
+    return tiled
+
 
 def _l1_loss(X):
     r"""Calculate the L1 loss of X, :math:`\|X\|_1`."""

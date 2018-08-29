@@ -57,6 +57,53 @@ def test_input_sample(make_data):
             assert np.array_equal(f[i], x)
 
 
+def test_ncp_input_samples(make_data):
+    """Test we are making the ncp extra samples correctly."""
+    x, _, X = make_data
+
+    net = (
+        ab.InputLayer(name='X', n_samples=1) >>
+        ab.NCPContinuousPerturb(input_noise=1.)
+    )
+
+    F, KL = net(X=x)
+    tc = tf.test.TestCase()
+
+    with tc.test_session():
+        f = F.eval()
+        assert KL.eval() == 0.0
+        assert f.shape[0] == 2
+        assert np.all(f[0] == x)
+
+
+def test_ncp_output(make_data):
+    """Test we are making the ncp extra samples correctly, and KL is OK."""
+    x, _, X = make_data
+    x = x.astype(np.float32)
+
+    net_ncp = (
+        ab.InputLayer(name='X', n_samples=1) >>
+        ab.NCPContinuousPerturb(input_noise=1.) >>
+        ab.DenseNCP(output_dim=1)
+    )
+
+    net = (
+        ab.InputLayer(name='X', n_samples=1) >>
+        ab.DenseVariational(output_dim=1)
+    )
+
+    F, KL = net_ncp(X=x)
+    F_var, KL_var = net(X=x)
+    tc = tf.test.TestCase()
+
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        f, f_var = F.eval(), F_var.eval()
+        assert f.shape[0] == 1
+        assert f.shape == f_var.shape
+        assert KL.eval() >= KL_var.eval()
+
+
 def test_activation(make_data):
     """Test nonlinear activation layer."""
     x, _, X = make_data
