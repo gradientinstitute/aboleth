@@ -597,10 +597,23 @@ class DenseVariational(SampleLayer3):
 class EmbedVariational(DenseVariational):
     r"""Dense (fully connected) embedding layer, with variational inference.
 
-    This layer works directly inputs of *K* category *indices* rather than
-    one-hot representations, for efficiency. Each column of the input is
-    embedded seperately, and the result concatenated along the last axis.
-    It is a dense linear layer,
+    This layer works directly on inputs of *K* category *indices* rather than
+    one-hot representations, for efficiency. Note, this only works on a single
+    column, see the ``PerFeature`` layer to embed multiple columns. Eg.
+
+
+    .. code::
+
+        cat_layers = [EmbedVar(10, k) for k in x_categories]
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.PerFeature(*cat_layers) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+        )
+
+    This layer is a effectively a ``DenseVariational`` layer,
 
     .. math::
         f(\mathbf{X}) = \mathbf{X} \mathbf{W},
@@ -709,7 +722,35 @@ class EmbedVariational(DenseVariational):
 #
 
 class NCPContinuousPerturb(SampleLayer):
-    """TODO."""
+    r"""Noise Constrastive Prior continous variable perturbation layer.
+
+    This layer doubles the number of samples going through the model, and adds
+    a random normal perturbation to the second set of samples. This implements
+    Equation 3 in "Reliable Uncertainty Estimates in Deep Neural Networks using
+    Noise Contrastive Priors" https://arxiv.org/abs/1807.09289.
+
+    This should be the *first* layer in a network after an input layer, and
+    needs to be used in conjuction with ``DenseNCP``. For example:
+
+    .. code::
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.NCPContinuousPerturb() >>
+            ab.Dense(output_dim=32) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+            ab.Dense(output_dim=8) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.DenseNCP(output_dim=1)
+        )
+
+    Parameters
+    ----------
+    input_noise : float, tf.Tensor, tf.Variable
+        The standard deviation of the random perturbation to add to the inputs.
+
+    """
 
     def __init__(self, input_noise=1.):
         """Instantiate a NCPContinuousPerturb layer."""
@@ -717,19 +758,79 @@ class NCPContinuousPerturb(SampleLayer):
 
     def _build(self, X):
         # calculate the perturbation
-        loc = tf.constant(0., X.dtype)
-        scale = tf.constant(self.input_noise, X.dtype)
-        noise = tf.distributions.Normal(loc, scale).sample(tf.shape(X))
+        loc = tf.constant(0.)
+        noise_dist = tf.distributions.Normal(loc, self.input_noise)
+        noise = noise_dist.sample(tf.shape(X))
 
-        # Concatenate the perturbation
         X_pert = tf.concat([X, X + noise], axis=0)
         return X_pert, 0.0
 
 
 class NCPCategoricalPerturb(SampleLayer):
-    """TODO."""
+    r"""Noise Constrastive Prior categorical variable perturbation layer.
 
-    pass
+    This layer doubles the number of samples going through the model, and
+    randomly flips the categories in the second set of samples. This implements
+    (the categorical version of) Equation 3 in "Reliable Uncertainty Estimates
+    in Deep Neural Networks using Noise Contrastive Priors"
+    https://arxiv.org/abs/1807.09289.
+
+    The choice to randomly flip a category is drawn from a Bernoulli
+    distribution per sample (with probability ``flip_prob``), then the new
+    category is randomly chosen with probability ``1 / n_categories``.
+
+    This should be the *first* layer in a network after an input layer, and
+    needs to be used in conjuction with ``DenseNCP``. Also, like the embedding
+    layers, this only applies to *one column of categorical inputs*, so we
+    advise you use it with the ``PerFeature`` layer. For example:
+
+    .. code::
+
+        cat_layers = [
+            (NCPCategoricalPerturb(k) >> Embed(10, k))
+            for k in x_categories
+        ]
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.PerFeature(*cat_layers) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.Dense(output_dim=32) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+            ab.Dense(output_dim=8) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.DenseNCP(output_dim=1)
+        )
+
+    Parameters
+    ----------
+    input_noise : float, tf.Tensor, tf.Variable
+        The standard deviation of the random perturbation to add to the inputs.
+
+    """
+
+    def __init__(self, n_categories, flip_prob=0.1):
+        """Instantiate a NCPCategoricalPerturb layer."""
+        self.n_categories = n_categories
+        self.flip_prob = flip_prob
+
+    def _build(self, X):
+        dim = tf.shape(X)
+
+        # Binary decision to flip category
+        mask_dist = tf.distributions.Bernoulli(probs=self.flip_prob)
+        mask = mask_dist.sample(dim)
+
+        # Uniform categorical to choose which category to flip to
+        p = tf.ones(self.n_categories) / self.n_categories
+        flip_dist = tf.distributions.Categorical(probs=p)
+        flips = flip_dist.sample(dim)
+
+        # Flip and concatenate
+        X_flips = (mask * X) + ((1 - mask) * flips)
+        X_pert = tf.concat([X, X_flips], axis=0)
+        return X_pert, 0.
 
 
 class DenseNCP(DenseVariational):
@@ -745,6 +846,7 @@ class DenseNCP(DenseVariational):
     layers (after an input layer). For example:
 
     .. code::
+
         net = (
             ab.InputLayer(name="X", n_samples=n_samples_) >>
             ab.NCPContinuousPerturb() >>
@@ -982,9 +1084,21 @@ class Dense(SampleLayer):
 class Embed(SampleLayer3):
     r"""Dense (fully connected) embedding layer.
 
-    This layer works directly inputs of *K* category *indices* rather than
-    one-hot representations, for efficiency. Each column of the input is
-    embedded seperately, and the result concatenated along the last axis.
+    This layer works directly on inputs of *K* category *indices* rather than
+    one-hot representations, for efficiency. Note, this only works on a single
+    column, see the ``PerFeature`` layer to embed multiple columns. E.g.
+
+    .. code::
+
+        cat_layers = [Embed(10, k) for k in x_categories]
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.PerFeature(*cat_layers) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+        )
+
     It is a dense linear layer,
 
     .. math::

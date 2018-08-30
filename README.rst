@@ -27,6 +27,8 @@ Some of the features of Aboleth:
 - Random Fourier and arc-cosine features for approximate Gaussian processes.
   Optional variational optimisation of these feature weights as per [1]_.
 - Imputation layers with parameters that are learned as part of a model.
+- Noise Contrastive Priors [3]_ for better out-of-domain uncertainty
+  estimation.
 - Very flexible construction of networks, e.g. multiple inputs, ResNets etc.
 - Compatible and interoperable with other neural net frameworks such as `Keras
   <https://keras.io/>`_ (see the `demos
@@ -135,6 +137,9 @@ References
        Expansions for Deep Gaussian Processes. In ICML, 2017.
 .. [2] Kingma, D. P. and Welling, M. Auto-encoding variational Bayes. In ICLR,
        2014.
+.. [3] Hafner, D., Tran, D., Irpan, A., Lillicrap, T. and Davidson, J., 2018. 
+       Reliable Uncertainty Estimates in Deep Neural Networks using Noise
+       Contrastive Priors. arXiv preprint arXiv:1807.09289.
 
 
 License
