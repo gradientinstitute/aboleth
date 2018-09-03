@@ -21,10 +21,9 @@ setup(
     package_dir={'aboleth': 'aboleth'},
     include_package_data=True,
     install_requires=[
-        'numpy>=1.12.0',
-        'scipy>=0.18.1',
         'tensorflow>=1.10.0',
         'tensorflow-probability>=0.3',
+        'scipy>=0.18.1',
         'six>=1.10.0'
     ],
     extras_require={
