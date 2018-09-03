@@ -139,12 +139,12 @@ def nnet_bayesian(X, Y):
 def nnet_ncp(X, Y):
     """Noise contrastive prior network."""
     noise = ab.pos_variable(.5)
-    lstd = ab.pos_variable(.1)
-    noiseloc = ab.pos_variable(1.)
+    lstd = 1.
+    perturb_noise = 10.
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.NCPContinuousPerturb(input_noise=noiseloc) >>
+        ab.NCPContinuousPerturb(input_noise=perturb_noise) >>
         ab.Dense(output_dim=32) >>
         ab.Activation(tf.nn.selu) >>
         ab.Dense(output_dim=16) >>

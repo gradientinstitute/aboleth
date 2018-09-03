@@ -858,6 +858,16 @@ class DenseNCP(DenseVariational):
             ab.DenseNCP(output_dim=1)
         )
 
+    As you can see from this example, we have only made the last layer
+    probabilistic/Bayesian (``DenseNCP``), and have left the rest of the
+    network maximum likelihood/MAP. This is also how the original authors of
+    the algorithm have implemented it. While this layer also works with
+    ``DenseVariational`` layers (etc.) this is not how is has been originally
+    implemented, and the contribution of uncertainty from these layers to the
+    latent function will not be accounted for in this layer. This is because
+    the nonlinear activations between layers make evaluating this density
+    intractable, unless we had something like normalising flows.
+
     Parameters
     ----------
     output_dim : int
