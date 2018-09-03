@@ -5,7 +5,8 @@ from .losses import elbo, max_posterior
 from .baselayers import stack
 from .layers import (Activation, DropOut, MaxPool2D, Flatten, DenseVariational,
                      EmbedVariational, Conv2DVariational, Dense, Embed, Conv2D,
-                     InputLayer, RandomFourier, RandomArcCosine)
+                     InputLayer, RandomFourier, RandomArcCosine,
+                     NCPContinuousPerturb, NCPCategoricalPerturb, DenseNCP)
 from .hlayers import Concat, Sum, PerFeature
 from .impute import (MaskInputLayer, MeanImpute, FixedNormalImpute,
                      LearnedScalarImpute, FixedScalarImpute,
@@ -33,6 +34,9 @@ __all__ = (
     'Embed',
     'RandomFourier',
     'RandomArcCosine',
+    'NCPContinuousPerturb',
+    'NCPCategoricalPerturb',
+    'DenseNCP',
     'norm_prior',
     'norm_posterior',
     'gaus_posterior',

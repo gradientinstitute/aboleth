@@ -26,8 +26,8 @@ def data():
     x = np.vstack((x1, x2)).T
     w = np.array([[0.5], [2.0]])
     Y = np.dot(x, w) + RAND.randn(N, 1)
-    X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
-    return x, Y, X
+    X = tf.cast(tf.tile(tf.expand_dims(x, 0), [3, 1, 1]), dtype=tf.float32)
+    return x.astype(np.float32), Y.astype(np.float32), X
 
 
 @pytest.fixture

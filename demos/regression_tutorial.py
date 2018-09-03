@@ -24,14 +24,14 @@ Ns = 400  # Number of testing points to generate
 true_noise = 0.05  # Add noise to the GP draws, to make things a little harder
 
 # Model settings
-n_samples = 5  # Number of random samples to get from an Aboleth net
+n_samples = 3  # Number of random samples to get from an Aboleth net
 p_samples = 100  # Number of prediction samples
 n_epochs = 4000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 n_samples_ = tf.placeholder_with_default(n_samples, [])
 
-model = "deep_gaussian_process"
+model = "nnet_ncp"
 
 
 # Models for regression
@@ -98,14 +98,14 @@ def nnet_dropout(X, Y):
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.Dense(output_dim=40, l2_reg=lambda_) >>
-        ab.Activation(tf.tanh) >>
+        ab.Dense(output_dim=32, l2_reg=lambda_) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DropOut(keep_prob=0.9, independent=True) >>
-        ab.Dense(output_dim=20, l2_reg=lambda_) >>
-        ab.Activation(tf.tanh) >>
+        ab.Dense(output_dim=16, l2_reg=lambda_) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DropOut(keep_prob=0.95, independent=True) >>
-        ab.Dense(output_dim=10, l2_reg=lambda_) >>
-        ab.Activation(tf.tanh) >>
+        ab.Dense(output_dim=8, l2_reg=lambda_) >>
+        ab.Activation(tf.nn.selu) >>
         ab.Dense(output_dim=1, l2_reg=lambda_)
     )
 
@@ -117,17 +117,41 @@ def nnet_dropout(X, Y):
 
 def nnet_bayesian(X, Y):
     """Bayesian neural net."""
-    noise = 0.05
+    noise = 0.01
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.DenseVariational(output_dim=5) >>
-        ab.Activation(tf.nn.relu) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DenseVariational(output_dim=4) >>
-        ab.Activation(tf.nn.relu) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DenseVariational(output_dim=3) >>
-        ab.Activation(tf.tanh) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DenseVariational(output_dim=1)
+    )
+
+    f, kl = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.elbo(lkhood, kl, N)
+    return f, loss
+
+
+def nnet_ncp(X, Y):
+    """Noise contrastive prior network."""
+    noise = ab.pos_variable(.5)
+    lstd = 1.
+    perturb_noise = 10.
+
+    net = (
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
+        ab.NCPContinuousPerturb(input_noise=perturb_noise) >>
+        ab.Dense(output_dim=32) >>
+        ab.Activation(tf.nn.selu) >>
+        ab.Dense(output_dim=16) >>
+        ab.Activation(tf.nn.selu) >>
+        ab.Dense(output_dim=8) >>
+        ab.Activation(tf.tanh) >>
+        ab.DenseNCP(output_dim=1, prior_std=.1, latent_std=lstd)
     )
 
     f, kl = net(X=X)
@@ -166,7 +190,7 @@ def gaussian_process(X, Y):
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
-        ab.DenseVariational(output_dim=1, full=True)
+        ab.DenseVariational(output_dim=1, full=True, learn_prior=True)
     )
 
     f, kl = net(X=X)
@@ -185,7 +209,7 @@ def deep_gaussian_process(X, Y):
         ab.RandomFourier(n_features=20, kernel=ab.RBF(learn_lenscale=True)) >>
         ab.DenseVariational(output_dim=5, full=False) >>
         ab.RandomFourier(n_features=10, kernel=ab.RBF(1., seed=1)) >>
-        ab.DenseVariational(output_dim=1, full=False)
+        ab.DenseVariational(output_dim=1, full=False, learn_prior=True)
     )
 
     f, kl = net(X=X)
@@ -204,7 +228,8 @@ model_dict = {
     "nnet_bayesian": nnet_bayesian,
     "svr": svr,
     "gaussian_process": gaussian_process,
-    "deep_gaussian_process": deep_gaussian_process
+    "deep_gaussian_process": deep_gaussian_process,
+    "nnet_ncp": nnet_ncp
 }
 
 # A list of models that have predictive distributions we can draw from
@@ -215,6 +240,7 @@ probabilistic = [
     "bayesian_svr",
     "gaussian_process",
     "deep_gaussian_process",
+    "nnet_ncp"
     # "svr"
 ]
 
@@ -231,7 +257,8 @@ def main():
 
     # Get training and testing data
     train_bounds = [-10, 10]
-    pred_bounds = [-14, 14]
+    pred_bounds = [-20, 20]
+    # pred_bounds = [-14, 14]
     rnd = np.random.RandomState(RSEED)
     Xr = rnd.rand(N, 1) * (train_bounds[1] - train_bounds[0]) + train_bounds[0]
     Xr = Xr.astype(np.float32)

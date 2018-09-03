@@ -111,7 +111,7 @@ def gaus_posterior(dim, std0, suffix=None):
     # Optimize only values in lower triangular
     u, v = np.tril_indices(i)
     indices = (u * i + v)[:, np.newaxis]
-    l0 = (np.tile(np.eye(i) * std0, [o, 1, 1])[:, u, v].T).astype(np.float32)
+    l0 = (np.tile(np.eye(i, dtype=np.float32) * std0, [o, 1, 1])[:, u, v].T)
     lflat = tf.Variable(l0, name=_add_suffix("W_cov_q", suffix))
     Lt = tf.transpose(tf.scatter_nd(indices, lflat, shape=(i * i, o)))
     L = tf.reshape(Lt, (o, i, i))
