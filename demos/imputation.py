@@ -29,8 +29,8 @@ NCLASSES = 7  # Number of target classes
 # METHOD = "LearnedNormalImpute"
 # METHOD = "FixedNormalImpute"
 # METHOD = "FixedScalarImpute"
-# METHOD = "LearnedScalarImpute"
-METHOD = "MeanImpute"
+METHOD = "LearnedScalarImpute"
+# METHOD = "MeanImpute"
 
 # Optimization
 NEPOCHS = 5  # Number of times to see the data in training
@@ -63,20 +63,22 @@ def main():
 
         # Use Aboleth to imputate
         mask_input = ab.MaskInputLayer(name='M')  # Missing data mask input
+        xm = np.ma.array(Xo, mask=mask)
         if METHOD == "LearnedNormalImpute":
-            input_layer = ab.LearnedNormalImpute(data_input, mask_input)
+            mean = tf.Variable(np.ma.mean(xm, axis=0).data.astype(np.float32))
+            std = ab.pos_variable(np.ma.std(xm, axis=0)
+                                  .data.astype(np.float32))
+            input_layer = ab.NormalImpute(data_input, mask_input, mean, std)
         elif METHOD == "LearnedScalarImpute":
-            input_layer = ab.LearnedScalarImpute(data_input, mask_input)
+            scalar = tf.Variable(tf.zeros(Xo.shape[-1]))
+            input_layer = ab.ScalarImpute(data_input, mask_input, scalar)
         elif METHOD == "FixedNormalImpute":
-            xm = np.ma.array(Xo, mask=mask)
             mean = np.ma.mean(xm, axis=0).data.astype(np.float32)
             std = np.ma.std(xm, axis=0).data.astype(np.float32)
-            input_layer = ab.FixedNormalImpute(data_input, mask_input, mean,
-                                               std)
+            input_layer = ab.NormalImpute(data_input, mask_input, mean, std)
         elif METHOD == "FixedScalarImpute":
-            xm = np.ma.array(Xo, mask=mask)
             mean = np.ma.mean(xm, axis=0).data.astype(np.float32)
-            input_layer = ab.FixedScalarImpute(data_input, mask_input, mean)
+            input_layer = ab.ScalarImpute(data_input, mask_input, mean)
         elif METHOD == "MeanImpute":
             input_layer = ab.MeanImpute(data_input, mask_input)
 

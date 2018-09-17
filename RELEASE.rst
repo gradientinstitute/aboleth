@@ -1,3 +1,20 @@
+Release 0.9.0
+=============
+
+This release focuses on better initialisation for the weights, and improves the
+performance of feed-forward neural nets.
+
+- Self-normalising neural net initialisation and dropout options.
+- Noise contrastive prior layers for better uncertainty estimation away from
+  training data.
+- TensorFlow Custom estimator interface demonstrated in the SARCOS demos.
+- Simplifies interfaces for learning priors etc in the variational and kernel
+  layers.
+- Remove "MAP" nomenclature from the non-variational layers, as these layers
+  have no regularisation by default now.
+- Simplifies imputation layers interfaces.
+
+
 Release 0.8.0
 =============
 

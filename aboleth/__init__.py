@@ -8,9 +8,8 @@ from .layers import (Activation, DropOut, MaxPool2D, Flatten, DenseVariational,
                      InputLayer, RandomFourier, RandomArcCosine,
                      NCPContinuousPerturb, NCPCategoricalPerturb, DenseNCP)
 from .hlayers import Concat, Sum, PerFeature
-from .impute import (MaskInputLayer, MeanImpute, FixedNormalImpute,
-                     LearnedScalarImpute, FixedScalarImpute,
-                     LearnedNormalImpute, ExtraCategoryImpute)
+from .impute import (MaskInputLayer, MeanImpute, ScalarImpute, NormalImpute,
+                     ExtraCategoryImpute)
 from .kernels import RBF, Matern, RBFVariational
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
 from .prediction import sample_mean, sample_percentiles, sample_model
@@ -54,10 +53,8 @@ __all__ = (
     'PerFeature',
     'MaskInputLayer',
     'MeanImpute',
-    'FixedNormalImpute',
-    'LearnedScalarImpute',
-    'FixedScalarImpute',
-    'LearnedNormalImpute',
+    'NormalImpute',
+    'ScalarImpute',
     'ExtraCategoryImpute',
     'RBF',
     'RBFVariational',

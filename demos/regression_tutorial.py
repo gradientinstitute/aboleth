@@ -24,7 +24,7 @@ Ns = 400  # Number of testing points to generate
 true_noise = 0.05  # Add noise to the GP draws, to make things a little harder
 
 # Model settings
-n_samples = 3  # Number of random samples to get from an Aboleth net
+n_samples = 1  # Number of random samples to get from an Aboleth net
 p_samples = 100  # Number of prediction samples
 n_epochs = 4000  # how many times to see the data for training
 batch_size = 10  # mini batch size for stochastric gradients
@@ -150,7 +150,7 @@ def nnet_ncp(X, Y):
         ab.Dense(output_dim=16) >>
         ab.Activation(tf.nn.selu) >>
         ab.Dense(output_dim=8) >>
-        ab.Activation(tf.tanh) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DenseNCP(output_dim=1, prior_std=.1, latent_std=lstd)
     )
 
@@ -185,7 +185,7 @@ def svr(X, Y):
 def gaussian_process(X, Y):
     """Gaussian Process Regression."""
     noise = ab.pos_variable(.5)
-    kern = ab.RBF(learn_lenscale=True)  # learn lengthscale
+    kern = ab.RBF(learn_lenscale=False)  # learn lengthscale
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>

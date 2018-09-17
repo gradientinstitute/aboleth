@@ -15,19 +15,19 @@ from aboleth.datasets import fetch_gpml_sarcos_data
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-NSAMPLES = 3  # Number of random samples to get from an Aboleth net
+NSAMPLES = 1  # Number of random samples to get from an Aboleth net
 NFEATURES = 500  # Number of random features/bases to use in the approximation
-NOISE = 3.0  # Initial estimate of the observation noise
+NOISE = 1.0  # Initial estimate of the observation noise
 
 # Random Fourier Features, this is setting up an anisotropic length scale, or
 # one length scale per dimension
-LENSCALE = 5 * np.ones((21, 1), dtype=np.float32)
+LENSCALE = np.ones((21, 1), dtype=np.float32)
 
 # Learning and prediction settings
 BATCH_SIZE = 200  # number of observations per mini batch
 NEPOCHS = 200  # Number of times to iterate though the dataset
 EPOCHS_PER_EVAL = 10  # Number of epochs between evals
-NPREDICTSAMPLES = 20  # Number of prediction samples
+NPREDICTSAMPLES = 50  # Number of prediction samples
 
 
 def get_data():
@@ -78,7 +78,7 @@ def predict_input_fn(Xs):
 def r2_metric(labels, predictions):
     SST, update_op1 = tf.metrics.mean_squared_error(
         labels, tf.reduce_mean(labels, axis=0))
-    SSE, update_op2 = tf.metrics.mean_squared_error(labels, predictions )
+    SSE, update_op2 = tf.metrics.mean_squared_error(labels, predictions)
     return tf.subtract(1.0, tf.div(SSE, SST)), tf.group(update_op1, update_op2)
 
 def my_model(features, labels, mode, params):
@@ -93,7 +93,9 @@ def my_model(features, labels, mode, params):
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
         ab.RandomFourier(n_features=NFEATURES, kernel=kernel) >>
-        ab.DenseVariational(output_dim=1, full=True, prior_std=1.0,
+        ab.Dense(output_dim=64, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DenseVariational(output_dim=1, full=False, prior_std=1.0,
                             learn_prior=True)
     )
 
