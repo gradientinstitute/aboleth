@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 
 RSEED = 666
 ab.set_hyperseed(RSEED)
-CONFIG = tf.ConfigProto(device_count={'GPU': 1})  # Use GPU ?
+CONFIG = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU ?
 
 FRAC_TEST = 0.1  # Fraction of data to use for hold-out testing
 FRAC_MISSING = 0.2  # Fraction of data that is missing
@@ -26,15 +26,16 @@ NCLASSES = 7  # Number of target classes
 
 # Imputation method CHANGE THESE
 # METHOD = None
-METHOD = "LearnedNormalImpute"
+# METHOD = "LearnedNormalImpute"
 # METHOD = "FixedNormalImpute"
-# METHOD = "LearnedScalarImpute"
+# METHOD = "FixedScalarImpute"
+METHOD = "LearnedScalarImpute"
 # METHOD = "MeanImpute"
 
 # Optimization
 NEPOCHS = 5  # Number of times to see the data in training
 BSIZE = 100  # Mini batch size
-LSAMPLES = 5  # Number of samples for training
+LSAMPLES = 3  # Number of samples for training
 PSAMPLES = 50  # Number of predictions samples
 
 
@@ -62,16 +63,22 @@ def main():
 
         # Use Aboleth to imputate
         mask_input = ab.MaskInputLayer(name='M')  # Missing data mask input
+        xm = np.ma.array(Xo, mask=mask)
         if METHOD == "LearnedNormalImpute":
-            input_layer = ab.LearnedNormalImpute(data_input, mask_input)
+            mean = tf.Variable(np.ma.mean(xm, axis=0).data.astype(np.float32))
+            std = ab.pos_variable(np.ma.std(xm, axis=0)
+                                  .data.astype(np.float32))
+            input_layer = ab.NormalImpute(data_input, mask_input, mean, std)
         elif METHOD == "LearnedScalarImpute":
-            input_layer = ab.LearnedScalarImpute(data_input, mask_input)
+            scalar = tf.Variable(tf.zeros(Xo.shape[-1]))
+            input_layer = ab.ScalarImpute(data_input, mask_input, scalar)
         elif METHOD == "FixedNormalImpute":
-            xm = np.ma.array(Xo, mask=mask)
             mean = np.ma.mean(xm, axis=0).data.astype(np.float32)
             std = np.ma.std(xm, axis=0).data.astype(np.float32)
-            input_layer = ab.FixedNormalImpute(data_input, mask_input, mean,
-                                               std)
+            input_layer = ab.NormalImpute(data_input, mask_input, mean, std)
+        elif METHOD == "FixedScalarImpute":
+            mean = np.ma.mean(xm, axis=0).data.astype(np.float32)
+            input_layer = ab.ScalarImpute(data_input, mask_input, mean)
         elif METHOD == "MeanImpute":
             input_layer = ab.MeanImpute(data_input, mask_input)
 
@@ -96,7 +103,7 @@ def main():
 
     net = (
         ab.Concat(cat_layers, con_layers) >>
-        ab.Activation(tf.nn.elu) >>
+        ab.Activation(tf.nn.selu) >>
         ab.DenseVariational(output_dim=NCLASSES)
     )
 

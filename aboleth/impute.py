@@ -3,7 +3,6 @@ import tensorflow as tf
 
 from aboleth.baselayers import MultiLayer
 from aboleth.random import seedgen
-from aboleth.util import pos, summary_histogram
 
 
 class MaskInputLayer(MultiLayer):
@@ -31,11 +30,12 @@ class MaskInputLayer(MultiLayer):
         return M, 0.0
 
 
-class ImputeOp(MultiLayer):
-    r"""Abstract Base Impute operation. These specialise MultiLayers.
+class ImputeOp3(MultiLayer):
+    r"""Abstract Base Impute operation for rank 3 Tensors (samples, N, D).
 
-    They expect a data InputLayer and a mask InputLayer. They return layers in
-    which the masked values have been imputed.
+    These specialise MultiLayers and they expect a data InputLayer and a mask
+    InputLayer. They return layers in which the masked values have been
+    imputed.
 
     Parameters
     ----------
@@ -48,7 +48,7 @@ class ImputeOp(MultiLayer):
     """
 
     def __init__(self, datalayer, masklayer):
-        """Construct and instance of an ImputeOp operation."""
+        """Construct and instance of an ImputeOp3 operation."""
         self.datalayer = datalayer
         self.masklayer = masklayer
 
@@ -111,7 +111,7 @@ class ImputeOp(MultiLayer):
         pass
 
 
-class ImputeColumnWise(ImputeOp):
+class ImputeColumnWise(ImputeOp3):
     r"""Abstract class for imputing column-wise from a vector or scalar.
 
     This implements ``_impute2D`` and this calls the ``_impute_columns`` method
@@ -196,12 +196,12 @@ class MeanImpute(ImputeColumnWise):
         return col_nan_means
 
 
-class LearnedScalarImpute(ImputeColumnWise):
-    r"""Impute the missing values using learnt scalar for each column.
+class ScalarImpute(ImputeColumnWise):
+    r"""Impute the missing values using a scalar for each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
     mask layer. Creates a layer that returns a tensor in which the masked
-    values have been imputed with a learned scalar value per colum.
+    values have been imputed with a provided scalar value per colum.
 
     Parameters
     ----------
@@ -210,68 +210,28 @@ class LearnedScalarImpute(ImputeColumnWise):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be an InputLayer.
+    scalars : float, array-like, tf.Variable
+        A scalar or an array of the values with which to impute each data
+        column. This can be learned if it is a ``tf.Variable``.
 
     """
+
+    def __init__(self, datalayer, masklayer, scalars):
+        """Construct and instance of a RandomGaussImpute operation."""
+        super().__init__(datalayer, masklayer)
+        self.impute_scalars = scalars
 
     def _initialise_variables(self, X):
         """Initialise the impute variables."""
         datadim = int(X.shape[2])
-        self.impute_scalars = tf.Variable(
-            tf.random_normal(shape=(datadim,), seed=next(seedgen)),
-            name="impute_scalars"
-        )
-        summary_histogram(self.impute_scalars)
+        self.impute_scalars = self.impute_scalars * tf.ones(shape=(datadim,))
 
     def _impute_columns(self, X_2D_zero):
         """Return the learned scalars for imputation."""
         return self.impute_scalars
 
 
-class LearnedNormalImpute(ImputeColumnWise):
-    r"""Impute the missing values with draws from learned normal distributions.
-
-    Takes two layers, one the returns a data tensor and the other returns a
-    mask layer. This creates a layer that will learn marginal Gaussian
-    parameters per column, and infill missing values using draws from these
-    Gaussians.
-
-    Parameters
-    ----------
-    datalayer : callable
-        A layer that returns a data tensor. Must be an InputLayer.
-    masklayer : callable
-        A layer that returns a boolean mask tensor where True values are
-        masked. Must be an InputLayer.
-
-    """
-
-    def _initialise_variables(self, X):
-        """Initialise the impute variables."""
-        datadim = int(X.shape[2])
-        impute_means = tf.Variable(
-            tf.random_normal(shape=(datadim,), seed=next(seedgen)),
-            name="impute_means"
-        )
-        impute_var = tf.Variable(
-            tf.random_gamma(alpha=1., shape=(datadim,), seed=next(seedgen)),
-            name="impute_vars"
-        )
-
-        summary_histogram(impute_means)
-        summary_histogram(impute_var)
-
-        self.normal = tf.distributions.Normal(
-            impute_means,
-            tf.sqrt(pos(impute_var))
-        )
-
-    def _impute_columns(self, X_2D_zero):
-        """Return random draws from an iid Normal for imputation."""
-        col_draws = self.normal.sample(seed=next(seedgen))
-        return col_draws
-
-
-class FixedNormalImpute(LearnedNormalImpute):
+class NormalImpute(ImputeColumnWise):
     r"""Impute the missing values using marginal Gaussians over each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -285,10 +245,15 @@ class FixedNormalImpute(LearnedNormalImpute):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form ``f(**kwargs)``.
-    loc : array-like
+    loc : float, array-like, tf.Variable
         A list of the global mean values of each data column
-    scale : array-like
+    scale : float, array-like, tf.Variable
         A list of the global standard deviation of each data column
+
+    Note
+    ----
+    ``loc`` and ``scale`` can be ``tf.Variable`` if you wish to learn these
+    statisics from the data.
 
     """
 
@@ -299,7 +264,15 @@ class FixedNormalImpute(LearnedNormalImpute):
         self.scale = scale
 
     def _initialise_variables(self, X):
-        self.normal = tf.distributions.Normal(self.loc, self.scale)
+        D = X.shape[2]
+        mean = tf.ones((D,)) * self.loc
+        std = tf.ones((D,)) * self.scale
+        self.normal = tf.distributions.Normal(mean, std)
+
+    def _impute_columns(self, X_2D_zero):
+        """Return random draws from an iid Normal for imputation."""
+        col_draws = self.normal.sample(seed=next(seedgen))
+        return col_draws
 
 
 class ExtraCategoryImpute(ImputeColumnWise):

@@ -27,11 +27,9 @@ def test_shift_invariant_kernels(kernels):
 
 @pytest.mark.parametrize('kernels', kernel_list)
 @pytest.mark.parametrize('lenscales', [
+    None,
     1.0,
-    np.array([1.0]),
-    np.ones((10, 1), dtype=np.float32),
-    tf.constant(1.0),
-    tf.ones((10, 1))
+    np.ones(10, dtype=np.float32),
 ])
 def test_ARD_lenscales(kernels, lenscales):
     """Test random kernels with multi-dim lenscales."""

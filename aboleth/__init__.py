@@ -3,17 +3,17 @@ from . import distributions
 from .version import __version__
 from .losses import elbo, max_posterior
 from .baselayers import stack
-from .layers import (Activation, DropOut, MaxPool2D, Reshape, DenseVariational,
-                     EmbedVariational, Conv2DVariational, DenseMAP, EmbedMAP,
-                     Conv2DMAP, InputLayer, RandomFourier, RandomArcCosine)
+from .layers import (Activation, DropOut, MaxPool2D, Flatten, DenseVariational,
+                     EmbedVariational, Conv2DVariational, Dense, Embed, Conv2D,
+                     InputLayer, RandomFourier, RandomArcCosine,
+                     NCPContinuousPerturb, NCPCategoricalPerturb, DenseNCP)
 from .hlayers import Concat, Sum, PerFeature
-from .impute import (MaskInputLayer, MeanImpute, FixedNormalImpute,
-                     LearnedScalarImpute, LearnedNormalImpute,
+from .impute import (MaskInputLayer, MeanImpute, ScalarImpute, NormalImpute,
                      ExtraCategoryImpute)
 from .kernels import RBF, Matern, RBFVariational
 from .distributions import (norm_prior, norm_posterior, gaus_posterior)
 from .prediction import sample_mean, sample_percentiles, sample_model
-from .util import (batch, pos, batch_prediction)
+from .util import (batch, pos_variable, batch_prediction)
 from .random import set_hyperseed
 
 __all__ = (
@@ -24,15 +24,18 @@ __all__ = (
     'Activation',
     'DropOut',
     'MaxPool2D',
-    'Reshape',
+    'Flatten',
     'Conv2DVariational',
     'DenseVariational',
     'EmbedVariational',
-    'Conv2DMAP',
-    'DenseMAP',
-    'EmbedMAP',
+    'Conv2D',
+    'Dense',
+    'Embed',
     'RandomFourier',
     'RandomArcCosine',
+    'NCPContinuousPerturb',
+    'NCPCategoricalPerturb',
+    'DenseNCP',
     'norm_prior',
     'norm_posterior',
     'gaus_posterior',
@@ -40,7 +43,7 @@ __all__ = (
     'sample_percentiles',
     'sample_model',
     'batch',
-    'pos',
+    'pos_variable',
     'batch_prediction',
     'set_hyperseed',
     'InputLayer',
@@ -50,9 +53,8 @@ __all__ = (
     'PerFeature',
     'MaskInputLayer',
     'MeanImpute',
-    'FixedNormalImpute',
-    'LearnedScalarImpute',
-    'LearnedNormalImpute',
+    'NormalImpute',
+    'ScalarImpute',
     'ExtraCategoryImpute',
     'RBF',
     'RBFVariational',

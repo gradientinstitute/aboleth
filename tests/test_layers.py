@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 import aboleth as ab
 
-from aboleth.distributions import norm_prior, gaus_posterior
 from aboleth.layers import SampleLayer, SampleLayer3
 
 
@@ -57,6 +56,79 @@ def test_input_sample(make_data):
             assert np.array_equal(f[i], x)
 
 
+def test_ncp_con_input_samples(make_data):
+    """Test we are making the ncp extra samples correctly."""
+    x, _, X = make_data
+
+    net = (
+        ab.InputLayer(name='X', n_samples=1) >>
+        ab.NCPContinuousPerturb(input_noise=1.)
+    )
+
+    F, KL = net(X=x)
+    tc = tf.test.TestCase()
+
+    with tc.test_session():
+        f = F.eval()
+        assert KL.eval() == 0.0
+        assert f.shape[0] == 2
+        assert np.all(f[0] == x)
+        assert np.all(f[1] != x)
+
+
+def test_ncp_cat_input_samples(make_categories):
+    """Test we are making the ncp extra samples correctly."""
+    x, K = make_categories
+
+    pflip = 0.5
+    pcats = 1. / K
+    pdiff = pflip * (1 - pcats)
+
+    net = (
+        ab.InputLayer(name='X', n_samples=1) >>
+        ab.NCPCategoricalPerturb(flip_prob=pflip, n_categories=K)
+    )
+
+    F, KL = net(X=x)
+    tc = tf.test.TestCase()
+
+    with tc.test_session():
+        f = F.eval()
+        assert KL.eval() == 0.0
+        assert f.shape[0] == 2
+        assert np.all(f[0] == x)
+        prob = np.mean(f[1] != x)
+        assert np.allclose(prob, pdiff, atol=0.1)
+
+
+def test_ncp_output(make_data):
+    """Test we are making the ncp extra samples correctly, and KL is OK."""
+    x, _, X = make_data
+    x = x.astype(np.float32)
+
+    net_ncp = (
+        ab.InputLayer(name='X', n_samples=1) >>
+        ab.NCPContinuousPerturb(input_noise=1.) >>
+        ab.DenseNCP(output_dim=1)
+    )
+
+    net = (
+        ab.InputLayer(name='X', n_samples=1) >>
+        ab.DenseVariational(output_dim=1)
+    )
+
+    F, KL = net_ncp(X=x)
+    F_var, KL_var = net(X=x)
+    tc = tf.test.TestCase()
+
+    with tc.test_session():
+        tf.global_variables_initializer().run()
+        f, f_var = F.eval(), F_var.eval()
+        assert f.shape[0] == 1
+        assert f.shape == f_var.shape
+        assert KL.eval() >= KL_var.eval()
+
+
 def test_activation(make_data):
     """Test nonlinear activation layer."""
     x, _, X = make_data
@@ -66,25 +138,36 @@ def test_activation(make_data):
     with tc.test_session():
         F, KL = act(X)
 
-        assert np.all(np.tanh(X.eval()) == F.eval())
+        assert np.allclose(np.tanh(X.eval()), F.eval())
         assert KL == 0
 
 
-def test_dropout(random):
+@pytest.mark.parametrize('indep', [True, False])
+def test_dropout(random, indep):
     """Test dropout layer."""
-    X = np.repeat(random.randn(1, 30, 20), 3, axis=0)
+    samples, rows, cols = 3, 5, 1000
+    keep_prob = 0.9
+    X = (random.randn(samples, rows, cols) + 1).astype(np.float32)
     ab.set_hyperseed(666)
-    drop = ab.DropOut(0.5)
+    drop = ab.DropOut(keep_prob, independent=indep)
 
     F, KL = drop(X)
 
     tc = tf.test.TestCase()
     with tc.test_session():
         f = F.eval()
-        prop_zero = np.sum(f == 0) / np.prod(f.shape)
+        dropped = np.where(f == 0)
+
+        # Check we dropout whole columns
+        if not indep:
+            for s, _, c in zip(*dropped):
+                assert np.allclose(f[s, :, c], 0.)
+
+        # Check the dropout proportions are approximately correct
+        active = 1 - np.sum(f[:, 0, :] == 0) / (samples * cols)
 
         assert f.shape == X.shape
-        assert (prop_zero >= 0.4) and (prop_zero <= 0.6)
+        assert (active >= keep_prob - 0.05) and (active <= keep_prob + 0.05)
         assert KL == 0
 
 
@@ -118,12 +201,12 @@ def test_max_pooling2d(make_image_data):
         assert KL == 0
 
 
-def test_reshape(make_image_data):
-    """Test dropout layer."""
+def test_flatten(make_image_data):
+    """Test flatten layer."""
     x, _, X = make_image_data
 
     # reshape. useful for feeding output of conv layer into dense layer
-    reshape = ab.Reshape(target_shape=(28*28*3,))
+    reshape = ab.Flatten()
 
     F, KL = reshape(X)
 
@@ -154,7 +237,7 @@ def test_arc_cosine(make_data):
 
 
 @pytest.mark.parametrize('reps', [1, 3, 10])
-@pytest.mark.parametrize('layer', [ab.EmbedVariational, ab.EmbedMAP])
+@pytest.mark.parametrize('layer', [ab.EmbedVariational, ab.Embed])
 def test_dense_embeddings(make_categories, reps, layer):
     """Test the embedding layer."""
     x, K = make_categories
@@ -177,7 +260,7 @@ def test_dense_embeddings(make_categories, reps, layer):
         assert Phi.shape == (S, N, D * reps)
 
 
-@pytest.mark.parametrize('dense', [ab.DenseMAP, ab.DenseVariational])
+@pytest.mark.parametrize('dense', [ab.Dense, ab.DenseVariational])
 def test_dense_outputs(dense, make_data):
     """Make sure the dense layers output expected dimensions."""
     x, _, _ = make_data
@@ -197,7 +280,7 @@ def test_dense_outputs(dense, make_data):
         assert np.isscalar(KL.eval(feed_dict={x_: x}))
 
 
-@pytest.mark.parametrize('conv2d', [ab.Conv2DMAP, ab.Conv2DVariational])
+@pytest.mark.parametrize('conv2d', [ab.Conv2D, ab.Conv2DVariational])
 @pytest.mark.parametrize(
     'kwargs', [
         dict(filters=D, kernel_size=(4, 4)),
@@ -242,10 +325,10 @@ def test_conv2d_outputs(conv2d, kwargs, make_image_data):
 @pytest.mark.parametrize('layer_args', [
     (SampleLayer, ()),
     (SampleLayer3, ()),
-    (ab.DenseMAP, (D,)),
+    (ab.Dense, (D,)),
     (ab.DenseVariational, (D,)),
     (ab.EmbedVariational, (2, D)),
-    (ab.Conv2DMAP, (8, (4, 4))),
+    (ab.Conv2D, (8, (4, 4))),
     (ab.Conv2DVariational, (8, (4, 4))),
     (ab.RandomFourier, (2, ab.RBF())),
     (ab.RandomArcCosine, (2,)),
@@ -292,13 +375,7 @@ def test_fourier_features(kernels, make_data):
         assert kl >= 0
 
 
-@pytest.mark.parametrize('dists', [
-    {'prior_W': norm_prior((4, 4, 3, D), 1.), 'prior_b': norm_prior((D,), 1.)},
-    {'post_W': norm_prior((4, 4, 3, D), 1.), 'post_b': norm_prior((D,), 1.)},
-    {'prior_W': norm_prior((4, 4, 3, D), 1.),
-     'post_W': norm_prior((4, 4, 3, D), 1.)}
-])
-def test_conv2d_distribution(dists, make_image_data):
+def test_conv2d_distribution(make_image_data):
     """Test initialising dense variational layers with distributions."""
     x, _, X = make_image_data
     S = 3
@@ -306,7 +383,7 @@ def test_conv2d_distribution(dists, make_image_data):
     x_, X_ = _make_placeholders(x, S)
     N, height, width, channels = x.shape
 
-    Phi, KL = ab.Conv2DVariational(filters=D, kernel_size=(4, 4), **dists)(X_)
+    Phi, KL = ab.Conv2DVariational(filters=D, kernel_size=(4, 4))(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():
@@ -316,14 +393,7 @@ def test_conv2d_distribution(dists, make_image_data):
         assert KL.eval() >= 0.
 
 
-@pytest.mark.parametrize('dists', [
-    {'prior_W': norm_prior(DIM, 1.), 'prior_b': norm_prior((D,), 1.)},
-    {'post_W': norm_prior(DIM, 1.), 'post_b': norm_prior((D,), 1.)},
-    {'prior_W': norm_prior(DIM, 1.), 'post_W': norm_prior(DIM, 1.)},
-    {'prior_W': norm_prior(DIM, 1.), 'post_W': gaus_posterior(DIM, 1.)},
-    {'prior_W': gaus_posterior(DIM, 1.), 'post_W': gaus_posterior(DIM, 1.)},
-])
-def test_dense_distribution(dists, make_data):
+def test_dense_distribution(make_data):
     """Test initialising dense variational layers with distributions."""
     x, _, _ = make_data
     S = 3
@@ -331,7 +401,7 @@ def test_dense_distribution(dists, make_data):
     x_, X_ = _make_placeholders(x, S)
     N = x.shape[0]
 
-    Phi, KL = ab.DenseVariational(output_dim=D, **dists)(X_)
+    Phi, KL = ab.DenseVariational(output_dim=D)(X_)
     tc = tf.test.TestCase()
     with tc.test_session():
         tf.global_variables_initializer().run()
@@ -340,18 +410,13 @@ def test_dense_distribution(dists, make_data):
         assert KL.eval() >= 0.
 
 
-@pytest.mark.parametrize('dists', [
-    {'prior_W': norm_prior(EDIM, 1.), 'post_W': norm_prior(EDIM, 1.)},
-    {'prior_W': norm_prior(EDIM, 1.), 'post_W': gaus_posterior(EDIM, 1.)},
-    {'prior_W': gaus_posterior(EDIM, 1.), 'post_W': gaus_posterior(EDIM, 1.)},
-])
-def test_embeddings_distribution(dists, make_categories):
+def test_embeddings_distribution(make_categories):
     """Test initialising embedding variational layers with distributions."""
     x, K = make_categories
     N = len(x)
     S = 3
     x_, X_ = _make_placeholders(x, S, tf.int32)
-    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K, **dists)(X_)
+    output, KL = ab.EmbedVariational(output_dim=D, n_categories=K)(X_)
 
     tc = tf.test.TestCase()
     with tc.test_session():

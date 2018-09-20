@@ -79,7 +79,7 @@ following code,
 
     net = (
         ab.InputLayer(name="X") >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.Dense(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
     f, reg = net(X=X)
@@ -232,13 +232,13 @@ Aboleth is here:
 
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
-        ab.DenseMAP(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
+        ab.Dense(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
+        ab.Dense(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
+        ab.Dense(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.Dense(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
     f, reg = net(X=X)
@@ -267,15 +267,15 @@ layers.
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
-        ab.DenseMAP(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
+        ab.Dense(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.9) >>
-        ab.DenseMAP(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DropOut(keep_prob=0.9, independent=True) >>
+        ab.Dense(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.95) >>
-        ab.DenseMAP(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
+        ab.DropOut(keep_prob=0.95, independent=True) >>
+        ab.Dense(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.Dense(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
     f, reg = net(X=X)
@@ -376,7 +376,7 @@ The code for this is as follows:
     net = (
         ab.InputLayer(name="X", n_samples=1) >>
         ab.RandomFourier(n_features=50, kernel=kern) >>
-        ab.DenseMAP(output_dim=1, l2_reg=lambda_, l1_reg=0.)
+        ab.Dense(output_dim=1, l2_reg=lambda_, l1_reg=0.)
     )
 
     f, reg = net(X=X)

@@ -8,11 +8,13 @@ from aboleth.distributions import (norm_prior, norm_posterior, gaus_posterior,
                                    kl_sum)
 from aboleth.baselayers import Layer, MultiLayer
 from aboleth.util import summary_histogram
+from aboleth.initialisers import initialise_weights, initialise_stds
 
 
 #
 # Layer type base classes
 #
+
 
 class InputLayer(MultiLayer):
     r"""Create an input layer.
@@ -45,10 +47,14 @@ class InputLayer(MultiLayer):
     def _build(self, **kwargs):
         """Build the tiling input layer."""
         X = kwargs[self.name]
-        # (n_samples, N, D)
-        Xs = tf.tile(tf.expand_dims(X, 0), [self.n_samples, 1, 1])
+        # tile like (n_samples, ...)
+        Xs = _tile2samples(self.n_samples, X)
         return Xs, 0.0
 
+
+#
+#  Sample Layer Abstract base classes
+#
 
 class SampleLayer(Layer):
     r"""Sample Layer base class.
@@ -115,12 +121,6 @@ class SampleLayer3(SampleLayer):
         Net, KL = super(SampleLayer3, self).__call__(X)
         return Net, KL
 
-    @staticmethod
-    def _get_X_dims(X):
-        """Get the dimensions of the rank 3 input tensor, X."""
-        n_samples, (input_dim,) = SampleLayer._get_X_dims(X)
-        return n_samples, input_dim
-
 
 #
 # Activation and Transformation Layers
@@ -158,27 +158,46 @@ class DropOut(Layer):
     keep_prob : float, Tensor
         the probability of keeping an input. See `tf.dropout
         <https://www.tensorflow.org/api_docs/python/tf/nn/dropout>`_.
+    independent: bool
+        Use independently sampled droput for each observation if ``True``. This
+        may dramatically increase convergence, but will no longer only sample
+        the latent function.
     observation_axis : int
         The axis that indexes the observations (``N``). This will assume the
         obserations are on the *second* axis, i.e. ``(n_samples, N, ...)``.
         This is so we can repeat the dropout pattern over observations, which
         has the effect of dropping out weights consistently, thereby sampling
-        the "latent function" of the layer.
+        the "latent function" of the layer. This is only active if
+        ``independent`` is set to ``False``.
+    alpha : bool
+        Use alpha dropout (tf.contrib.nn.alpha_dropout) that maintains the self
+        normalising property of SNNs.
+
+    Note
+    ----
+    If a more complex noise shape, or some other modification to dropout is
+    required, you can use an Activation layer. E.g.
+    ``ab.Activation(lambda x: tf.nn.dropout(x, **your_args))``.
 
     """
 
-    def __init__(self, keep_prob, observation_axis=1):
+    def __init__(self, keep_prob, independent=True, observation_axis=1,
+                 alpha=False):
         """Create an instance of a Dropout layer."""
         self.keep_prob = keep_prob
         self.obsax = observation_axis
+        self.independent = independent
+        self.dropout = tf.contrib.nn.alpha_dropout if alpha else tf.nn.dropout
 
     def _build(self, X):
         """Build the graph of this layer."""
         # Set noise shape to equivalent to different samples from posterior
         # i.e. share the samples along the data-observations axis
-        noise_shape = tf.concat([tf.shape(X)[:self.obsax], [1],
-                                 tf.shape(X)[(self.obsax + 1):]], axis=0)
-        Net = tf.nn.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
+        noise_shape = None
+        if not self.independent:
+            noise_shape = tf.concat([tf.shape(X)[:self.obsax], [1],
+                                     tf.shape(X)[(self.obsax + 1):]], axis=0)
+        Net = self.dropout(X, self.keep_prob, noise_shape, seed=next(seedgen))
         KL = 0.
         return Net, KL
 
@@ -216,25 +235,21 @@ class MaxPool2D(Layer):
         return Net, KL
 
 
-class Reshape(Layer):
-    """Reshape layer.
+class Flatten(Layer):
+    """Flattening layer.
 
-    Reshape and output an tensor to a specified shape.
+    Reshape and output a tensor to be always rank 3 (keeps first dimension
+    which is samples, and second dimension which is observations).
 
-    Parameters
-    ----------
-    target_shape : tuple of ints
-        Does not include the samples or batch axes.
+    I.e. if ``X.shape`` is ``(3, 100, 5, 5, 3)`` this flatten the last
+    dimensions to ``(3, 100, 75)``.
 
     """
 
-    def __init__(self, target_shape):
-        """Initialize instance of a Reshape layer."""
-        self.target_shape = target_shape
-
     def _build(self, X):
         """Build the graph of this layer."""
-        new_shape = (int(X.shape[0]), tf.shape(X)[1]) + self.target_shape
+        flat_dim = np.product(X.shape[2:])
+        new_shape = tf.concat([tf.shape(X)[0:2], [flat_dim]], 0)
         Net = tf.reshape(X, new_shape)
         KL = 0.
         return Net, KL
@@ -272,7 +287,7 @@ class RandomFourier(SampleLayer3):
     def _build(self, X):
         """Build the graph of this layer."""
         # Random weights
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         dtype = X.dtype.as_numpy_dtype
         P, KL = self.kernel.weights(input_dim, self.n_features, dtype)
         Ps = tf.tile(tf.expand_dims(P, 0), [n_samples, 1, 1])
@@ -298,10 +313,13 @@ class RandomArcCosine(RandomFourier):
     n_features : int
         the number of unique random features, the actual output dimension of
         this layer will be ``2 * n_features``.
-    lenscale : float, ndarray, Tensor
-        the lenght scales of the ar-cosine kernel, this can be a scalar for
-        an isotropic kernel, or a vector for an automatic relevance detection
-        (ARD) kernel.
+    lenscale : float, ndarray, optional
+        The length scales of the arc-cosine kernel. This can be a scalar
+        for an isotropic kernel, or a vector of shape (input_dim,) for an
+        automatic relevance detection (ARD) kernel. If not provided, it will
+        be set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto'
+        setting for a scikit learn SVM with a RBF kernel).
+        If learn_lenscale is True, lenscale will be its initial value.
     p : int
         The order of the arc-cosine kernel, this must be an integer greater
         than, or eual to zero. 0 will lead to sigmoid-like kernels, 1 will lead
@@ -309,12 +327,9 @@ class RandomArcCosine(RandomFourier):
     variational : bool
         use variational features instead of random features, (i.e. VAR-FIXED in
         [2]).
-    lenscale_posterior : float, ndarray, optional
-        the *initial* value for the posterior length scale. This is only used
-        if ``variational==True``. This can be a scalar or vector (different
-        initial value per input dimension). If this is left as None, it will be
-        set to ``sqrt(1 / input_dim)`` (this is similar to the 'auto' setting
-        for a scikit learn SVM with a RBF kernel).
+    learn_lenscale : bool
+        Whether to learn the length scale. If True, the lenscale value provided
+        is used for initialisation.
 
     Note
     ----
@@ -331,15 +346,15 @@ class RandomArcCosine(RandomFourier):
 
     """
 
-    def __init__(self, n_features, lenscale=1.0, p=1, variational=False,
-                 lenscale_posterior=None):
+    def __init__(self, n_features, lenscale=None, p=1, variational=False,
+                 learn_lenscale=False):
         """Create an instance of an arc cosine kernel layer."""
         # Setup random weights
         if variational:
             kern = RBFVariational(lenscale=lenscale,
-                                  lenscale_posterior=lenscale_posterior)
+                                  learn_lenscale=learn_lenscale)
         else:
-            kern = RBF(lenscale=lenscale)
+            kern = RBF(lenscale=lenscale, learn_lenscale=learn_lenscale)
         super().__init__(n_features=n_features, kernel=kern)
 
         # Kernel order
@@ -358,7 +373,7 @@ class RandomArcCosine(RandomFourier):
 
 
 #
-# Weight layers
+# Variational Weight layers
 #
 
 class Conv2DVariational(SampleLayer):
@@ -380,56 +395,45 @@ class Conv2DVariational(SampleLayer):
     padding : str
         One of 'SAME' or 'VALID'. Defaults to 'SAME'. The type of padding
         algorithm to use.
-    prior_std : float, np.array, tf.Tensor
-        the value of the weight prior standard deviation (:math:`\sigma` above)
-    post_std : float
-        the initial value of the posterior standard deviation.
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
+    learn_prior: bool, optional
+        Whether to learn the prior standard deviation.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
-    prior_W : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``prior_std`` parameter.
-    prior_b : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer intercept. It
-        must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``prior_std`` and ``use_bias`` parameters.
-    post_W : tf.distributions.Distribution, optional
-        It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.norm_posterior``.
-    post_b : tf.distributions.Distributions, optional
-        This is the posterior distribution object to use on the layer
-        intercept. It must have parameters compatible with (output_dim,) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.norm_posterior``.
 
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
-                 prior_std=1., post_std=1., use_bias=True, prior_W=None,
-                 prior_b=None, post_W=None, post_b=None):
+                 prior_std='glorot', learn_prior=False, use_bias=True):
         """Create and instance of a variational Conv2D layer."""
         self.filters = filters
         self.kernel_size = kernel_size
         self.strides = [1] + list(strides) + [1]
         self.padding = padding
-        self.pstd = prior_std
-        self.qstd = post_std
         self.use_bias = use_bias
-        self.pW = prior_W
-        self.pb = prior_b
-        self.qW = post_W
-        self.qb = post_b
+        self.prior_std0 = prior_std
+        self.learn_prior = learn_prior
 
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, (height, width, channels) = self._get_X_dims(X)
         W_shp, b_shp = self._weight_shapes(channels)
 
+        # get effective IO shapes, DAN's fault if this is wrong
+        receptive_field = np.product(W_shp[:-2])
+        n_inputs = receptive_field * channels
+        n_outputs = receptive_field * self.filters
+
+        self.pstd, self.qstd = initialise_stds(n_inputs, n_outputs,
+                                               self.prior_std0,
+                                               self.learn_prior, "conv2d")
         # Layer weights
-        self.pW = _make_prior(self.pstd, self.pW, W_shp)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shp, False, "conv")
+        self.pW = _make_prior(self.pstd, W_shp)
+        self.qW = _make_posterior(self.qstd, W_shp, False, "conv")
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -443,11 +447,10 @@ class Conv2DVariational(SampleLayer):
             elems=(X, Wsamples), dtype=tf.float32)
 
         # Optional bias
-        if self.use_bias or not (self.prior_b is None and self.post_b is None):
+        if self.use_bias:
             # Layer intercepts
-            self.pb = _make_prior(self.pstd, self.pb, b_shp)
-            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False,
-                                      "conv_bias")
+            self.pb = _make_prior(self.pstd, b_shp)
+            self.qb = _make_posterior(self.qstd, b_shp, False, "conv_bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -503,8 +506,9 @@ class DenseVariational(SampleLayer3):
     :math:`\mathbf{C}_j \in \mathbb{R}^{D_{in} \times D_{in}}`.
 
     This layer will use variational inference to learn the posterior
-    parameters, and optionally the ``prior_std`` parameter can be passed in as
-    a ``tf.Variable``, in which case it will also be learned.
+    parameters, and optionally the ``prior_std`` parameter can be  learned
+    if ``learn_prior`` is set to True. The given value is then used to
+    initialize.
 
     Whenever this layer is called, it will return the result,
 
@@ -522,59 +526,43 @@ class DenseVariational(SampleLayer3):
     ----------
     output_dim : int
         the dimension of the output of this layer
-    prior_std : float, np.array, tf.Tensor
-        the value of the weight prior standard deviation (:math:`\sigma` above)
-    post_std : float
-        the initial value of the posterior standard deviation.
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
+    learn_prior : bool, optional
+        Whether to learn the prior
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
-    prior_W : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``prior_std`` parameter.
-    prior_b : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer intercept. It
-        must have parameters compatible with (output_dim,) shaped weights.
-        This ignores the ``prior_std`` and ``use_bias`` parameters.
-    post_W : tf.distributions.Distribution, optional
-        It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.gaus_posterior``.
-    post_b : tf.distributions.Distributions, optional
-        This is the posterior distribution object to use on the layer
-        intercept. It must have parameters compatible with (output_dim,) shaped
-        weights. This ignores the ``use_bias`` and ``post_std`` parameters.
-        See also ``distributions.norm_posterior``.
 
     """
 
-    def __init__(self, output_dim, prior_std=1., post_std=1., full=False,
-                 use_bias=True, prior_W=None, prior_b=None, post_W=None,
-                 post_b=None):
+    def __init__(self, output_dim, prior_std=1., learn_prior=False, full=False,
+                 use_bias=True):
         """Create and instance of a variational dense layer."""
         self.output_dim = output_dim
-        self.pstd = prior_std
-        self.qstd = post_std
         self.full = full
         self.use_bias = use_bias
-        self.pW = prior_W
-        self.pb = prior_b
-        self.qW = post_W
-        self.qb = post_b
+        self.prior_std0 = prior_std
+        self.learn_prior = learn_prior
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         W_shp, b_shp = self._weight_shapes(input_dim)
 
+        self.pstd, self.qstd = initialise_stds(input_dim, self.output_dim,
+                                               self.prior_std0,
+                                               self.learn_prior, "dense")
+
         # Layer weights
-        self.pW = _make_prior(self.pstd, self.pW, W_shp)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shp, self.full,
-                                  "dense")
+        self.pW = _make_prior(self.pstd, W_shp)
+        self.qW = _make_posterior(self.qstd, W_shp, self.full, "dense")
 
         # Regularizers
         KL = kl_sum(self.qW, self.pW)
@@ -584,11 +572,10 @@ class DenseVariational(SampleLayer3):
         Net = tf.matmul(X, Wsamples)
 
         # Optional bias
-        if self.use_bias or not (self.prior_b is None and self.post_b is None):
+        if self.use_bias:
             # Layer intercepts
-            self.pb = _make_prior(self.pstd, self.pb, b_shp)
-            self.qb = _make_posterior(self.qstd, self.qb, b_shp, False,
-                                      "dense_bias")
+            self.pb = _make_prior(self.pstd, b_shp)
+            self.qb = _make_posterior(self.qstd, b_shp, False, "dense_bias")
 
             # Regularizers
             KL += kl_sum(self.qb, self.pb)
@@ -610,10 +597,23 @@ class DenseVariational(SampleLayer3):
 class EmbedVariational(DenseVariational):
     r"""Dense (fully connected) embedding layer, with variational inference.
 
-    This layer works directly inputs of *K* category *indices* rather than
-    one-hot representations, for efficiency. Each column of the input is
-    embedded seperately, and the result concatenated along the last axis.
-    It is a dense linear layer,
+    This layer works directly on inputs of *K* category *indices* rather than
+    one-hot representations, for efficiency. Note, this only works on a single
+    column, see the ``PerFeature`` layer to embed multiple columns. Eg.
+
+
+    .. code::
+
+        cat_layers = [EmbedVar(10, k) for k in x_categories]
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.PerFeature(*cat_layers) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+        )
+
+    This layer is a effectively a ``DenseVariational`` layer,
 
     .. math::
         f(\mathbf{X}) = \mathbf{X} \mathbf{W},
@@ -643,8 +643,9 @@ class EmbedVariational(DenseVariational):
     :math:`\mathbf{C}_j \in \mathbb{R}^{K \times K}`.
 
     This layer will use variational inference to learn the posterior
-    parameters, and optionally the ``prior_std`` parameter can be passed in as
-    a ``tf.Variable``, in which case it will also be learned.
+    parameters, and optionally the ``prior_std`` parameter can be learned
+    if ``learn_prior`` is set to True. The ``prior_std`` value given will
+    be used for initialization.
 
     Whenever this layer is called, it will return the result,
 
@@ -663,48 +664,43 @@ class EmbedVariational(DenseVariational):
         the dimension of the output (embedding) of this layer
     n_categories : int
         the number of categories in the input variable
-    prior_std : float, np.array, tf.Tensor
-        the value of the weight prior standard deviation (:math:`\sigma` above)
-    post_std : float
-        the initial value of the posterior standard deviation.
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
+    learn_prior : bool, optional
+        Whether to learn the prior
     full : bool
         If true, use a full covariance Gaussian posterior for *each* of the
         output weight columns, otherwise use an independent (diagonal) Normal
         posterior.
-    prior_W : tf.distributions.Distribution, optional
-        This is the prior distribution object to use on the layer weights. It
-        must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``prior_std`` parameter.
-    post_W : tf.distributions.Distribution, optional
-        This is the posterior distribution object to use on the layer weights.
-        It must have parameters compatible with (input_dim, output_dim) shaped
-        weights. This ignores the ``full`` and ``post_std`` parameters. See
-        also ``distributions.gaus_posterior``.
 
     """
 
-    def __init__(self, output_dim, n_categories, prior_std=1., post_std=1.,
-                 full=False, prior_W=None, post_W=None):
+    def __init__(self, output_dim, n_categories, prior_std=1.,
+                 learn_prior=False, full=False):
         """Create and instance of a variational dense embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
         self.n_categories = n_categories
-        self.pstd = prior_std
-        self.qstd = post_std
         self.full = full
-        self.pW = prior_W
-        self.qW = post_W
+        self.prior_std0 = prior_std
+        self.learn_prior = learn_prior
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         W_shape, _ = self._weight_shapes(self.n_categories)
         n_batch = tf.shape(X)[1]
 
+        self.pstd, self.qstd = initialise_stds(input_dim, self.output_dim,
+                                               self.prior_std0,
+                                               self.learn_prior, "embed")
+
         # Layer weights
-        self.pW = _make_prior(self.pstd, self.pW, W_shape)
-        self.qW = _make_posterior(self.qstd, self.qW, W_shape, self.full,
-                                  "embed")
+        self.pW = _make_prior(self.pstd, W_shape)
+        self.qW = _make_posterior(self.qstd, W_shape, self.full, "embed")
 
         # Index into the relevant weights rather than using sparse matmul
         Wsamples = _sample_W(self.qW, n_samples)
@@ -721,11 +717,230 @@ class EmbedVariational(DenseVariational):
         return Net, KL
 
 
-class Conv2DMAP(SampleLayer):
-    r"""A 2D convolution layer, with maximum a posteriori (MAP) inference.
+#
+# Noise Contrastive Layers
+#
 
-    This layer uses maximum *a-posteriori* inference to learn the
-    convolutional kernels and biases, and so also returns complexity
+class NCPContinuousPerturb(SampleLayer):
+    r"""Noise Constrastive Prior continous variable perturbation layer.
+
+    This layer doubles the number of samples going through the model, and adds
+    a random normal perturbation to the second set of samples. This implements
+    Equation 3 in "Reliable Uncertainty Estimates in Deep Neural Networks using
+    Noise Contrastive Priors" https://arxiv.org/abs/1807.09289.
+
+    This should be the *first* layer in a network after an input layer, and
+    needs to be used in conjuction with ``DenseNCP``. For example:
+
+    .. code::
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.NCPContinuousPerturb() >>
+            ab.Dense(output_dim=32) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+            ab.Dense(output_dim=8) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.DenseNCP(output_dim=1)
+        )
+
+    Parameters
+    ----------
+    input_noise : float, tf.Tensor, tf.Variable
+        The standard deviation of the random perturbation to add to the inputs.
+
+    """
+
+    def __init__(self, input_noise=1.):
+        """Instantiate a NCPContinuousPerturb layer."""
+        self.input_noise = input_noise
+
+    def _build(self, X):
+        # calculate the perturbation
+        loc = tf.constant(0.)
+        noise_dist = tf.distributions.Normal(loc, self.input_noise)
+        noise = noise_dist.sample(tf.shape(X))
+
+        X_pert = tf.concat([X, X + noise], axis=0)
+        return X_pert, 0.0
+
+
+class NCPCategoricalPerturb(SampleLayer):
+    r"""Noise Constrastive Prior categorical variable perturbation layer.
+
+    This layer doubles the number of samples going through the model, and
+    randomly flips the categories in the second set of samples. This implements
+    (the categorical version of) Equation 3 in "Reliable Uncertainty Estimates
+    in Deep Neural Networks using Noise Contrastive Priors"
+    https://arxiv.org/abs/1807.09289.
+
+    The choice to randomly flip a category is drawn from a Bernoulli
+    distribution per sample (with probability ``flip_prob``), then the new
+    category is randomly chosen with probability ``1 / n_categories``.
+
+    This should be the *first* layer in a network after an input layer, and
+    needs to be used in conjuction with ``DenseNCP``. Also, like the embedding
+    layers, this only applies to *one column of categorical inputs*, so we
+    advise you use it with the ``PerFeature`` layer. For example:
+
+    .. code::
+
+        cat_layers = [
+            (NCPCategoricalPerturb(k) >> Embed(10, k))
+            for k in x_categories
+        ]
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.PerFeature(*cat_layers) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.Dense(output_dim=32) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+            ab.Dense(output_dim=8) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.DenseNCP(output_dim=1)
+        )
+
+    Parameters
+    ----------
+    input_noise : float, tf.Tensor, tf.Variable
+        The standard deviation of the random perturbation to add to the inputs.
+
+    """
+
+    def __init__(self, n_categories, flip_prob=0.1):
+        """Instantiate a NCPCategoricalPerturb layer."""
+        self.n_categories = n_categories
+        self.flip_prob = flip_prob
+
+    def _build(self, X):
+        dim = tf.shape(X)
+
+        # Binary decision to flip category
+        mask_dist = tf.distributions.Bernoulli(probs=self.flip_prob)
+        mask = mask_dist.sample(dim)
+
+        # Uniform categorical to choose which category to flip to
+        p = tf.ones(self.n_categories) / self.n_categories
+        flip_dist = tf.distributions.Categorical(probs=p)
+        flips = flip_dist.sample(dim)
+
+        # Flip and concatenate
+        X_flips = (mask * X) + ((1 - mask) * flips)
+        X_pert = tf.concat([X, X_flips], axis=0)
+        return X_pert, 0.
+
+
+class DenseNCP(DenseVariational):
+    r"""A DenseVariational layer with Noise Constrastive Prior.
+
+    This is basically just a ``DenseVariational`` layer, but with an added
+    Kullback Leibler penalty on the latent function, as derived in Equation (6)
+    in "Reliable Uncertainty Estimates in Deep Neural Networks using Noise
+    Contrastive Priors" https://arxiv.org/abs/1807.09289.
+
+    This should be the *last* layer in a network, and needs to be used in
+    conjuction with ``NCPContinuousPerturb`` and/or ``NCPCategoricalPerturb``
+    layers (after an input layer). For example:
+
+    .. code::
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.NCPContinuousPerturb() >>
+            ab.Dense(output_dim=32) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+            ab.Dense(output_dim=8) >>
+            ab.Activation(tf.nn.selu) >>
+            ab.DenseNCP(output_dim=1)
+        )
+
+    As you can see from this example, we have only made the last layer
+    probabilistic/Bayesian (``DenseNCP``), and have left the rest of the
+    network maximum likelihood/MAP. This is also how the original authors of
+    the algorithm have implemented it. While this layer also works with
+    ``DenseVariational`` layers (etc.) this is not how is has been originally
+    implemented, and the contribution of uncertainty from these layers to the
+    latent function will not be accounted for in this layer. This is because
+    the nonlinear activations between layers make evaluating this density
+    intractable, unless we had something like normalising flows.
+
+    Parameters
+    ----------
+    output_dim : int
+        the dimension of the output of this layer
+    prior_std : str, float
+        the value of the weight prior standard deviation
+        (:math:`\sigma` above). The user can also provide a string to specify
+        an initialisation function. Defaults to 'glorot'. If a string,
+        must be one of 'glorot' or 'autonorm'.
+    learn_prior : bool, optional
+        Whether to learn the prior on the weights.
+    use_bias : bool
+        If true, also learn a bias weight, e.g. a constant offset weight.
+    latent_mean : float
+        The prior mean over the latent function(s) on the output of this layer.
+        This specifies what value the latent function should take away from the
+        support of the training data.
+    latent_std : float
+        The prior standard deviation over the latent function(s) on the output
+        of this layer. This controls the strength of the regularisation away
+        from the latent mean.
+
+    Note
+    ----
+    This implementation is inspired by:
+    https://github.com/brain-research/ncp/blob/master/ncp/models/bbb_ncp.py
+
+    """
+
+    def __init__(self, output_dim, prior_std=1., learn_prior=False,
+                 use_bias=True, latent_mean=0., latent_std=1.):
+        """Instantiate a DenseNCP layer."""
+        super().__init__(
+            output_dim=output_dim,
+            prior_std=prior_std,
+            learn_prior=learn_prior,
+            full=False,
+            use_bias=use_bias
+        )
+        self.f_prior = tf.distributions.Normal(latent_mean, latent_std)
+
+    def _build(self, X):
+        # Extract perturbed predictions
+        n_samples = tf.shape(X)[0] // 2
+        X_orig, X_pert = X[:n_samples], X[n_samples:]
+
+        # Build Dense Layer
+        F, KL = super()._build(X_orig)
+
+        # Build a latent function density
+        qWmean = _tile2samples(n_samples, tf.transpose(self.qW.mean()))
+        qWvar = _tile2samples(n_samples, tf.transpose(self.qW.variance()))
+        f_loc = tf.matmul(X_pert, qWmean)
+        if self.use_bias:
+            f_loc += self.qb.mean()
+        f_scale = tf.sqrt(tf.matmul(X_pert ** 2, qWvar))
+        f_post = tf.distributions.Normal(f_loc, f_scale)
+
+        # Calculate NCP loss
+        KL += kl_sum(f_post, self.f_prior) / tf.to_float(n_samples)
+
+        return F, KL
+
+
+#
+# Maximum likelihood/MAP Weight layers
+#
+
+class Conv2D(SampleLayer):
+    r"""A 2D convolution layer.
+
+    This layer uses maximum likelihood or maximum *a-posteriori* inference to
+    learn the convolutional kernels and biases, and so also returns complexity
     penalities (l1 or l2) for the weights and biases.
 
     Parameters
@@ -750,11 +965,16 @@ class Conv2DMAP(SampleLayer):
         :math:`\frac{1}{2} \text{l2_reg} \times \|\mathbf{W}\|^2_2`
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
+    init_fn : str, callable
+        The function to use to initialise the weights. The default is
+        'glorot_trunc', the truncated normal glorot function. If supplied,
+        the callable takes a shape (input_dim, output_dim) as an argument
+        and returns the weight matrix.
 
     """
 
     def __init__(self, filters, kernel_size, strides=(1, 1), padding='SAME',
-                 l1_reg=1., l2_reg=1., use_bias=True):
+                 l1_reg=0., l2_reg=0., use_bias=True, init_fn='glorot_trunc'):
         """Create and instance of a variational Conv2D layer."""
         self.filters = filters
         self.kernel_size = kernel_size
@@ -763,17 +983,15 @@ class Conv2DMAP(SampleLayer):
         self.l1 = l1_reg
         self.l2 = l2_reg
         self.use_bias = use_bias
+        self.init_fn = init_fn
 
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, (height, width, channels) = self._get_X_dims(X)
         W_shape, b_shape = self._weight_shapes(channels)
 
-        W = tf.Variable(tf.truncated_normal(
-            shape=W_shape,
-            seed=next(seedgen)),
-            name="W_map"
-        )
+        W_init = initialise_weights(W_shape, self.init_fn)
+        W = tf.Variable(W_init, name="W_map")
         summary_histogram(W)
 
         Net = tf.map_fn(
@@ -785,11 +1003,8 @@ class Conv2DMAP(SampleLayer):
 
         # Optional Bias
         if self.use_bias:
-            b = tf.Variable(tf.truncated_normal(
-                shape=b_shape,
-                seed=next(seedgen)),
-                name="b_map"
-            )
+            b_init = initialise_weights(b_shape, self.init_fn)
+            b = tf.Variable(b_init, name="b_map")
             summary_histogram(b)
 
             Net = tf.nn.bias_add(Net, b)
@@ -805,8 +1020,8 @@ class Conv2DMAP(SampleLayer):
         return weight_shape, bias_shape
 
 
-class DenseMAP(SampleLayer):
-    r"""Dense (fully connected) linear layer, with MAP inference.
+class Dense(SampleLayer):
+    r"""Dense (fully connected) linear layer.
 
     This implements a linear layer, and when called returns
 
@@ -816,8 +1031,9 @@ class DenseMAP(SampleLayer):
     where :math:`\mathbf{X} \in \mathbb{R}^{N \times D_{in}}`,
     :math:`\mathbf{W} \in \mathbb{R}^{D_{in} \times D_{out}}` and
     :math:`\mathbf{b} \in \mathbb{R}^{D_{out}}`. This layer uses maximum
-    *a-posteriori* inference to learn the weights and biases, and so also
-    returns complexity penalities (l1 or l2) for the weights and biases.
+    likelihood or maximum *a-posteriori* inference to learn the weights and
+    biases, and so also returns complexity penalities (l1 or l2) for the
+    weights and biases.
 
     Parameters
     ----------
@@ -831,35 +1047,42 @@ class DenseMAP(SampleLayer):
         :math:`\frac{1}{2} \text{l2_reg} \times \|\mathbf{W}\|^2_2`
     use_bias : bool
         If true, also learn a bias weight, e.g. a constant offset weight.
+    init_fn : str, callable
+        The function to use to initialise the weights. The default is
+        'glorot', the uniform glorot function. If supplied,
+        the callable takes a shape (input_dim, output_dim) as an argument
+        and returns the weight matrix.
 
     """
 
-    def __init__(self, output_dim, l1_reg=1., l2_reg=1., use_bias=True):
-        """Create and instance of a dense layer with MAP regularizers."""
+    def __init__(self, output_dim, l1_reg=0., l2_reg=0., use_bias=True,
+                 init_fn='glorot'):
+        """Create and instance of a dense layer with regularizers."""
         self.output_dim = output_dim
         self.l1 = l1_reg
         self.l2 = l2_reg
         self.use_bias = use_bias
+        self.init_fn = init_fn
 
     def _build(self, X):
         """Build the graph of this layer."""
         n_samples, input_shape = self._get_X_dims(X)
-        Wdim = tuple(input_shape) + (self.output_dim,)
+        Wdim = input_shape + [self.output_dim]
 
-        W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
-                        name="W_map")
+        W_init = initialise_weights(Wdim, self.init_fn)
+        W = tf.Variable(W_init, name="W_map")
         summary_histogram(W)
 
-        # We don't want to copy tf.Variable W so map over X
-        Net = tf.map_fn(lambda x: tf.matmul(x, W), X)
+        # Tiling W is much faster than mapping (tf.map_fn) the matmul
+        Net = tf.matmul(X, _tile2samples(n_samples, W))
 
         # Regularizers
         penalty = self.l2 * tf.nn.l2_loss(W) + self.l1 * _l1_loss(W)
 
         # Optional Bias
         if self.use_bias is True:
-            b = tf.Variable(tf.random_normal(shape=(1, self.output_dim),
-                                             seed=next(seedgen)), name="b_map")
+            b_init = initialise_weights((1, self.output_dim), self.init_fn)
+            b = tf.Variable(b_init, name="b_map")
             summary_histogram(b)
 
             Net += b
@@ -868,12 +1091,24 @@ class DenseMAP(SampleLayer):
         return Net, penalty
 
 
-class EmbedMAP(SampleLayer3):
-    r"""Dense (fully connected) embedding layer, with MAP inference.
+class Embed(SampleLayer3):
+    r"""Dense (fully connected) embedding layer.
 
-    This layer works directly inputs of *K* category *indices* rather than
-    one-hot representations, for efficiency. Each column of the input is
-    embedded seperately, and the result concatenated along the last axis.
+    This layer works directly on inputs of *K* category *indices* rather than
+    one-hot representations, for efficiency. Note, this only works on a single
+    column, see the ``PerFeature`` layer to embed multiple columns. E.g.
+
+    .. code::
+
+        cat_layers = [Embed(10, k) for k in x_categories]
+
+        net = (
+            ab.InputLayer(name="X", n_samples=n_samples_) >>
+            ab.PerFeature(*cat_layers) >>
+            ab.Activation(tf.nn.selu) >>
+            ...
+        )
+
     It is a dense linear layer,
 
     .. math::
@@ -882,8 +1117,9 @@ class EmbedMAP(SampleLayer3):
     Here :math:`\mathbf{X} \in \mathbb{N}_2^{N \times K}` and :math:`\mathbf{W}
     \in \mathbb{R}^{K \times D_{out}}`. Though in code we represent
     :math:`\mathbf{X}` as a vector of indices in :math:`\mathbb{N}_K^{N \times
-    1}`. This layer uses maximum *a-posteriori* inference to learn the weights
-    and so also returns complexity penalities (l1 or l2) for the weights.
+    1}`. This layer uses maximum likelihood or maximum *a-posteriori* inference
+    to learn the weights and so also returns complexity penalities (l1 or l2)
+    for the weights.
 
     Parameters
     ----------
@@ -897,25 +1133,33 @@ class EmbedMAP(SampleLayer3):
     l2_reg : float
         the value of the l2 weight regularizer,
         :math:`\frac{1}{2} \text{l2_reg} \times \|\mathbf{W}\|^2_2`
+    init_fn : str, callable
+        The function to use to initialise the weights. The default is
+        'glorot', the uniform glorot function. If supplied,
+        the callable takes a shape (input_dim, output_dim) as an argument
+        and returns the weight matrix.
+
 
     """
 
-    def __init__(self, output_dim, n_categories, l1_reg=1., l2_reg=1.):
-        """Create and instance of a MAP embedding layer."""
+    def __init__(self, output_dim, n_categories, l1_reg=0., l2_reg=0.,
+                 init_fn='glorot'):
+        """Create and instance of an embedding layer."""
         assert n_categories >= 2, "Need 2 or more categories for embedding!"
         self.output_dim = output_dim
         self.n_categories = n_categories
         self.l1 = l1_reg
         self.l2 = l2_reg
+        self.init_fn = init_fn
 
     def _build(self, X):
         """Build the graph of this layer."""
-        n_samples, input_dim = self._get_X_dims(X)
+        n_samples, (input_dim,) = self._get_X_dims(X)
         Wdim = (self.n_categories, self.output_dim)
         n_batch = tf.shape(X)[1]
 
-        W = tf.Variable(tf.random_normal(shape=Wdim, seed=next(seedgen)),
-                        name="W_map")
+        W_init = initialise_weights(Wdim, self.init_fn)
+        W = tf.Variable(W_init, name="W_map")
         summary_histogram(W)
 
         # Index into the relevant weights rather than using sparse matmul
@@ -932,6 +1176,13 @@ class EmbedMAP(SampleLayer3):
 #
 # Private module stuff
 #
+
+def _tile2samples(n_samples, tensor):
+    """Tile a tensor along axis 0 to match the number of samples."""
+    new_shape = [n_samples] + ([1] * len(tensor.shape))
+    tiled = tf.tile(tf.expand_dims(tensor, 0), new_shape)
+    return tiled
+
 
 def _l1_loss(X):
     r"""Calculate the L1 loss of X, :math:`\|X\|_1`."""
@@ -957,27 +1208,21 @@ def _sample_W(dist, n_samples, transpose=True):
     return Wsamples
 
 
-def _make_prior(std, prior_W, weight_shape):
+def _make_prior(std, weight_shape):
     """Check/make prior weight distributions."""
-    if prior_W is None:
-        prior_W = norm_prior(weight_shape, std=std)
-
+    prior_W = norm_prior(weight_shape, std=std)
     assert _is_dim(prior_W, weight_shape), \
         "Prior inconsistent dimension!"
-
     return prior_W
 
 
-def _make_posterior(std, post_W, weight_shape, full, suffix=None):
+def _make_posterior(std, weight_shape, full, suffix=None):
     """Check/make posterior."""
-    if post_W is None:
-        # We don't want a full-covariance on an intercept, check input_dim
-        if full and len(weight_shape) > 1:
-            post_W = gaus_posterior(weight_shape, std0=std, suffix=suffix)
-        else:
-            post_W = norm_posterior(weight_shape, std0=std, suffix=suffix)
-
+    # We don't want a full-covariance on an intercept, check input_dim
+    if full and len(weight_shape) > 1:
+        post_W = gaus_posterior(weight_shape, std0=std, suffix=suffix)
+    else:
+        post_W = norm_posterior(weight_shape, std0=std, suffix=suffix)
     assert _is_dim(post_W, weight_shape), \
         "Posterior inconsistent dimension!"
-
     return post_W

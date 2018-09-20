@@ -35,12 +35,10 @@ batch_size = 10  # mini batch size for stochastric gradients
 config = tf.ConfigProto(device_count={'GPU': 0})  # Use GPU? 0 is no
 
 # Model initialisation
-noise = tf.Variable(1.)  # Likelihood st. dev. initialisation, and learning
-reg = tf.Variable(1.)  # Weight prior std. dev, learn this too
+NOISE = 1.  # Likelihood st. dev. initialisation, and learning
 
 # Random Fourier Features
-lenscale = tf.Variable(1.)  # learn the length scale
-kern = ab.RBF(lenscale=ab.pos(lenscale))  # keep the length scale positive
+kern = ab.RBF(learn_lenscale=True)  # keep the length scale positive
 
 # Variational Fourier Features -- length-scale setting here is the "prior", we
 # can choose to optimise this or not
@@ -58,7 +56,7 @@ n_samples_ = tf.placeholder(tf.int32)
 net = (
     ab.InputLayer(name="X", n_samples=n_samples_) >>
     ab.RandomFourier(n_features=200, kernel=kern) >>
-    ab.DenseVariational(output_dim=1, prior_std=ab.pos(reg), full=True)
+    ab.DenseVariational(output_dim=1, learn_prior=True, full=True)
 )
 
 
@@ -93,7 +91,8 @@ def main():
     # This is where we build the actual GP model
     with tf.name_scope("Deepnet"):
         phi, kl = net(X=X_)
-        ll = tf.distributions.Normal(loc=phi, scale=ab.pos(noise)).log_prob(Y_)
+        noise = ab.pos_variable(NOISE)
+        ll = tf.distributions.Normal(loc=phi, scale=noise).log_prob(Y_)
         loss = ab.elbo(ll, kl, N)
 
     # Set up the training graph

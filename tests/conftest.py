@@ -14,11 +14,11 @@ RAND = np.random.RandomState(SEED)
 
 @pytest.fixture
 def random():
+    """Get a random seed."""
     return RAND
 
 
-@pytest.fixture
-def make_data():
+def data():
     """Make some simple data."""
     N = 100
     x1 = np.linspace(-10, 10, N)
@@ -26,8 +26,14 @@ def make_data():
     x = np.vstack((x1, x2)).T
     w = np.array([[0.5], [2.0]])
     Y = np.dot(x, w) + RAND.randn(N, 1)
-    X = tf.tile(tf.expand_dims(x, 0), [3, 1, 1])
-    return x, Y, X
+    X = tf.cast(tf.tile(tf.expand_dims(x, 0), [3, 1, 1]), dtype=tf.float32)
+    return x.astype(np.float32), Y.astype(np.float32), X
+
+
+@pytest.fixture
+def make_data():
+    """Make some simple data as a fixture."""
+    return data()
 
 
 @pytest.fixture
@@ -87,7 +93,7 @@ def make_missing_categories():
 @pytest.fixture
 def make_graph():
     """Make the requirements for making a simple tf graph."""
-    x, Y, X = make_data()
+    x, Y, X = data()
 
     layers = ab.stack(
         ab.InputLayer(name='X', n_samples=10),
