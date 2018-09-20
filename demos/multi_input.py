@@ -29,7 +29,7 @@ RSEED = 666
 ab.set_hyperseed(RSEED)
 
 # Sample width of net
-T_SAMPLES = 10  # Number of random samples to get from an Aboleth net
+T_SAMPLES = 1  # Number of random samples to get from an Aboleth net
 EMBED_DIMS = 5   # Number of dimensions to embed the categorical columns into
 
 BSIZE = 50  # Mini batch size
@@ -51,22 +51,28 @@ def main():
     # Define the continuous layers
     con_layer = (
         ab.InputLayer(name='con', n_samples=n_samples_) >>
-        ab.DenseVariational(output_dim=5, full=True)
+        ab.RandomFourier(100, kernel=ab.RBF(learn_lenscale=True)) >>
+        ab.Dense(output_dim=16, init_fn="autonorm")
     )
 
     # Now define the cateogrical layers, which we embed
-    # Note every embed_var call can be different, this is just "lazy"
-    cat_layer_list = [ab.EmbedVariational(EMBED_DIMS, i) for i in n_cats]
+    # Note every Embed call can be different, this is just "lazy"
+    cat_layer_list = [ab.Embed(EMBED_DIMS, i, init_fn="autonorm")
+                      for i in n_cats]
     cat_layer = (
         ab.InputLayer(name='cat', n_samples=n_samples_) >>
-        ab.PerFeature(*cat_layer_list)  # Assign columns to an embedding layers
+        ab.PerFeature(*cat_layer_list) >>  # Assign columns to embedding layers
+        ab.Activation(tf.nn.selu) >>
+        ab.Dense(16, init_fn="autonorm")
     )
 
     # Now we can feed the initial continuous and cateogrical layers to further
     # "joint" layers after we concatenate them
-    net = ab.stack(ab.Concat(con_layer, cat_layer),
-                   ab.RandomArcCosine(100, 1.),
-                   ab.DenseVariational(output_dim=1, full=True))
+    net = (
+        ab.Concat(con_layer, cat_layer) >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DenseVariational(output_dim=1)
+    )
 
     # Split data into training and testing
     Xt_con, Xs_con = np.split(X_con, [len(df_train)], axis=0)

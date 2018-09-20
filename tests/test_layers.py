@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 import aboleth as ab
 
-from aboleth.distributions import norm_prior, gaus_posterior
 from aboleth.layers import SampleLayer, SampleLayer3
 
 

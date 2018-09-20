@@ -3,7 +3,6 @@ import tensorflow as tf
 
 from aboleth.baselayers import MultiLayer
 from aboleth.random import seedgen
-from aboleth.util import pos_variable, summary_histogram
 
 
 class MaskInputLayer(MultiLayer):
@@ -197,38 +196,7 @@ class MeanImpute(ImputeColumnWise):
         return col_nan_means
 
 
-class LearnedScalarImpute(ImputeColumnWise):
-    r"""Impute the missing values using learnt scalar for each column.
-
-    Takes two layers, one the returns a data tensor and the other returns a
-    mask layer. Creates a layer that returns a tensor in which the masked
-    values have been imputed with a learned scalar value per colum.
-
-    Parameters
-    ----------
-    datalayer : callable
-        A layer that returns a data tensor. Must be an InputLayer.
-    masklayer : callable
-        A layer that returns a boolean mask tensor where True values are
-        masked. Must be an InputLayer.
-
-    """
-
-    def _initialise_variables(self, X):
-        """Initialise the impute variables."""
-        datadim = int(X.shape[2])
-        self.impute_scalars = tf.Variable(
-            tf.random_normal(shape=(datadim,), seed=next(seedgen)),
-            name="impute_scalars"
-        )
-        summary_histogram(self.impute_scalars)
-
-    def _impute_columns(self, X_2D_zero):
-        """Return the learned scalars for imputation."""
-        return self.impute_scalars
-
-
-class FixedScalarImpute(LearnedScalarImpute):
+class ScalarImpute(ImputeColumnWise):
     r"""Impute the missing values using a scalar for each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -242,9 +210,9 @@ class FixedScalarImpute(LearnedScalarImpute):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be an InputLayer.
-    scalars : float, array-like
+    scalars : float, array-like, tf.Variable
         A scalar or an array of the values with which to impute each data
-        column.
+        column. This can be learned if it is a ``tf.Variable``.
 
     """
 
@@ -256,49 +224,14 @@ class FixedScalarImpute(LearnedScalarImpute):
     def _initialise_variables(self, X):
         """Initialise the impute variables."""
         datadim = int(X.shape[2])
-        self.impute_scalars *= tf.ones(shape=(datadim,))
-
-
-class LearnedNormalImpute(ImputeColumnWise):
-    r"""Impute the missing values with draws from learned normal distributions.
-
-    Takes two layers, one the returns a data tensor and the other returns a
-    mask layer. This creates a layer that will learn marginal Gaussian
-    parameters per column, and infill missing values using draws from these
-    Gaussians.
-
-    Parameters
-    ----------
-    datalayer : callable
-        A layer that returns a data tensor. Must be an InputLayer.
-    masklayer : callable
-        A layer that returns a boolean mask tensor where True values are
-        masked. Must be an InputLayer.
-
-    """
-
-    def _initialise_variables(self, X):
-        """Initialise the impute variables."""
-        datadim = int(X.shape[2])
-        impute_means = tf.Variable(
-            tf.random_normal(shape=(datadim,), seed=next(seedgen)),
-            name="impute_means"
-        )
-        std0 = tf.random_gamma(alpha=1., shape=(datadim,), seed=next(seedgen))
-        impute_std = pos_variable(std0, name="impute_std")
-
-        summary_histogram(impute_means)
-        summary_histogram(impute_std)
-
-        self.normal = tf.distributions.Normal(impute_means, impute_std)
+        self.impute_scalars = self.impute_scalars * tf.ones(shape=(datadim,))
 
     def _impute_columns(self, X_2D_zero):
-        """Return random draws from an iid Normal for imputation."""
-        col_draws = self.normal.sample(seed=next(seedgen))
-        return col_draws
+        """Return the learned scalars for imputation."""
+        return self.impute_scalars
 
 
-class FixedNormalImpute(LearnedNormalImpute):
+class NormalImpute(ImputeColumnWise):
     r"""Impute the missing values using marginal Gaussians over each column.
 
     Takes two layers, one the returns a data tensor and the other returns a
@@ -312,10 +245,15 @@ class FixedNormalImpute(LearnedNormalImpute):
     masklayer : callable
         A layer that returns a boolean mask tensor where True values are
         masked. Must be of form ``f(**kwargs)``.
-    loc : float, array-like
+    loc : float, array-like, tf.Variable
         A list of the global mean values of each data column
-    scale : float, array-like
+    scale : float, array-like, tf.Variable
         A list of the global standard deviation of each data column
+
+    Note
+    ----
+    ``loc`` and ``scale`` can be ``tf.Variable`` if you wish to learn these
+    statisics from the data.
 
     """
 
@@ -330,6 +268,11 @@ class FixedNormalImpute(LearnedNormalImpute):
         mean = tf.ones((D,)) * self.loc
         std = tf.ones((D,)) * self.scale
         self.normal = tf.distributions.Normal(mean, std)
+
+    def _impute_columns(self, X_2D_zero):
+        """Return random draws from an iid Normal for imputation."""
+        col_draws = self.normal.sample(seed=next(seedgen))
+        return col_draws
 
 
 class ExtraCategoryImpute(ImputeColumnWise):
