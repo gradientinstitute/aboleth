@@ -269,10 +269,10 @@ layers.
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.Dense(output_dim=40, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.9, independent=True) >>
+        ab.DropOut(keep_prob=0.9, independent=False) >>
         ab.Dense(output_dim=20, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
-        ab.DropOut(keep_prob=0.95, independent=True) >>
+        ab.DropOut(keep_prob=0.95, independent=False) >>
         ab.Dense(output_dim=10, l2_reg=lambda_, l1_reg=0.) >>
         ab.Activation(tf.tanh) >>
         ab.Dense(output_dim=1, l2_reg=lambda_, l1_reg=0.)
@@ -296,8 +296,8 @@ regularisers per layer for example).
 We can also use our ``DenseVariational`` layers with an `ELBO` objective to
 create a Bayesian neural net. For brevity's sake we won't go into the exact
 form of the objective, except to say that it parallels the conversion of the
-linear regressor objective to the neural network objective. The code for
-building the Bayesian neural net regressor is,
+linear regressor objective to the ELBO objective, but for neural nets. The code
+for building the Bayesian neural net regressor is,
 
 .. code::
 
@@ -336,6 +336,92 @@ fitting a complex function (or fewer parameters).
 .. figure:: regression_figs/nnet_bayesian_1000.png
 
     Bayesian Neural network with 1000 training points, R-square :math:`0.9983`.
+
+
+There are some other neural network architectures that are worth being aware
+of, in particular self normalising neural networks (SNN) [6]_, and noise
+contrastive prior (NCP) networks [7]_. Self normalising neural networks, very
+basically, are standard (optionally dropout) neural networks that have a
+particular initialisation, activation function, and dropout scaling that
+increases the efficiency of back-propagation of gradients, and therefore speeds
+convergence.  This allows us to use wider and deeper feed-forward networks. For
+example,
+
+.. code::
+
+    noise = .5  # Likelihood st. dev.
+
+    net = (
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
+        ab.Dense(output_dim=64, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DropOut(keep_prob=0.9, independent=False, alpha=True) >>
+        ab.Dense(output_dim=32, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DropOut(keep_prob=0.9, independent=False, alpha=True) >>
+        ab.Dense(output_dim=32, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DropOut(keep_prob=0.9, independent=False, alpha=True) >>
+        ab.Dense(output_dim=16, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.Dense(output_dim=1, init_fn="autonorm")
+    )
+
+    f, reg = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
+
+Note the ``init_fn="autonorm"`` initialisation, ``tf.nn.selu`` activations, and
+the ``alpha=True`` dropout.  This net is wider and deeper than the previous
+nets, and also performs well.
+
+.. figure:: regression_figs/snn.png
+
+    Self normalising neural network, R-square :math:`0.9910`.
+
+Noise contrastive prior [7]_ networks are similar to the Bayesian (ELBO) neural
+nets, but they have a couple of new layers (``NCPContinuousPerturb`` and
+``DenseNCP``) that allow us to set a prior on *latent functions* directly. This
+is useful when we want to control how the neural net behaves away from the
+training data, in a similar fashion to a Gaussian process. With the
+``DenseNCP`` left at its default settings, it well penalise the posterior
+latent function diverging from a :math:`\mathcal{N}(0, 1)` prior away from
+data. Here is an example (using some of the SNN building blocks),
+
+.. code::
+
+   perturb_noise = 6.  # approximately std(X)
+   noise = ab.pos_variable(0.1)
+
+   net = (
+       ab.InputLayer(name="X", n_samples=n_samples_) >>
+       ab.NCPContinuousPerturb(input_noise=perturb_noise) >>
+       ab.Dense(output_dim=64, init_fn="autonorm") >>
+       ab.Activation(tf.nn.selu) >>
+       ab.Dense(output_dim=32, init_fn="autonorm") >>
+       ab.Activation(tf.nn.selu) >>
+       ab.Dense(output_dim=32, init_fn="autonorm") >>
+       ab.Activation(tf.nn.selu) >>
+       ab.Dense(output_dim=16, init_fn="autonorm") >>
+       ab.Activation(tf.nn.selu) >>
+       ab.DenseNCP(output_dim_apply=1, prior_std="autonorm")
+   )
+
+   f, kl = net(X=X)
+   lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+   loss = ab.elbo(lkhood, kl, N)
+
+Note how we only make the last layer a variational layer (``DenseNCP`` has
+``DenseVariational`` as a base class). This is following the implementation in
+[7]_, and works well in practice since the large KL penalty is only applied to
+the last layer and the latent function,
+
+.. figure:: regression_figs/ncp.png
+
+    Noise constrastive prior neural network, R-square :math:`0.9941`.
+
+This neural net appears to perform as well as the SNN within the training
+data, but also has "well behaved" predictions away from the training data. 
 
 
 Support Vector-like Regression
@@ -515,3 +601,9 @@ References
        machines." In NIPS, 2007.
 .. [5] Cutajar, K. Bonilla, E. Michiardi, P. Filippone, M. "Random Feature 
        Expansions for Deep Gaussian Processes." In ICML, 2017.
+.. [6] Klambauer, G, Unterthiner, T., Mayr, A., and Hochreiter, S. 
+       "Self-normalizing neural networks." In Advances in Neural Information
+       Processing Systems, pp. 971-980. 2017.
+.. [7] Hafner, D., Tran, D., Irpan, A., Lillicrap, T. and Davidson, J., 2018. 
+       Reliable Uncertainty Estimates in Deep Neural Networks using Noise
+       Contrastive Priors. arXiv preprint arXiv:1807.09289.

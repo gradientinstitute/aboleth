@@ -837,9 +837,10 @@ class DenseNCP(DenseVariational):
     r"""A DenseVariational layer with Noise Constrastive Prior.
 
     This is basically just a ``DenseVariational`` layer, but with an added
-    Kullback Leibler penalty on the latent function, as derived in Equation (6)
-    in "Reliable Uncertainty Estimates in Deep Neural Networks using Noise
-    Contrastive Priors" https://arxiv.org/abs/1807.09289.
+    Kullback Leibler penalty on the latent function (on selected dimensions),
+    as derived in Equation (6) in "Reliable Uncertainty Estimates in Deep
+    Neural Networks using Noise Contrastive Priors"
+    https://arxiv.org/abs/1807.09289.
 
     This should be the *last* layer in a network, and needs to be used in
     conjuction with ``NCPContinuousPerturb`` and/or ``NCPCategoricalPerturb``
@@ -855,7 +856,7 @@ class DenseNCP(DenseVariational):
             ...
             ab.Dense(output_dim=8) >>
             ab.Activation(tf.nn.selu) >>
-            ab.DenseNCP(output_dim=1)
+            ab.DenseNCP(output_dim_apply=1)
         )
 
     As you can see from this example, we have only made the last layer
@@ -870,8 +871,16 @@ class DenseNCP(DenseVariational):
 
     Parameters
     ----------
-    output_dim : int
-        the dimension of the output of this layer
+    output_dim_apply : int
+        the dimension of the output of this layer to apply the noise
+        contrastive prior. The total output dimensions is ``output_dim_apply``
+        + ``output_dim_pass``.
+    output_dim_pass : int
+        the dimension of the output of this layer that does not have the noise
+        contrastive prior applied. The total output dimensions is
+        ``output_dim_apply`` + ``output_dim_pass``. This may be useful if, for
+        example, your likelihood is Normal, and you wish to make the scale
+        parameter a function of your data (heteroscedastic noise model.)
     prior_std : str, float
         the value of the weight prior standard deviation
         (:math:`\sigma` above). The user can also provide a string to specify
@@ -897,16 +906,22 @@ class DenseNCP(DenseVariational):
 
     """
 
-    def __init__(self, output_dim, prior_std=1., learn_prior=False,
-                 use_bias=True, latent_mean=0., latent_std=1.):
+    def __init__(self, output_dim_apply, output_dim_pass=0., prior_std=1.,
+                 learn_prior=False, use_bias=True, latent_mean=0.,
+                 latent_std=1.):
         """Instantiate a DenseNCP layer."""
+        if output_dim_apply < 1:
+            raise ValueError("Use a DenseVariational layer if output_dim_apply"
+                             " is less than one.")
         super().__init__(
-            output_dim=output_dim,
+            output_dim=output_dim_apply + output_dim_pass,
             prior_std=prior_std,
             learn_prior=learn_prior,
             full=False,
             use_bias=use_bias
         )
+        self.apply_dim = output_dim_apply
+        self.pass_dim = output_dim_pass
         self.f_prior = tf.distributions.Normal(latent_mean, latent_std)
 
     def _build(self, X):
@@ -914,16 +929,16 @@ class DenseNCP(DenseVariational):
         n_samples = tf.shape(X)[0] // 2
         X_orig, X_pert = X[:n_samples], X[n_samples:]
 
-        # Build Dense Layer
+        # Build DenseVariational Layer
         F, KL = super()._build(X_orig)
 
         # Build a latent function density
-        qWmean = _tile2samples(n_samples, tf.transpose(self.qW.mean()))
-        qWvar = _tile2samples(n_samples, tf.transpose(self.qW.variance()))
-        f_loc = tf.matmul(X_pert, qWmean)
+        qWm = tf.transpose(self.qW.mean()[:self.apply_dim, ...])
+        qWv = tf.transpose(self.qW.variance()[:self.apply_dim, ...])
+        f_loc = tf.matmul(X_pert, _tile2samples(n_samples, qWm))
         if self.use_bias:
-            f_loc += self.qb.mean()
-        f_scale = tf.sqrt(tf.matmul(X_pert ** 2, qWvar))
+            f_loc += self.qb.mean()[:self.apply_dim]
+        f_scale = tf.sqrt(tf.matmul(X_pert**2, _tile2samples(n_samples, qWv)))
         f_post = tf.distributions.Normal(f_loc, f_scale)
 
         # Calculate NCP loss

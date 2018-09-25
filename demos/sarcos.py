@@ -1,5 +1,5 @@
 #! /usr/bin/env python3
-"""Sarcos regression demo with TensorBoard."""
+"""Sarcos regression demo with TensorBoard and Custom Estimators."""
 import logging
 
 import numpy as np
@@ -93,9 +93,7 @@ def my_model(features, labels, mode, params):
     net = (
         ab.InputLayer(name="X", n_samples=n_samples) >>
         ab.RandomFourier(n_features=NFEATURES, kernel=kernel) >>
-        ab.Dense(output_dim=64, init_fn="autonorm") >>
-        ab.Activation(tf.nn.selu) >>
-        ab.DenseVariational(output_dim=1, full=False, prior_std=1.0,
+        ab.DenseVariational(output_dim=1, full=True, prior_std=1.0,
                             learn_prior=True)
     )
 

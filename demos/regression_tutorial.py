@@ -115,6 +115,32 @@ def nnet_dropout(X, Y):
     return f, loss
 
 
+def nnet_snn(X, Y):
+    """Self normalising neural net."""
+    noise = .5  # Likelihood st. dev.
+
+    net = (
+        ab.InputLayer(name="X", n_samples=n_samples_) >>
+        ab.Dense(output_dim=64, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DropOut(keep_prob=0.9, independent=False, alpha=True) >>
+        ab.Dense(output_dim=32, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DropOut(keep_prob=0.9, independent=False, alpha=True) >>
+        ab.Dense(output_dim=32, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DropOut(keep_prob=0.9, independent=False, alpha=True) >>
+        ab.Dense(output_dim=16, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.Dense(output_dim=1, init_fn="autonorm")
+    )
+
+    f, reg = net(X=X)
+    lkhood = tf.distributions.Normal(loc=f, scale=noise).log_prob(Y)
+    loss = ab.max_posterior(lkhood, reg)
+    return f, loss
+
+
 def nnet_bayesian(X, Y):
     """Bayesian neural net."""
     noise = 0.01
@@ -138,20 +164,21 @@ def nnet_bayesian(X, Y):
 
 def nnet_ncp(X, Y):
     """Noise contrastive prior network."""
-    noise = ab.pos_variable(.5)
-    lstd = 1.
-    perturb_noise = 10.
+    perturb_noise = 6.  # approximately std(X)
+    noise = ab.pos_variable(0.1)
 
     net = (
         ab.InputLayer(name="X", n_samples=n_samples_) >>
         ab.NCPContinuousPerturb(input_noise=perturb_noise) >>
-        ab.Dense(output_dim=32) >>
+        ab.Dense(output_dim=64, init_fn="autonorm") >>
         ab.Activation(tf.nn.selu) >>
-        ab.Dense(output_dim=16) >>
+        ab.Dense(output_dim=32, init_fn="autonorm") >>
         ab.Activation(tf.nn.selu) >>
-        ab.Dense(output_dim=8) >>
+        ab.Dense(output_dim=32, init_fn="autonorm") >>
         ab.Activation(tf.nn.selu) >>
-        ab.DenseNCP(output_dim=1, prior_std=.1, latent_std=lstd)
+        ab.Dense(output_dim=16, init_fn="autonorm") >>
+        ab.Activation(tf.nn.selu) >>
+        ab.DenseNCP(output_dim_apply=1, prior_std="autonorm")
     )
 
     f, kl = net(X=X)
@@ -229,7 +256,8 @@ model_dict = {
     "svr": svr,
     "gaussian_process": gaussian_process,
     "deep_gaussian_process": deep_gaussian_process,
-    "nnet_ncp": nnet_ncp
+    "nnet_ncp": nnet_ncp,
+    "nnet_snn": nnet_snn
 }
 
 # A list of models that have predictive distributions we can draw from
@@ -240,7 +268,8 @@ probabilistic = [
     "bayesian_svr",
     "gaussian_process",
     "deep_gaussian_process",
-    "nnet_ncp"
+    "nnet_ncp",
+    "nnet_snn"
     # "svr"
 ]
 
@@ -257,8 +286,7 @@ def main():
 
     # Get training and testing data
     train_bounds = [-10, 10]
-    pred_bounds = [-20, 20]
-    # pred_bounds = [-14, 14]
+    pred_bounds = [-14, 14]
     rnd = np.random.RandomState(RSEED)
     Xr = rnd.rand(N, 1) * (train_bounds[1] - train_bounds[0]) + train_bounds[0]
     Xr = Xr.astype(np.float32)
