@@ -109,12 +109,12 @@ def test_ncp_output(make_data):
     net_ncp = (
         ab.InputLayer(name='X', n_samples=1) >>
         ab.NCPContinuousPerturb(input_noise=1.) >>
-        ab.DenseNCP(output_dim=1)
+        ab.DenseNCP(output_dim_apply=1, output_dim_pass=1)
     )
 
     net = (
         ab.InputLayer(name='X', n_samples=1) >>
-        ab.DenseVariational(output_dim=1)
+        ab.DenseVariational(output_dim=2)
     )
 
     F, KL = net_ncp(X=x)
