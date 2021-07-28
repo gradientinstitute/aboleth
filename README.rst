@@ -4,8 +4,8 @@ Aboleth
 
 .. |copy| unicode:: 0xA9
 
-.. image:: https://circleci.com/gh/data61/aboleth/tree/develop.svg?style=svg&circle-token=f02db635cf3a7e998e17273c91f13ffae7dbf088
-    :target: https://circleci.com/gh/data61/aboleth/tree/develop
+.. image:: https://circleci.com/gh/gradientinstitute/aboleth/tree/develop.svg?style=svg&circle-token=f02db635cf3a7e998e17273c91f13ffae7dbf088
+    :target: https://circleci.com/gh/gradientinstitute/aboleth/tree/develop
     :alt: circleCI
 
 .. image:: https://readthedocs.org/projects/aboleth/badge/?version=stable
@@ -32,7 +32,7 @@ Some of the features of Aboleth:
 - Very flexible construction of networks, e.g. multiple inputs, ResNets etc.
 - Compatible and interoperable with other neural net frameworks such as `Keras
   <https://keras.io/>`_ (see the `demos
-  <https://github.com/data61/aboleth/tree/develop/demos>`_ for more
+  <https://github.com/gradientinstitute/aboleth/tree/develop/demos>`_ for more
   information).
 
 
@@ -101,7 +101,7 @@ For the best performance on your architecture, we recommend installing
 <https://www.tensorflow.org/install/install_sources>`_.
 
 Or, to install additional dependencies required by the `demos
-<https://github.com/data61/aboleth/tree/develop/demos>`_::
+<https://github.com/gradientinstitute/aboleth/tree/develop/demos>`_::
 
     $ pip install aboleth[demos]
 
@@ -123,7 +123,7 @@ See the `quick start guide
 for more in depth guide, have a look at our `tutorials
 <http://aboleth.readthedocs.io/en/latest/tutorials/tutorials.html>`_.
 Also see the `demos
-<https://github.com/data61/aboleth/tree/develop/demos>`_ folder for more
+<https://github.com/gradientinstitute/aboleth/tree/develop/demos>`_ folder for more
 examples of creating and training algorithms with Aboleth.
 
 The full project documentation can be found on `readthedocs
